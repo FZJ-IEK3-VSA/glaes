@@ -62,11 +62,11 @@ constraintLibrary = {}
 
 # add sources
 constraint = namedtuple('constraint',"low high steps stepsize path")
-for f in glob(join(path,"*.tif")):
+for f in glob(join(path,"*_*_*_*.tif")):
     # Parse information
     glaesDataFile = glaesDataFileRE.match(basename(f))
     if glaesDataFile is None: 
-        print("WARNING: Could not parse file - ", basename(f))
+        print("WARNING: Could not parse file -", basename(f))
         continue
     # add to library
     info = glaesDataFile.groupdict()
@@ -120,14 +120,14 @@ class ExclusionCalculator(object):
         if geomSimplify: geomSimplify = abs(geomSimplify)
 
         # plot the region background
-        s.region.drawGeometry(ax=ax, simplification=geomSimplify, mplParams=dict(fc=(140/255,0,0), ec='None', zorder=0))
+        s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc=(140/255,0,0), ec='None', zorder=0)
 
         # plot the availability
         a2b = LinearSegmentedColormap.from_list('alpha_to_blue',[(1,1,1,0),(0,91/255, 130/255, 1)])
         gk.raster.drawImage(s.availability, bounds=s.region.extent, ax=ax, scaling=dataScaling, cmap=a2b)
 
         # Draw the region boundaries
-        s.region.drawGeometry(ax=ax, simplification=geomSimplify, mplParams=dict(fc='None', ec='k', linewidth=3))
+        s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc='None', ec='k', linewidth=3)
 
         # Done!
         if doShow:
@@ -156,9 +156,9 @@ class ExclusionCalculator(object):
     def exclude(s, name, value=None):
         """Exclude areas as caluclated by one of the indicators.indicateXXX scripts where XXX is replaced by a constraint name
 
-        * if not 'value' input is given, the default vuffer/threshold value is chosen (see the individual function's docstrings for more information)
+        * if not 'value' input is given, the default buffer/threshold value is chosen (see the individual function's docstrings for more information)
         * name examples:
-            - Urban
+            - Urban 
             - Rural
             - Industrial
             - Agriculture
@@ -171,24 +171,48 @@ class ExclusionCalculator(object):
             - Landscapes
             - Mines
             - Monuments
-            - Nslope
+            - NSlope
             - Oceans
             - Parks
             - Reserves
             - Rivers
             - Slope
             - Wetlands
+            - SecondaryRoads 
+            - MainRoads 
+            - PowerLines 
+            - Railways 
+            - Habitats 
+            - Wilderness 
+            - MixedWoodlands 
+            - ConiferousWoodlands 
+            - DeciduousWoodland
         """
 
         # get the indicated area
-        func = globals()["indicate"+name.title()]
+        try:
+            func = globals()["indicate"+name]
+        except KeyError:
+            findName = "indicate"+name.lower().replace(" ","").replace("_","")
+
+            # Try to find the right function
+            found = False
+            for funcName in filter(lambda x: 'indicate' in x, globals().keys()):
+                if findName == funcName.lower():
+                    found = True
+                    func = globals()[funcName]
+                    break
+
+            if not found:
+                raise GlaesError("Could not understand function call. See the docstring for this function for the appropriate options")
+
+
         if value is None: areas = func(s.region)
         else: areas = func(s.region, value)
 
         # exclude the indicated area from the total availability
         s._availability = np.min([s._availability, 1-areas],0)
  
-
 ## Helper functions
 def _general_indicator(region, constraint, limit):
     # make sure reg is a geokit.Regionmask object
@@ -288,8 +312,8 @@ indicateMines.__doc__ = bufferedDoc( "mines" , "mining areas")
 def indicateMonuments(region, securityDistance=DEFAULTS["natural-monuments"]): return _general_indicator(region, "natural-monuments", securityDistance)
 indicateMonuments.__doc__ = bufferedDoc( "natural-monuments" , "protected natural monuments")
 
-def indicateNslope(region, degreesAbove=DEFAULTS["nslope"]): return _general_indicator(region, "nslope", degreesAbove)
-indicateNslope.__doc__ = thresholdDoc( "nslope" , "north-facing slopes", "degrees")
+def indicateNSlope(region, degreesAbove=DEFAULTS["nslope"]): return _general_indicator(region, "nslope", degreesAbove)
+indicateNSlope.__doc__ = thresholdDoc( "nslope" , "north-facing slopes", "degrees")
 
 def indicateOceans(region, securityDistance=DEFAULTS["oceans"]): return _general_indicator(region, "oceans", securityDistance)
 indicateOceans.__doc__ = bufferedDoc( "oceans" , "oceans")
@@ -308,6 +332,35 @@ indicateSlope.__doc__ = thresholdDoc( "slope" , "terrain slopes", "degrees")
 
 def indicateWetlands(region, securityDistance=DEFAULTS["wetlands"]): return _general_indicator(region, "wetlands", securityDistance)
 indicateWetlands.__doc__ = bufferedDoc( "wetlands" , "wetland areas")
+
+def indicateSecondaryRoads( region, securityDistance=DEFAULTS["roads-secondary"] ): return _general_indicator(region, "roads-secondary", securityDistance)
+indicateSecondaryRoads.__doc__ = bufferedDoc( "roads-secondary", "secondary roads")
+
+def indicateMainRoads( region, securityDistance=DEFAULTS["roads-main"] ): return _general_indicator(region, "roads-main", securityDistance)
+indicateMainRoads.__doc__ = bufferedDoc( "roads-main", "main roads")
+
+def indicatePowerLines( region, securityDistance=DEFAULTS["power-lines"] ): return _general_indicator(region, "power-lines", securityDistance)
+indicatePowerLines.__doc__ = bufferedDoc( "power-lines", "power lines")
+
+def indicateRailways( region, securityDistance=DEFAULTS["railways"] ): return _general_indicator(region, "railways", securityDistance)
+indicateRailways.__doc__ = bufferedDoc( "railways", "railways")
+
+def indicateHabitats( region, securityDistance=DEFAULTS["habitats"] ): return _general_indicator(region, "habitats", securityDistance)
+indicateHabitats.__doc__ = bufferedDoc( "habitats", "habitats")
+
+def indicateWilderness( region, securityDistance=DEFAULTS["wilderness"] ): return _general_indicator(region, "wilderness", securityDistance)
+indicateWilderness.__doc__ = bufferedDoc( "wilderness", "wildernesses")
+
+def indicateMixedWoodlands():pass
+#def indicateMixedWoodlands( region, securityDistance=DEFAULTS["woodlands-mixed"] ): return _general_indicator(region, "woodlands-mixed", securityDistance)
+#indicateMixedWoodlands.__doc__ = bufferedDoc( "woodlands-mixed", "mixed woodland areas")
+
+def indicateConiferousWoodlands( region, securityDistance=DEFAULTS["woodlands-coniferous"] ): return _general_indicator(region, "woodlands-coniferous", securityDistance)
+indicateConiferousWoodlands.__doc__ = bufferedDoc( "woodlands-coniferous", "coniferous (needle-leaved) woodland areas")
+
+def indicateDeciduousWoodlands( region, securityDistance=DEFAULTS["woodlands-deciduous"] ): return _general_indicator(region, "woodlands-deciduous", securityDistance)
+indicateDeciduousWoodlands.__doc__ = bufferedDoc( "woodlands-deciduous", "deciduous (broad-leaved) woodland areas")
+
 
 '''
 def excludeAspect(s, degreeRange=(-45, 225)):
