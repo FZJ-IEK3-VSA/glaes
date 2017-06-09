@@ -1,3 +1,5 @@
-from ._core import (GlaesError,
-                    ExclusionCalculator)
-import glaes.indicators
+from .core import (GlaesError,
+                   indicators,
+                   ExclusionCalculator,
+                   mappers,
+                   WeightedCriterionCalculator)
