@@ -484,7 +484,7 @@ def mapperFunc(criterionName):
         if knownValues[0] > knownValues[-1]: # if known values are given in DESCENDING order, flip both
             knownValues = knownValues[::-1]
             knownScores = knownScores[::-1]
-        print(criterionName, knownValues)
+
         # make sure reg is a geokit.Regionmask object
         region = gk.RegionMask.load(region)
         
@@ -661,6 +661,33 @@ class WeightedCriterionCalculator(object):
         shortName = name if shortName is None else shortName
         s._unnormalizedWeights[shortName] = newWeights
     
+    def addExternalCriterion(s, source, knownValues, name='external', knownScores=(0,1), weight=1, resampleAlg='cubic'):
+        """Exclude areas as calcuclated by one of the indicator functions in glaes.indicators
+
+        * if not 'value' input is given, the default buffer/threshold value is chosen (see the individual function's 
+          docstring for more information)
+        """
+        # make sure known inputs are okay
+        if knownValues[0] > knownValues[-1]: # if known values are given in DESCENDING order, flip both
+            knownValues = knownValues[::-1]
+            knownScores = knownScores[::-1]
+
+        # make a mutator
+        def mutator(data):
+            return np.interp(data, knownValues, knownScores)
+
+        # mclip,mutate,andwarp the datasource
+        clippedDS = s.region.extent.clipRaster(source)
+        mutDS = gk.raster.mutateValues( clippedDS, processor=mutator)
+        result = s.region.warp(mutDS, resampleAlg=resampleAlg)
+
+        newWeights = weight*result
+        s._totalWeight += weight
+
+        # append
+        s._unnormalizedWeights[name] = newWeights
+
+
     def combine(s, combiner='mult'):
         # Set combiner
         if combiner == 'sum':
