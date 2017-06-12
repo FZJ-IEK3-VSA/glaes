@@ -2,233 +2,18 @@ import geokit as gk
 import re 
 import numpy as np
 from glob import glob 
-from os.path import dirname, basename, join, isdir
+from os.path import dirname, basename, join, isdir, splitext
 from collections import namedtuple, OrderedDict
+import json
+from warnings import warn
+from difflib import SequenceMatcher as SM
+
 
 # Sort out the data paths
-priordir = join(dirname(__file__), "..", "..", "data")
-priorgroups = filter(isdir, glob(join(priordir,"*")))
+priordir = join(dirname(__file__), "..", "..", "data", "europe")
 
 # Typical criteria
-Criterion = namedtuple("Criteria","typicalExclusion unit excludeDirection evaluationName doc")
-TypicalCriteria = {
-    "mixedWoodlandProximity": Criterion(
-        300, "meters", 'lessThan',
-        "woodlands-mixed",
-        "Precalculated pixels within X meters from mixed-forest woodlands"
-        ),
-
-    "coniferousWoodlandProximity": Criterion(
-        300, "meters", 'lessThan',
-        "woodlands-coniferous",
-        "Precalculated pixels within X meters from coniferous (needle-leaved) forests"
-        ),
-
-    "deciduousWoodlandProximity": Criterion(
-        300, "meters", 'lessThan',
-        "woodlands-deciduous",
-        "Precalculated pixels within X meters from deciduous (broad-leaved) forests"
-        ),
-
-    "lakeProximity": Criterion(
-        300, "meters", 'lessThan',
-        "lakes",
-        "Precalculated pixels within X meters from lakes and other stagnant water bodies"
-        ),
-
-    "riverProximity": Criterion(
-        400, "meters", 'lessThan',
-        "rivers",
-        "Precalculated pixels within X meters from rivers"
-        ),
-
-    "oceanProximity": Criterion(
-        300, "meters", 'lessThan',
-        "oceans",
-        "Precalculated pixels within X meters from oceans"
-        ),
-
-    "wetlandProximity": Criterion(
-        200, "meters", 'lessThan',
-        "wetlands",
-        "Precalculated pixels within X meters from wetlands"
-        ),
-
-    "elevationThreshold": Criterion(
-        1750, "meters", 'greaterThan',
-        "elevation",
-        "Precalculated pixels where the elevation is above X meters"
-        ),
-
-    "slopeThreshold": Criterion(
-        11, "degrees", 'greaterThan',
-        "slope",
-        "Precalculated pixels with an average terrain slope above X degrees"
-        ),
-
-    "northFacingSlopeThreshold": Criterion(
-        3, "degrees", 'greaterThan',
-        "nslope",
-        "Precalculated pixels with an average north-facing slope above X degrees"
-        ),
-
-    "powerLineProximity": Criterion(
-        150, "meters", 'lessThan',
-        "power-lines",
-        "Precalculated pixels within X meters from power lines"
-    ),
-
-    "mainRoadProximity": Criterion(
-        200, "meters", 'lessThan',
-        "roads-main",
-        "Precalculated pixels within X meters from main roads"
-    ),
-
-    "secondaryRoadProximity": Criterion(
-        100, "meters", 'lessThan',
-        "roads-secondary",
-        "Precalculated pixels within X meters from secondary roads"
-    ),
-
-    "railwayProximity": Criterion(
-        200, "meters", 'lessThan',
-        "railways",
-        "Precalculated pixels within X meters from railways"
-    ),
-
-    "urbanProximity": Criterion(
-        1500, "meters", 'lessThan',
-        "urban",
-        "Precalculated pixels within X meters from dense urban areas and cities"
-    ),
-
-    "ruralProximity": Criterion(
-        700, "meters", 'lessThan',
-        "rural",
-        "Precalculated pixels within X meters from sparse urban areas and rural settlements"
-    ),
-
-    "industrialProximity": Criterion(
-        300, "meters", 'lessThan',
-        "industrial",
-        "Precalculated pixels within X meters from industrial areas"
-    ),
-
-    "mineProximity": Criterion(
-        200, "meters", 'lessThan',
-        "mines",
-        "Precalculated pixels within X meters from mining area"
-    ),
-
-    "agricultureProximity": Criterion(
-        100, "meters", 'lessThan',
-        "agriculture",
-        "Precalculated pixels within X meters from agricultural areas"
-    ),
-
-    "airportProximity": Criterion(
-        4000, "meters", 'lessThan',
-        "airports",
-        "Precalculated pixels within X meters from airports"
-    ),
-
-    "airfieldProximity": Criterion(
-        3000, "meters", 'lessThan',
-        "airfields",
-        "Precalculated pixels within X meters from airfields"
-    ),
-
-    "parkProximity": Criterion(
-        1000, "meters", 'lessThan',
-        "parks",
-        "Precalculated pixels within X meters from protected parks"
-    ),
-
-    "landscapeProximity": Criterion(
-        1000, "meters", 'lessThan',
-        "landscapes",
-        "Precalculated pixels within X meters from protected landscapes"
-    ),
-
-    "naturalMonumentProximity": Criterion(
-        1000, "meters", 'lessThan',
-        "natural-monuments",
-        "Precalculated pixels within X meters from protected natural monuments"
-    ),
-
-    "reserveProximity": Criterion(
-        1000, "meters", 'lessThan',
-        "reserves",
-        "Precalculated pixels within X meters from protected reserves"
-    ),
-
-    "wildernessProximity": Criterion(
-        1000, "meters", 'lessThan',
-        "wilderness",
-        "Precalculated pixels within X meters from protected wildernesses"
-    ),
-
-    "biosphereProximity": Criterion(
-        1000, "meters", 'lessThan',
-        "biospheres",
-        "Precalculated pixels within X meters from protected biospheres"
-    ),
-
-    "habitatProximity": Criterion(
-        1000, "meters", 'lessThan',
-        "habitats",
-        "Precalculated pixels within X meters from protected habitats"
-    ),
-
-    "birdProximity": Criterion(
-        1000, "meters", 'lessThan',
-        "birds",
-        "Precalculated pixels within X meters from bird sanctuaries"
-    ),
-
-    "windspeedThreshold": Criterion(
-        5, "m/s", 'lessThan',
-        "resource-wind-050m",
-        "Precalculated pixels with an annual average windspeed measured at 50m BELOW X m/s"
-    ),
-
-    "windspeedThresholdAt50m": Criterion(
-        5, "m/s", 'lessThan',
-        "resource-wind-050m",
-        "Precalculated pixels with an annual average windspeed measured at 50m BELOW X m/s"
-    ),
-
-    "windspeedThresholdAt100m": Criterion(
-        5, "m/s", 'lessThan',
-        "resource-wind-100m",
-        "Precalculated pixels with an annual average windspeed measured at 100m BELOW X m/s"
-    ),
-
-    "ghiThreshold": Criterion(
-        4.5, "kWh/m2", 'lessThan',
-        "resource-ghi",
-        "Precalculated pixels with a mean global-horizontal irradiances (integrated over a day) below X kWh/m2"
-    ),
-
-    "dniThreshold": Criterion(
-        4.5, "kWh/m2", 'lessThan',
-        "resource-dni",
-        "Precalculated pixels with a mean direct-normal irradiances (integrated over a day) below X kWh/m2"
-    ),
-
-    "connectionDistance": Criterion(
-        10000, "meters", 'greaterThan',
-        "connection",
-        "Precalculated pixels which are further than X meters from the closest grid connection"
-    ),
-
-    "accessDistance": Criterion(
-        5000, "meters", 'greaterThan',
-        "access",
-        "Precalculated pixels which are further than X meters from the closest road"
-    ),
-
-    }
+Criterion = namedtuple("Criteria","doc typicalExclusion unit excludeDirection evaluationName untouchedValue noDataValue")
 
 # Prior datasource class
 class PriorSource(object):
@@ -236,81 +21,90 @@ class PriorSource(object):
 
     def __init__(s, path):
         s.path = path
+        ds = gk.raster.loadRaster(path)
 
-        # load values
-        s.parseName(path)
+        # Check if we're dealign with a GLAES prior
+        priorCheck = ds.GetMetadataItem("GLAES_PRIOR") 
+        if priorCheck is None or priorCheck != "YES": raise s._LoadFail()
 
-        # Get the variable class
-        found = False
-        for critName, critInfo in TypicalCriteria.items():
-            if s.name == critInfo.evaluationName:
-                found = True
-                break
+        # Load basic values
+        s.displayName = splitext(basename(path))[0]
+        s.unit = ds.GetMetadataItem("UNIT")
+        s.description = ds.GetMetadataItem("DESCRIPTION")
 
-        if not found:
-            raise RuntimeError("Could not match source to a typical criterion:", path)
+        # create edges and estimation-values
+        valMap = json.loads(ds.GetMetadataItem("VALUE_MAP"))
 
-        # Set some working info
-        s.displayName = critName
-        s.typicalExclusion = critInfo.typicalExclusion
-        s.unit = critInfo.unit
-        s.excludeDirection = critInfo.excludeDirection
+        s.edgeStr = []
+        s.edges = []
+        s.values = []
+        numRE = re.compile("^(?P<qualifier>[<>]?=?)(?P<value>-?[0-9.]+)$")
+        for i in range(len(valMap.keys())-1):
+            valString = valMap["%d"%i]
+            s.edgeStr.append(valString)
+
+            try:
+                qualifier, value = numRE.search(valString).groups()
+            except Exception as e:
+                print(valString)
+                raise e
+            value = float(value)
+            s.edges.append( value )
+
+            # estimate a value
+            if qualifier=="<": s.values.append( value-0.001 )
+            elif qualifier==">": s.values.append( value+0.001 )
+            else: s.values.append( value )
         
-        doc = critInfo.doc
-        doc+= "\n\nTYPICAL EXCLUSION: %f\n"%s.typicalExclusion
-        doc+= "\nPRECALCULATED EDGES:\n"
+        s.edges = np.array(s.edges)
+        s.values = np.array(s.values)
+
+        # make nodata and untouched value
+        qualifier, value = numRE.search(valMap["254"]).groups()
+        value = float(value)
+
+        # estimate a value
+        if qualifier=="<": s.untouchedValue = value-0.001
+        elif qualifier==">": s.untouchedValue = value+0.001
+        else: s.untouchedValue = value
+        s.noDataValue = -999999
+
+        # Make the doc string
+        doc = ""
+        doc += "%s\n"%s.description
+        doc += "UNITS: %s\n"%s.unit
+        doc += "VALUE MAP:\n"
+        doc += "  Raw Value : Precalculated Edge : Estimated Value\n"
         for i in range(len(s.edges)): 
-            doc += "\t%d -> %.2f %s\n"%(i, s.edges[i], s.unit)
+            doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(i, s.edgeStr[i], s.values[i])
+        doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(254, "untouched", s.untouchedValue)
+        doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(255, "no-data", s.noDataValue)
+
         s.__doc__ = doc
 
-    # Create file parser
-    rangeRE = re.compile("(?P<constraint>[a-zA-Z0-9-]+)_RS_(?P<low>[0-9-]+)_(?P<high>[0-9-]+)_(?P<steps>[0-9-]+).tif")
-    valueRE = re.compile("(?P<constraint>[a-zA-Z0-9-]+)_VS_(?P<values>[0-9_.-]+).tif")
+    def containsValue(s, val, verbose=False):
+        if val <= s.edges.max() and val >= s.edges.min(): 
+            return True
+        else: 
+            if verbose:
+                warn("%s: %f is outside the predefined boundaries (%f - %f)"%(s.displayName,val,s.edges.min(),s.edges.max()), Warning)
+            return False
 
-    def parseName(s, path):
-        # get the base
-        base = basename(path)
+    def valueOnEdge(s, val, verbose=False):
+        bestI = np.argmin(np.abs(s.edges-val))
+        bestEdge = s.edges[bestI]
 
-        ### Parse information
-        good = False
-
-        # First check for a range set
-        match = s.rangeRE.match(base)
-        if not match is None:
-            good = True
-
-            info = match.groupdict() 
-            s.name = info["constraint"]
-            low = int(info["low"])
-            high = int(info["high"])
-            steps = int(info["steps"])
-            
-            s.edges = np.linspace(low, high, steps+1)
-            s.values = (s.edges[1:] + s.edges[:-1])/2
-
-        # if that doesn't work, check for an explicit value set
-        if not good:
-            match = s.valueRE.match(base)
-            if not match is None:
-                good = True
-
-                info = match.groupdict() 
-                s.name = info["constraint"]
-                edges = np.array([float(x) for x in info["values"].split("_")])
-                
-                s.edges = edges
-                s.values = (s.edges[1:] + s.edges[:-1])/2 
-        
-        # If still not good, print warning and skip
-        if not good:
-            raise s._LoadFail()
-
-    def outsideEdges(s, val):
-        if s <= s.edges.max() and s >= s.edges.min(): return True
-        else: return False
+        if (abs(bestEdge-val) < 0.0001):
+            return True
+        elif abs((bestEdge-val)/(bestEdge if bestEdge!=0 else val)) <= 0.05:
+            return True
+        else:
+            if verbose:
+                warn("%s: %f is significantly different from the closest precalculated edge (%f)"%(s.displayName,val,bestEdge), Warning)
+            return False
 
     #### Make a datasource generator
-    def generateRaster(s, extent, untouchedValue='noData', noDataValue=99999999):
+    def generateRaster(s, extent ):
         
         # make better values
         values = [s.edges[0], ]
@@ -324,13 +118,13 @@ class PriorSource(object):
             noData = data == 255 
             untouched = data == 254
             result = np.interp(data, range(len(values)), values)
-            result[untouched] = noDataValue if untouchedValue =='noData' else untouchedValue
-            result[noData] = noDataValue
+            result[untouched] = s.untouchedValue
+            result[noData] = s.noDataValue
             return result
 
         # mutate main source
         clipDS = extent.clipRaster(s.path)
-        mutDS = gk.raster.mutateValues(clipDS, processor=mutator, noData=noDataValue)
+        mutDS = gk.raster.mutateValues(clipDS, processor=mutator, noData=s.noDataValue)
 
         # return
         return mutDS
@@ -376,14 +170,14 @@ class PriorSet(object):
         s._sources = OrderedDict()
 
         for f in glob(join(path,"*.tif")):
-            if f == 'goodAreas.tif':continue
+            if basename(f) == 'goodAreas.tif':continue
             
             try:
                 p = PriorSource(f)
                 setattr(s, p.displayName, p)
                 s.sources[p.displayName] = p
             except PriorSource._LoadFail:
-                print("WARNING: Could not parse file: %s - %s"%(basename(path), basename(f)))
+                print("WARNING: Could not parse file: %s"%(basename(f)))
                 pass
 
     def regionIsOkay(s, region):
@@ -405,12 +199,19 @@ class PriorSet(object):
         """An easily indexable/searchable list of the PriorSet's sources"""
         return s._sources
 
+    def __getitem__(s,prior):
+        try:
+            output = s.sources[prior]
+        except KeyError:
+            priorNames = list(s.sources.keys())
+            scores = [SM(None, prior, priorName).ratio() for priorName in priorNames]
 
-Priors = _Priors()
-for group in priorgroups:
-    # Create the set
-    ps = PriorSet(group)
+            bestMatch = priorNames[np.argmax(scores)]
+            print("Mapping '%s' to '%s'"%(prior, bestMatch))
 
-    # Save the set
-    setattr(Priors,basename(group),ps) # set the group
+            output = s.sources[bestMatch]
 
+        return output
+
+# MAKE THE PRIORS!
+Priors = PriorSet(priordir)
