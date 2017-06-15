@@ -10,7 +10,7 @@ from difflib import SequenceMatcher as SM
 
 
 # Sort out the data paths
-priordir = join(dirname(__file__), "..", "..", "data", "europe")
+priordir = join(dirname(__file__), "..", "..", "data", "priors")
 
 # Typical criteria
 Criterion = namedtuple("Criteria","doc typicalExclusion unit excludeDirection evaluationName untouchedValue noDataValue")
@@ -28,19 +28,35 @@ class PriorSource(object):
         if priorCheck is None or priorCheck != "YES": raise s._LoadFail()
 
         # Load basic values
-        s.displayName = splitext(basename(path))[0]
+        s.displayName = ds.GetMetadataItem("DISPLAY_NAME")
+        if s.displayName is None: 
+            s.displayName = splitext(basename(path))[0]
+        
         s.unit = ds.GetMetadataItem("UNIT")
         s.description = ds.GetMetadataItem("DESCRIPTION")
 
         # create edges and estimation-values
-        valMap = json.loads(ds.GetMetadataItem("VALUE_MAP"))
+        try:
+            valMap = json.loads(ds.GetMetadataItem("VALUE_MAP"))
+        except Exception as e:
+            print(path)
+            raise e
 
         s.edgeStr = []
         s.edges = []
         s.values = []
+
         numRE = re.compile("^(?P<qualifier>[<>]?=?)(?P<value>-?[0-9.]+)$")
-        for i in range(len(valMap.keys())-1):
-            valString = valMap["%d"%i]
+
+        # Arange values and qualifiers
+        rawValues = []
+        qualifiers = []
+        for i in range(253):
+            try:
+                valString = valMap["%d"%i]
+            except KeyError: # should fail when we've reached the end of the precalculated edges
+                break
+
             s.edgeStr.append(valString)
 
             try:
@@ -48,24 +64,42 @@ class PriorSource(object):
             except Exception as e:
                 print(valString)
                 raise e
-            value = float(value)
-            s.edges.append( value )
 
+            rawValues.append(float(value))
+            qualifiers.append(qualifier)
+
+        # set values
+        for i in range(len(rawValues)):
             # estimate a value
-            if qualifier=="<": s.values.append( value-0.001 )
-            elif qualifier==">": s.values.append( value+0.001 )
-            else: s.values.append( value )
+            if qualifiers[i]=="<": s.values.append( rawValues[i]-0.001 ) # subtract a little bit
+            elif qualifiers[i]==">": s.values.append( rawValues[i]+0.001 ) # add a little bit
+            else: 
+                if qualifiers[i]=="<=" and i!=0: 
+                    val = (rawValues[i]+rawValues[i-1])/2
+                elif qualifiers[i]==">=" and i!=(len(rawValues)-1): 
+                    val = (rawValues[i]+rawValues[i+1])/2 
+                else:
+                    val = rawValues[i]
+
+                s.values.append(val)
         
-        s.edges = np.array(s.edges)
+        # make into numpy arrays
+        s.edges = np.array(rawValues)
         s.values = np.array(s.values)
 
+        if not s.edges.size == s.values.size: raise RuntimeError(basename(path)+": edges length does not match values length")
+
         # make nodata and untouched value
-        qualifier, value = numRE.search(valMap["254"]).groups()
+        qualifier, value = numRE.search( valMap["%d"%(s.values.size-1)] ).groups() # Get the last calculated edge
         value = float(value)
 
         # estimate a value
-        if qualifier=="<": s.untouchedValue = value-0.001
-        elif qualifier==">": s.untouchedValue = value+0.001
+        if qualifier=="<=": # set the untouched value to everything above value
+            s.untouchedTight = value+0.001 
+            s.untouchedWide = value+100000000000000 
+        elif qualifier==">=": # do the opposite in this case
+            s.untouchedTight = value-0.001 
+            s.untouchedWide = value-100000000000000
         else: s.untouchedValue = value
         s.noDataValue = -999999
 
@@ -77,7 +111,7 @@ class PriorSource(object):
         doc += "  Raw Value : Precalculated Edge : Estimated Value\n"
         for i in range(len(s.edges)): 
             doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(i, s.edgeStr[i], s.values[i])
-        doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(254, "untouched", s.untouchedValue)
+        doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(254, "untouched", s.untouchedTight)
         doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(255, "no-data", s.noDataValue)
 
         s.__doc__ = doc
@@ -97,18 +131,24 @@ class PriorSource(object):
         if (abs(bestEdge-val) < 0.0001):
             return True
         elif abs((bestEdge-val)/(bestEdge if bestEdge!=0 else val)) <= 0.05:
-            return True
+            return False
         else:
             if verbose:
-                warn("%s: %f is significantly different from the closest precalculated edge (%f)"%(s.displayName,val,bestEdge), Warning)
+                print("PRIORS-%s: %f is significantly different from the closest precalculated edge (%f)"%(s.displayName,val,bestEdge))
             return False
 
     #### Make a datasource generator
-    def generateRaster(s, extent ):
+    def generateRaster(s, extent, untouched='Tight' ):
         
         # make better values
         values = [s.edges[0], ]
         values.extend( s.values.tolist() ) 
+        if untouched.lower()=='tight':
+            untouchedValue = s.untouchedTight
+        elif untouched.lower()=='wide':
+            untouchedValue = s.untouchedWide
+        else:
+            raise RuntimeError("'untouched' must be 'Tight' or 'Wide")
 
         # make a mutator function to make indexes to estimated values
         #indexToValue = np.vectorize(lambda i: s.values[i]) # TODO: test 'interp' vs 'vectorize'
@@ -118,7 +158,7 @@ class PriorSource(object):
             noData = data == 255 
             untouched = data == 254
             result = np.interp(data, range(len(values)), values)
-            result[untouched] = s.untouchedValue
+            result[untouched] = untouchedValue
             result[noData] = s.noDataValue
             return result
 
@@ -174,7 +214,7 @@ class PriorSet(object):
             
             try:
                 p = PriorSource(f)
-                setattr(s, p.displayName, p)
+                #setattr(s, p.displayName, p)
                 s.sources[p.displayName] = p
             except PriorSource._LoadFail:
                 print("WARNING: Could not parse file: %s"%(basename(f)))
@@ -189,7 +229,7 @@ class PriorSet(object):
             # Evertyhing is okay
             return True
         elif goodRatio > 0.95:
-            print("WARNING: A portion of the defined region is not included of the precalculated exclusion areas")
+            print("PRIORS-WARNING: A portion of the defined region is not included of the precalculated exclusion areas")
             return True
         else:
             return False
@@ -204,14 +244,33 @@ class PriorSet(object):
             output = s.sources[prior]
         except KeyError:
             priorNames = list(s.sources.keys())
-            scores = [SM(None, prior, priorName).ratio() for priorName in priorNames]
+            priorLow = prior.lower()
+            scores = [SM(None, priorLow, priorName).ratio() for priorName in priorNames]
 
             bestMatch = priorNames[np.argmax(scores)]
-            print("Mapping '%s' to '%s'"%(prior, bestMatch))
+            print("PRIORS: Mapping '%s' to '%s'"%(prior, bestMatch))
 
             output = s.sources[bestMatch]
 
         return output
+
+    def combinePriors(s, reg, priorNames, combiner='min'):
+
+        # make output matrix
+        outputMatrix = np.ones(reg.mask.shape)*999999999
+
+        # append each matrix
+        for name in priorNames:
+            tmp = reg.warp(s[name].generateRaster(reg.extent, "Wide"), applyMask=False)
+            if combiner == 'min':
+                outputMatrix = np.min([outputMatrix,tmp], 0)
+            elif combiner == 'max':
+                outputMatrix = np.max([outputMatrix,tmp], 0)
+
+        # make an output
+        outputRaster = reg.createRaster(data=outputMatrix)
+        return outputRaster
+
 
 # MAKE THE PRIORS!
 Priors = PriorSet(priordir)

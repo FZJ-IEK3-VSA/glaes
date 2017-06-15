@@ -117,13 +117,14 @@ class ExclusionCalculator(object):
     def areaAvailable(s): return s.availability.sum()*s.region.pixelWidth*s.region.pixelHeight
 
     ## General excluding functions
-    def excludeRasterType(s, source, value, **kwargs):
+    def excludeRasterType(s, source, value, valueMin=None, valueMax=None, **kwargs):
         """Exclude areas as calcuclated by one of the indicator functions in glaes.indicators
 
         * if not 'value' input is given, the default buffer/threshold value is chosen (see the individual function's 
           docstring for more information)
         """
         # Indicate on the source
+        if not (valueMin is None and valueMax is None): value = (valueMin,valueMax)
         areas = s.region.indicateValues(source, value, **kwargs)
         
         # exclude the indicated area from the total availability
@@ -145,7 +146,9 @@ class ExclusionCalculator(object):
         # exclude the indicated area from the total availability
         s._availability = np.min([s._availability, 1-areas],0)
 
-    def excludePrior(s, prior, value=None):
+    def excludePrior(s, prior, value=None, valueMin=None, valueMax=None):
+
+        if not (valueMin is None and valueMax is None): value = (valueMin,valueMax)
 
         # make sure we have a Prior object
         if isinstance(prior, str): prior = Priors[prior]
@@ -174,6 +177,44 @@ class ExclusionCalculator(object):
 
 
 class WeightedCriterionCalculator(object):
+    typicalValueScores = {
+        # THESE NEED TO BE CHECKED!!!!
+        "access_distance": ((0,1), (5000,0.5), (20000,0), ),
+        "agriculture_proximity": ((0,0), (100,0.5), (1000,1), ),
+        "airfield_proximity": ((0,0), (3000,0.5), (8000,1), ),
+        "airport_proximity": ((0,0), (4000,0.5), (10000,1), ),
+        "connection_distance": ((0,1), (10000,0.5), (20000,0), ),
+        "dni_threshold": ((0,0), (4,0.5), (8,1), ),
+        "elevation_threshold": ((1500,1), (1750,0.5), (2000,0), ),
+        "ghi_threshold": ((0,0), (4,0.5), (8,1), ),
+        "industrial_proximity": ((0,0), (300,0.5), (1000,1), ),
+        "lake_proximity": ((0,0), (300,0.5), (1000,1), ),
+        "mining_proximity": ((0,0), (200,0.5), (1000,1), ),
+        "north_facing_slope_threshold": ((0,1), (3,0.5), (5,0), ),
+        "ocean_proximity": ((0,0), (300,0.5), (1000,1), ),
+        "power_lines_proximity": ((0,0), (150,0.5), (500,1), ),
+        "protected_biosphere_proximity": ((0,0), (1000,0.5), (2000,1), ),
+        "protected_bird_proximity": ((0,0), (1000,0.5), (2000,1), ),
+        "protected_habitat_proximity": ((0,0), (1000,0.5), (2000,1), ),
+        "protected_landscape_proximity": ((0,0), (1000,0.5), (2000,1), ),
+        "protected_natural_monument_proximity": ((0,0), (1000,0.5), (2000,1), ),
+        "protected_park_proximity": ((0,0), (1000,0.5), (2000,1), ),
+        "protected_reserve_proximity": ((0,0), (1000,0.5), (2000,1), ),
+        "protected_wilderness_proximity": ((0,0), (1000,0.5), (2000,1), ),
+        "railway_proximity": ((0,0), (200,0.5), (1000,1), ),
+        "river_proximity": ((0,0), (400,0.5), (1000,1), ),
+        "roads_main_proximity": ((0,0), (200,0.5), (1000,1), ),
+        "roads_secondary_proximity": ((0,0), (100,0.5), (1000,1), ),
+        "settlements_rural_proximity": ((0,0), (700,0.5), (2000,1), ),
+        "settlements_urban_proximity": ((0,0), (1500,0.5), (3000,1), ),
+        "slope_threshold": ((0,1), (11,0.5), (20,0), ),
+        "wetland_proximity": ((0,0), (200,0.5), (1000,1), ),
+        "windspeed_100m_threshold": ((0,0), (5,0.5), (8,1), ),
+        "windspeed_50m_threshold": ((0,0), (5,0.5), (8,1), ),
+        "woodland_coniferous_proximity": ((0,0), (300,0.5), (1000,1), ),
+        "woodland_deciduous_proximity": ((0,0), (300,0.5), (1000,1), ),
+        "woodland_mixed_proximity": ((0,0), (300,0.5), (1000,1), )}
+
     def __init__(s, region, **kwargs):
 
         # load the region
@@ -274,15 +315,14 @@ class WeightedCriterionCalculator(object):
         * if not 'value' input is given, the default buffer/threshold value is chosen (see the individual function's 
           docstring for more information)
         """
+        if isinstance(source, str): source = Priors[source]
         if isinstance(source, PriorSource):
-            untouchedValue = kwargs.pop("untouchedValue",'noData')
-            noDataValue = kwargs.pop("noDataValue", 99999999)
             name = source.displayName if name is None else name
             
-            if vs is None: 
-                vs = [(source.edges[0],0), (source.typicalExclusion, 0.5), (source.edges[-1], 1.0)]
+            if vs is None:
+                vs = s.typicalValueScores[source.displayName]
                 
-            source = source.generateRaster( s.region.extent, untouchedValue=untouchedValue, noDataValue=noDataValue )
+            source = source.generateRaster( s.region.extent)
 
             skipClip=True # we dont need to clip again
 
