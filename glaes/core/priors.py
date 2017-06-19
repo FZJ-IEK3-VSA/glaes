@@ -100,7 +100,8 @@ class PriorSource(object):
         elif qualifier==">=": # do the opposite in this case
             s.untouchedTight = value-0.001 
             s.untouchedWide = value-100000000000000
-        else: s.untouchedValue = value
+        else: 
+            s.untouchedValue = value
         s.noDataValue = -999999
 
         # Make the doc string

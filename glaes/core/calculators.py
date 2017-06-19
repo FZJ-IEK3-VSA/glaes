@@ -153,7 +153,7 @@ class ExclusionCalculator(object):
         # exclude the indicated area from the total availability
         s._availability = np.min([s._availability, 1-areas],0)
 
-    def excludePrior(s, prior, value=None, valueMin=None, valueMax=None):
+    def excludePrior(s, prior, value=None, valueMin=None, valueMax=None, **kwargs):
 
         if not (valueMin is None and valueMax is None): value = (valueMin,valueMax)
 
@@ -187,7 +187,7 @@ class ExclusionCalculator(object):
         source = prior.generateRaster( s.region.extent )
 
         # Call the excluder
-        s.excludeRasterType( source, value=value)
+        s.excludeRasterType( source, value=value, **kwargs)
 
     def distributeItems(s, separation, pixelDivision=5, preprocessor=None):
         # Preprocess availability, maybe
@@ -199,52 +199,68 @@ class ExclusionCalculator(object):
         separation = separation / s.region.pixelSize
         sep2 = separation**2
         sepFloor = max(separation-1,0)
+        sepFloor2 = sepFloor**2
         sepCeil = separation+1
 
         # Make geom list
         x = np.zeros((1000000)) # initialize 1 000 000 possible x locations (can be expanded later)
         y = np.zeros((1000000)) # initialize 1 000 000 possible y locations (can be expanded later)
 
+        bot = 0
         cnt = 0
 
         # start searching
+        yN, xN = workingAvailability.shape
         substeps = np.linspace(-0.5, 0.5, pixelDivision)
-        for yi,xi in np.argwhere(workingAvailability):
-            # only continue if there are no points in the immidiate range of the whole pixel
-            immidiateRange = (np.abs(x[:cnt]-xi) <= sepFloor) & (np.abs(y[:cnt]-yi) <= sepFloor)
-            if immidiateRange.any(): continue
+        for yi in range(yN):
+            # update the "bottom" value
+            tooFarBehind = yi-y[bot:cnt] > sepCeil # find only those values which have a y-component greater than the separation distance
+            if tooFarBehind.size>0: 
+                bot += np.argmin(tooFarBehind) # since tooFarBehind is boolean, argmin should get the first index where it is false
 
-            # Get the indicies in the possible range
-            possiblyInRange = np.argwhere((np.abs(x[:cnt]-xi) <= sepCeil) & (np.abs(y[:cnt]-yi) <= sepCeil))
+            #print("yi:", yi, "   BOT:", bot, "   COUNT:",cnt)
 
-            # Start searching
-            found = False
-            for xss in substeps+xi:
-                for yss in substeps+yi:
-                    # Get the points which are in range
-                    inRange = np.argwhere( (np.abs(x[possiblyInRange]-xss) <= separation) & (np.abs(y[possiblyInRange]-yss) < separation))
-                    if inRange.size == 0:
-                        found = True
-                        break
+            for xi in np.argwhere(workingAvailability[yi,:]):
+                # Clip the total placement arrays
+                xClip = x[bot:cnt]
+                yClip = y[bot:cnt]
 
-                    # Test if any points in the range are overlapping
-                    overlapping = (x[inRange]*x[inRange] + y[inRange]*y[inRange]) <= sep2
-                    if overlapping.size == 0:
-                        found = True
-                        break
+                # calculate distances
+                xDist = np.abs(xClip-xi)
+                yDist = np.abs(yClip-yi)
 
-                if found: break
+                # Get the indicies in the possible range
+                possiblyInRange = np.argwhere( xDist <= sepCeil ) # all y values should already be within the sepCeil 
 
-            # Add if found
-            if found:
-                x[cnt] = xss
-                y[cnt] = yss
-                cnt += 1
-             
+                # only continue if there are no points in the immidiate range of the whole pixel
+                immidiateRange = (xDist[possiblyInRange]*xDist[possiblyInRange]) + (yDist[possiblyInRange]*yDist[possiblyInRange]) <= sepFloor2
+                if immidiateRange.any(): continue
+
+                # Start searching in the 'sub pixel'
+                found = False
+                for xsp in substeps+xi:
+                    xSubDist = np.abs(xClip[possiblyInRange]-xsp)
+                    for ysp in substeps+yi:
+                        ySubDist = np.abs(yClip[possiblyInRange]-ysp)
+
+                        # Test if any points in the range are overlapping
+                        overlapping = (xSubDist*xSubDist + ySubDist*ySubDist) <= sep2
+                        if not overlapping.any():
+                            found = True
+                            break
+
+                    if found: break
+
+                # Add if found
+                if found:
+                    x[cnt] = xsp
+                    y[cnt] = ysp
+                    cnt += 1
+                 
         # Convert identified points back into the region's coordinates
         coords = np.zeros((cnt,2))
-        coords[:,1] = s.region.extent.xMin + x[:cnt]*s.region.pixelWidth
-        coords[:,0] = s.region.extent.yMax - y[:cnt]*s.region.pixelWidth
+        coords[:,0] = s.region.extent.xMin + (x[:cnt]+0.5)*s.region.pixelWidth # shifted by 0.5 so that index corresponds to the center of the pixel
+        coords[:,1] = s.region.extent.yMax - (y[:cnt]-0.5)*s.region.pixelWidth # shifted by 0.5 so that index corresponds to the center of the pixel
 
         # Done!
         s.itemCoords = coords
