@@ -56,6 +56,9 @@ class ExclusionCalculator(object):
 
         # Make the total availability matrix
         s._availability = np.array(s.region.mask)
+
+        # Make a list of item coords
+        s.itemCoords=None
     
     def save(s, output, **kwargs):
         s.region.createRaster(output=output, data=s.availability, **kwargs)
@@ -88,6 +91,10 @@ class ExclusionCalculator(object):
 
         # Draw the region boundaries
         s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc='None', ec='k', linewidth=3)
+
+        # Draw Items?
+        if not s.itemCoords is None:
+            ax.plot(s.itemCoords[:,1], s.itemCoords[:,0], 'ok')
 
         # Done!
         if doShow:
@@ -162,18 +169,86 @@ class ExclusionCalculator(object):
             except KeyError:
                 raise GlaesError("Could not find a default exclusion set for %s"%prior.displayName)
 
-        # Check the boundaries
-        if not value[0] is None: prior.containsValue(value[0], True)
-        if not value[1] is None: prior.containsValue(value[1], True)
-        # Check edges
-        if not value[0] is None: prior.valueOnEdge(value[0], True)
-        if not value[1] is None: prior.valueOnEdge(value[1], True)
+        # Check the value input
+        if isinstance(value, tuple):
+
+            # Check the boundaries
+            if not value[0] is None: prior.containsValue(value[0], True)
+            if not value[1] is None: prior.containsValue(value[1], True)
+
+            # Check edges
+            if not value[0] is None: prior.valueOnEdge(value[0], True)
+            if not value[1] is None: prior.valueOnEdge(value[1], True)
+        else:
+            if not value==0:
+                print("It is advisable to exclude by a value range instead of a singular value")    
 
         # Make the raster
         source = prior.generateRaster( s.region.extent )
 
         # Call the excluder
         s.excludeRasterType( source, value=value)
+
+    def distributeItems(s, separation, pixelDivision=5, preprocessor=None):
+        # Preprocess availability, maybe
+        workingAvailability = preprocessor(s.availability) if not preprocessor is None else s.availability>0.5
+        if not workingAvailability.dtype == 'bool':
+            raise s.GlaesError("Working availability must be boolean type")
+
+        # Turn separation into pixel distances
+        separation = separation / s.region.pixelSize
+        sep2 = separation**2
+        sepFloor = max(separation-1,0)
+        sepCeil = separation+1
+
+        # Make geom list
+        x = np.zeros((1000000)) # initialize 1 000 000 possible x locations (can be expanded later)
+        y = np.zeros((1000000)) # initialize 1 000 000 possible y locations (can be expanded later)
+
+        cnt = 0
+
+        # start searching
+        substeps = np.linspace(-0.5, 0.5, pixelDivision)
+        for yi,xi in np.argwhere(workingAvailability):
+            # only continue if there are no points in the immidiate range of the whole pixel
+            immidiateRange = (np.abs(x[:cnt]-xi) <= sepFloor) & (np.abs(y[:cnt]-yi) <= sepFloor)
+            if immidiateRange.any(): continue
+
+            # Get the indicies in the possible range
+            possiblyInRange = np.argwhere((np.abs(x[:cnt]-xi) <= sepCeil) & (np.abs(y[:cnt]-yi) <= sepCeil))
+
+            # Start searching
+            found = False
+            for xss in substeps+xi:
+                for yss in substeps+yi:
+                    # Get the points which are in range
+                    inRange = np.argwhere( (np.abs(x[possiblyInRange]-xss) <= separation) & (np.abs(y[possiblyInRange]-yss) < separation))
+                    if inRange.size == 0:
+                        found = True
+                        break
+
+                    # Test if any points in the range are overlapping
+                    overlapping = (x[inRange]*x[inRange] + y[inRange]*y[inRange]) <= sep2
+                    if overlapping.size == 0:
+                        found = True
+                        break
+
+                if found: break
+
+            # Add if found
+            if found:
+                x[cnt] = xss
+                y[cnt] = yss
+                cnt += 1
+             
+        # Convert identified points back into the region's coordinates
+        coords = np.zeros((cnt,2))
+        coords[:,1] = s.region.extent.xMin + x[:cnt]*s.region.pixelWidth
+        coords[:,0] = s.region.extent.yMax - y[:cnt]*s.region.pixelWidth
+
+        # Done!
+        s.itemCoords = coords
+        return coords
 
 
 class WeightedCriterionCalculator(object):

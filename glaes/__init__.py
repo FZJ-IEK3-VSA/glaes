@@ -6,3 +6,4 @@
 
 from .core.priors import Priors
 from .core.calculators import ExclusionCalculator, WeightedCriterionCalculator
+from .predefinedExclusions import ExclusionSets
