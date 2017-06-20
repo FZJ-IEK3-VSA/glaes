@@ -101,7 +101,7 @@ class ExclusionCalculator(object):
 
         # Draw Items?
         if not s.itemCoords is None:
-            ax.plot(s.itemCoords[:,1], s.itemCoords[:,0], 'ok')
+            ax.plot(s.itemCoords[:,0], s.itemCoords[:,1], 'ok')
 
         # Done!
         if doShow:
@@ -122,7 +122,7 @@ class ExclusionCalculator(object):
     @property
     def availability(s): 
         """The pixelated areas left over after all applied exclusions"""
-        return s._availability
+        return s._availability > 0.5
 
     @property
     def percentAvailable(s): return 100*s.availability.sum()/s.region.mask.sum()
@@ -267,7 +267,7 @@ class ExclusionCalculator(object):
         # Convert identified points back into the region's coordinates
         coords = np.zeros((cnt,2))
         coords[:,0] = s.region.extent.xMin + (x[:cnt]+0.5)*s.region.pixelWidth # shifted by 0.5 so that index corresponds to the center of the pixel
-        coords[:,1] = s.region.extent.yMax - (y[:cnt]-0.5)*s.region.pixelWidth # shifted by 0.5 so that index corresponds to the center of the pixel
+        coords[:,1] = s.region.extent.yMax - (y[:cnt]+0.5)*s.region.pixelWidth # shifted by 0.5 so that index corresponds to the center of the pixel
 
         # Done!
         s.itemCoords = coords
@@ -279,6 +279,10 @@ class WeightedCriterionCalculator(object):
         # THESE NEED TO BE CHECKED!!!!
         "access_distance": ((0,1), (5000,0.5), (20000,0), ),
         "agriculture_proximity": ((0,0), (100,0.5), (1000,1), ),
+        "agriculture_arable_proximity": ((0,0), (100,0.5), (1000,1), ),
+        "agriculture_pasture_proximity": ((0,0), (100,0.5), (1000,1), ),
+        "agriculture_permanent_crop_proximity": ((0,0), (100,0.5), (1000,1), ),
+        "agriculture_heterogeneous_proximity": ((0,0), (100,0.5), (1000,1), ),
         "airfield_proximity": ((0,0), (3000,0.5), (8000,1), ),
         "airport_proximity": ((0,0), (4000,0.5), (10000,1), ),
         "connection_distance": ((0,1), (10000,0.5), (20000,0), ),
@@ -288,9 +292,8 @@ class WeightedCriterionCalculator(object):
         "industrial_proximity": ((0,0), (300,0.5), (1000,1), ),
         "lake_proximity": ((0,0), (300,0.5), (1000,1), ),
         "mining_proximity": ((0,0), (200,0.5), (1000,1), ),
-        "north_facing_slope_threshold": ((0,1), (3,0.5), (5,0), ),
         "ocean_proximity": ((0,0), (300,0.5), (1000,1), ),
-        "power_lines_proximity": ((0,0), (150,0.5), (500,1), ),
+        "power_line_proximity": ((0,0), (150,0.5), (500,1), ),
         "protected_biosphere_proximity": ((0,0), (1000,0.5), (2000,1), ),
         "protected_bird_proximity": ((0,0), (1000,0.5), (2000,1), ),
         "protected_habitat_proximity": ((0,0), (1000,0.5), (2000,1), ),
@@ -301,11 +304,14 @@ class WeightedCriterionCalculator(object):
         "protected_wilderness_proximity": ((0,0), (1000,0.5), (2000,1), ),
         "railway_proximity": ((0,0), (200,0.5), (1000,1), ),
         "river_proximity": ((0,0), (400,0.5), (1000,1), ),
+        "roads_proximity": ((0,0), (200,0.5), (1000,1), ),
         "roads_main_proximity": ((0,0), (200,0.5), (1000,1), ),
         "roads_secondary_proximity": ((0,0), (100,0.5), (1000,1), ),
-        "settlements_rural_proximity": ((0,0), (700,0.5), (2000,1), ),
-        "settlements_urban_proximity": ((0,0), (1500,0.5), (3000,1), ),
+        "settlement_proximity": ((0,0), (700,0.5), (2000,1), ),
+        "settlement_urban_proximity": ((0,0), (1500,0.5), (3000,1), ),
         "slope_threshold": ((0,1), (11,0.5), (20,0), ),
+        "slope_north_facing_threshold": ((0,1), (3,0.5), (5,0), ),
+        "waterbody_proximity": ((0,0), (400,0.5), (1000,1), ),
         "wetland_proximity": ((0,0), (200,0.5), (1000,1), ),
         "windspeed_100m_threshold": ((0,0), (5,0.5), (8,1), ),
         "windspeed_50m_threshold": ((0,0), (5,0.5), (8,1), ),
@@ -323,10 +329,11 @@ class WeightedCriterionCalculator(object):
         s._unnormalizedWeights = OrderedDict()
         s._totalWeight = 0
         s._result = None
+        s.noData = -1
 
         # Keep an exclusion matrix
         if not exclusions is None:
-            if not exclusions.dtype is np.bool:
+            if not exclusions.dtype == np.bool:
                 raise GlaesError("Exclusion matrix must be a boolean type")
             if not exclusions.shape == s.region.mask.shape:
                 raise GlaesError("Exclusion matrix shape must match the region's mask shape")
@@ -337,7 +344,7 @@ class WeightedCriterionCalculator(object):
     def save(s, output, **kwargs):
         s.region.createRaster(output=output, data=s.result, **kwargs)
 
-    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, method='local'):
+    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, view='local'):
         # import some things
         from matplotlib.colors import LinearSegmentedColormap
         
@@ -363,10 +370,10 @@ class WeightedCriterionCalculator(object):
         rbg = LinearSegmentedColormap.from_list('blue_green_red',[(130/255,0,0,1), (0,91/255, 130/255, 1), (0,130/255, 0, 1)])
         rbg.set_under(color='w',alpha=1)
 
-        if method == 'local': result = s.resultLocal
-        elif method == 'global': result = s.resultGlobal
-        elif method == 'raw': result = s.resultRaw
-        else: raise GlaesError("method not understood")
+        if view == 'local': result = s.resultLocal
+        elif view == 'global': result = s.resultGlobal
+        elif view == 'raw': result = s.resultRaw
+        else: raise GlaesError("view not understood")
 
         h = gk.raster.drawImage(result, bounds=s.region.extent, ax=ax, scaling=dataScaling, cmap=rbg, vmin=0)
 
@@ -392,18 +399,18 @@ class WeightedCriterionCalculator(object):
         minV = s.result[s.region.mask].min()
         maxV = s.result[s.region.mask].max()
         out = (s.result-minV)/(maxV-minV)
-        return s.region.applyMask( out, noData=-1)
+        return s.region.applyMask( out, noData=s.noData)
 
     @property
     def resultGlobal(s):
         """The pixelated areas left over after all weighted overlays"""
         out = s.result/s.totalWeight
-        return s.region.applyMask( out, noData=-1)
+        return s.region.applyMask( out, noData=s.noData)
 
     @property
     def resultRaw(s):
         """The pixelated areas left over after all weighted overlays"""
-        return s.region.applyMask( s.result, noData=-1)
+        return s.region.applyMask( s.result, noData=s.noData)
 
     @property
     def totalWeight(s): 
@@ -471,7 +478,7 @@ class WeightedCriterionCalculator(object):
     def combine(s, combiner='sum'):
         # Set combiner
         if combiner == 'sum':
-            result = np.zeroes(s.region.mask.shape)
+            result = np.zeros(s.region.mask.shape)
             for k,v in s._unnormalizedWeights.items(): result+=v
         
         elif combiner == 'mult':
@@ -488,12 +495,26 @@ class WeightedCriterionCalculator(object):
         # do combination
         s._result = result
 
-    def extractValues(s, locations, **kwargs):
+    def extractValues(s, locations, view='local', srs=None, mode='linear-spline', **kwargs):
+        # get result 
+        if view == 'local': result = s.resultLocal
+        elif view == 'global': result = s.resultGlobal
+        elif view == 'raw': result = s.resultRaw
+        else: raise GlaesError("view not understood")
+
+        # Fill no data
+        if not mode=='near': # there's no point if we're using 'near'
+            result[ result==s.noData ] = 0
+
         # make result into a dataset
-        ds = s.region.createRaster(data=s.result)
+        ds = s.region.createRaster(data=result)
+
+        # make sure we have an srs
+        if srs is None: srs = s.region.srs
+        else: srs = gk.srs.loadSRS(srs)
 
         # extract values
-        vals = gk.raster.interpolateValues(ds, locations, pointSRS=s.region.srs, **kwargs)
+        vals = gk.raster.interpolateValues(ds, locations, pointSRS=srs, mode=mode, **kwargs)
 
         # done!
         return vals
