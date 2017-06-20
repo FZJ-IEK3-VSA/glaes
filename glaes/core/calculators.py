@@ -6,6 +6,7 @@ import numpy as np
 from collections import namedtuple, OrderedDict
 
 from .priors import Priors, PriorSource
+from .util import GlaesError
 
 
 ###############################
@@ -14,6 +15,10 @@ class ExclusionCalculator(object):
     typicalExclusions = {
         "access_distance": (5000, None ),
         "agriculture_proximity": (None, 100 ),
+        "agriculture_arable_proximity": (None, 100 ),
+        "agriculture_pasture_proximity": (None, 100 ),
+        "agriculture_permanent_crop_proximity": (None, 100 ),
+        "agriculture_heterogeneous_proximity": (None, 100 ),
         "airfield_proximity": (None, 3000 ),
         "airport_proximity": (None, 4000 ),
         "connection_distance": (10000, None ),
@@ -23,9 +28,8 @@ class ExclusionCalculator(object):
         "industrial_proximity": (None, 300 ),
         "lake_proximity": (None, 300 ),
         "mining_proximity": (None, 200 ),
-        "north_facing_slope_threshold": (3, None ),
         "ocean_proximity": (None, 300 ),
-        "power_lines_proximity": (None, 150 ),
+        "power_line_proximity": (None, 200 ),
         "protected_biosphere_proximity": (None, 1000 ),
         "protected_bird_proximity": (None, 1000 ),
         "protected_habitat_proximity": (None, 1000 ),
@@ -37,11 +41,14 @@ class ExclusionCalculator(object):
         "railway_proximity": (None, 200 ),
         "river_proximity": (None, 400 ),
         "roads_main_proximity": (None, 200 ),
+        "roads_proximity": (None, 200 ), 
         "roads_secondary_proximity": (None, 100 ),
-        "settlements_rural_proximity": (None, 700 ),
-        "settlements_urban_proximity": (None, 1500 ),
+        "settlement_proximity": (None, 700 ),
+        "settlement_urban_proximity": (None, 1500 ),
         "slope_threshold": (11, None ),
+        "slope_north_facing_threshold": (3, None ),
         "wetland_proximity": (None, 200 ),
+        "waterbody_proximity": (None, 300 ),
         "windspeed_100m_threshold": (None, 5 ),
         "windspeed_50m_threshold": (None, 5 ),
         "woodland_coniferous_proximity": (None, 300 ),
@@ -160,7 +167,7 @@ class ExclusionCalculator(object):
         # make sure we have a Prior object
         if isinstance(prior, str): prior = Priors[prior]
 
-        if not isinstance( prior, PriorSource): raise GlaesError("'prior' input must be a Prior object of an associated string")
+        if not isinstance( prior, PriorSource): raise GlaesError("'prior' input must be a Prior object or an associated string")
 
         # try to get the default value if one isn't given
         if value is None:
@@ -181,7 +188,7 @@ class ExclusionCalculator(object):
             if not value[1] is None: prior.valueOnEdge(value[1], True)
         else:
             if not value==0:
-                print("It is advisable to exclude by a value range instead of a singular value")    
+                print("WARNING: It is advisable to exclude by a value range instead of a singular value")    
 
         # Make the raster
         source = prior.generateRaster( s.region.extent )

@@ -1,5 +1,1 @@
-# ignore all the things!
-*
-
-# except me ;)
-!.gitignore
+*.zip

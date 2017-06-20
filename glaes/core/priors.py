@@ -34,6 +34,7 @@ class PriorSource(object):
         
         s.unit = ds.GetMetadataItem("UNIT")
         s.description = ds.GetMetadataItem("DESCRIPTION")
+        s.alternateName = ds.GetMetadataItem("ALTERNATE_NAME")
 
         # create edges and estimation-values
         try:
@@ -215,8 +216,13 @@ class PriorSet(object):
             
             try:
                 p = PriorSource(f)
-                #setattr(s, p.displayName, p)
                 s.sources[p.displayName] = p
+                if p.alternateName != "NONE":
+                    # make a new prior and update the displayName
+                    p2 = PriorSource(f)
+                    p2.displayName = p.alternateName
+                    s.sources[p.alternateName] = p2
+
             except PriorSource._LoadFail:
                 print("WARNING: Could not parse file: %s"%(basename(f)))
                 pass
@@ -249,6 +255,7 @@ class PriorSet(object):
             scores = [SM(None, priorLow, priorName).ratio() for priorName in priorNames]
 
             bestMatch = priorNames[np.argmax(scores)]
+
             print("PRIORS: Mapping '%s' to '%s'"%(prior, bestMatch))
 
             output = s.sources[bestMatch]
