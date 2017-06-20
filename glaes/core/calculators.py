@@ -306,7 +306,7 @@ class WeightedCriterionCalculator(object):
         "woodland_deciduous_proximity": ((0,0), (300,0.5), (1000,1), ),
         "woodland_mixed_proximity": ((0,0), (300,0.5), (1000,1), )}
 
-    def __init__(s, region, **kwargs):
+    def __init__(s, region, exclusions=None, **kwargs):
 
         # load the region
         s.region = gk.RegionMask.load(region, **kwargs)
@@ -316,6 +316,16 @@ class WeightedCriterionCalculator(object):
         s._unnormalizedWeights = OrderedDict()
         s._totalWeight = 0
         s._result = None
+
+        # Keep an exclusion matrix
+        if not exclusions is None:
+            if not exclusions.dtype is np.bool:
+                raise GlaesError("Exclusion matrix must be a boolean type")
+            if not exclusions.shape == s.region.mask.shape:
+                raise GlaesError("Exclusion matrix shape must match the region's mask shape")
+            s.exclusions = exclusions
+        else:
+            s.exclusions = None
     
     def save(s, output, **kwargs):
         s.region.createRaster(output=output, data=s.result, **kwargs)
@@ -446,11 +456,12 @@ class WeightedCriterionCalculator(object):
         s._totalWeight += weight
 
         # append
-
         s._unnormalizedWeights[name] = newWeights
 
+        # make sure to clear any old result
+        s._result = None
 
-    def combine(s, combiner='mult'):
+    def combine(s, combiner='sum'):
         # Set combiner
         if combiner == 'sum':
             result = np.zeroes(s.region.mask.shape)
@@ -463,5 +474,19 @@ class WeightedCriterionCalculator(object):
         else:
             result = combiner(s._unnormalizedWeights)
 
+        # apply mask if one exists
+        if not s.exclusions is None:
+            result *= s.exclusions
+
         # do combination
         s._result = result
+
+    def extractValues(s, locations, **kwargs):
+        # make result into a dataset
+        ds = s.region.createRaster(data=s.result)
+
+        # extract values
+        vals = gk.raster.interpolateValues(ds, locations, pointSRS=s.region.srs, **kwargs)
+
+        # done!
+        return vals
