@@ -38,10 +38,13 @@ class ExclusionCalculator(object):
         "protected_park_proximity": (None, 1000 ),
         "protected_reserve_proximity": (None, 1000 ),
         "protected_wilderness_proximity": (None, 1000 ),
+        "camping_proximity": (None, 500), 
+        "touristic_proximity": (None, 1000),
+        "leisure_proximity": (None, 500),
         "railway_proximity": (None, 200 ),
         "river_proximity": (None, 400 ),
-        "roads_main_proximity": (None, 200 ),
         "roads_proximity": (None, 200 ), 
+        "roads_main_proximity": (None, 200 ),
         "roads_secondary_proximity": (None, 100 ),
         "settlement_proximity": (None, 700 ),
         "settlement_urban_proximity": (None, 1500 ),
@@ -51,6 +54,7 @@ class ExclusionCalculator(object):
         "waterbody_proximity": (None, 300 ),
         "windspeed_100m_threshold": (None, 5 ),
         "windspeed_50m_threshold": (None, 5 ),
+        "woodland_proximity": (None, 300 ),
         "woodland_coniferous_proximity": (None, 300 ),
         "woodland_deciduous_proximity": (None, 300 ),
         "woodland_mixed_proximity": (None, 300 )}
@@ -196,7 +200,7 @@ class ExclusionCalculator(object):
         # Call the excluder
         s.excludeRasterType( source, value=value, **kwargs)
 
-    def distributeItems(s, separation, pixelDivision=5, preprocessor=None):
+    def distributeItems(s, separation, pixelDivision=5, preprocessor=None, maxTurbines=10000000):
         # Preprocess availability, maybe
         workingAvailability = preprocessor(s.availability) if not preprocessor is None else s.availability>0.5
         if not workingAvailability.dtype == 'bool':
@@ -210,8 +214,8 @@ class ExclusionCalculator(object):
         sepCeil = separation+1
 
         # Make geom list
-        x = np.zeros((1000000)) # initialize 1 000 000 possible x locations (can be expanded later)
-        y = np.zeros((1000000)) # initialize 1 000 000 possible y locations (can be expanded later)
+        x = np.zeros((maxTurbines)) # initialize 1 000 000 possible x locations (can be expanded later)
+        y = np.zeros((maxTurbines)) # initialize 1 000 000 possible y locations (can be expanded later)
 
         bot = 0
         cnt = 0
@@ -219,6 +223,9 @@ class ExclusionCalculator(object):
         # start searching
         yN, xN = workingAvailability.shape
         substeps = np.linspace(-0.5, 0.5, pixelDivision)
+        substeps[0]+=0.0001 # add a tiny bit to the left/top edge (so that the point is definitely in the right pixel)
+        substeps[-1]-=0.0001 # subtract a tiny bit to the right/bottom edge for the same reason
+        
         for yi in range(yN):
             # update the "bottom" value
             tooFarBehind = yi-y[bot:cnt] > sepCeil # find only those values which have a y-component greater than the separation distance

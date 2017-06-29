@@ -143,8 +143,7 @@ class PriorSource(object):
     def generateRaster(s, extent, untouched='Tight' ):
         
         # make better values
-        values = [s.edges[0], ]
-        values.extend( s.values.tolist() ) 
+        values = s.values
         if untouched.lower()=='tight':
             untouchedValue = s.untouchedTight
         elif untouched.lower()=='wide':
