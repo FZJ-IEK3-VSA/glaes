@@ -200,9 +200,9 @@ class ExclusionCalculator(object):
         # Call the excluder
         s.excludeRasterType( source, value=value, **kwargs)
 
-    def distributeItems(s, separation, pixelDivision=5, preprocessor=None, maxTurbines=10000000):
-        # Preprocess availability, maybe
-        workingAvailability = preprocessor(s.availability) if not preprocessor is None else s.availability>0.5
+    def distributeItems(s, separation, pixelDivision=5, preprocessor=lambda x: x>=0.5, maxTurbines=10000000):
+        # Preprocess availability
+        workingAvailability = preprocessor(s.availability)
         if not workingAvailability.dtype == 'bool':
             raise s.GlaesError("Working availability must be boolean type")
 
@@ -274,11 +274,86 @@ class ExclusionCalculator(object):
         # Convert identified points back into the region's coordinates
         coords = np.zeros((cnt,2))
         coords[:,0] = s.region.extent.xMin + (x[:cnt]+0.5)*s.region.pixelWidth # shifted by 0.5 so that index corresponds to the center of the pixel
-        coords[:,1] = s.region.extent.yMax - (y[:cnt]+0.5)*s.region.pixelWidth # shifted by 0.5 so that index corresponds to the center of the pixel
+        coords[:,1] = s.region.extent.yMax - (y[:cnt]+0.5)*s.region.pixelHeight # shifted by 0.5 so that index corresponds to the center of the pixel
 
         # Done!
         s.itemCoords = coords
         return coords
+
+    def distributeAreas(s, targetArea=2000000, radiusSteps=20, minAvailabilityRatio=0.3, preprocessor=lambda x: x>=0.5):
+        
+        # convert area to pixel area
+        targetArea = targetArea/s.region.pixelHeight/s.region.pixelWidth
+
+        # get maximum pixel radius
+        maxArea = targetArea/minAvailabilityRatio
+        maxRadius = np.sqrt(maxArea/np.pi)
+        mRI = int(np.ceil(maxRadius))
+
+        # Get the working availability
+        workingAvailability = preprocessor(s.availability)
+        if not workingAvailability.dtype == 'bool':
+            raise s.GlaesError("Working availability must be boolean type")
+
+        # pad the availability matrix so that we can evaluate the kernel on the edges
+        yN, xN = workingAvailability.shape
+        tmp = np.zeros((yN+2*mRI, xN+2*mRI), dtype=bool)
+        tmp[mRI:-mRI, mRI:-mRI] = workingAvailability
+        workingAvailability = tmp
+
+        # make a set of inclusion stamps
+        y = x = np.arange(-mRI,mRI+1)
+        xx,yy = np.meshgrid(x,y)
+
+        stamps = [ np.sqrt(xx*xx+yy*yy)<=radius for radius in np.linspace(0,maxRadius,radiusSteps) ]
+        stampSizes = [stamp.sum() for stamp in stamps]
+
+        # Make an empty areas matrix
+        noData = 2**32-1
+        areas = np.zeros(workingAvailability.shape, dtype=np.uint32)+noData
+
+        # Loop over all available points which are not too close to the borders
+        count = 0
+        coordinates = []
+        indexes = np.argwhere(workingAvailability)
+        for yi,xi in indexes:
+            # Be sure index isn't already taken by something
+            if not areas[yi,xi] == noData: continue
+
+            # start searching for an acceptable area
+            found = False
+            for si in range(len(stamps)):
+                areaMat = np.logical_and(workingAvailability[yi-mRI:yi+mRI+1, xi-mRI:xi+mRI+1], stamps[si])
+                area = areaMat.sum()
+
+                if area >= targetArea: # break out if we have found an area which satisfies the target area
+                    found=True
+                    coordinates.append((xi,yi))
+                    break
+
+                if area/stampSizes[si] < minAvailabilityRatio: # break out if we go below the minimum availability ratio
+                    break
+
+            # If nothing has been found, the point is bad (probably meaning the indicated pixels are too isolated)
+            #  in this case, just go to the next pixel
+            if not found: continue
+
+            # Now that we know something has been found, add the areas to areas matrix indicated by the count
+            areas[yi-mRI:yi+mRI+1, xi-mRI:xi+mRI+1][areaMat] = count
+            count += 1
+
+            # also remove these pixels from the availability matrix
+            workingAvailability[yi-mRI:yi+mRI+1, xi-mRI:xi+mRI+1][areaMat] = 0
+
+        # unpad the areas matrix
+        areas = areas[mRI:-mRI, mRI:-mRI]
+
+        # convert index coordinates to SRS coordinates
+        x = s.region.extent.xMin + (np.array([c[0] for c in coordinates])+0.5-mRI) * s.region.pixelWidth
+        y = s.region.extent.yMax - (np.array([c[1] for c in coordinates])+0.5-mRI) * s.region.pixelHeight
+
+        # return the coordinates and areas matrix
+        return x, y, areas
 
 
 class WeightedCriterionCalculator(object):
