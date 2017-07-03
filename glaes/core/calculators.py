@@ -4,6 +4,7 @@ from glob import glob
 import re
 import numpy as np
 from collections import namedtuple, OrderedDict
+import time
 
 from .priors import Priors, PriorSource
 from .util import GlaesError
@@ -382,34 +383,34 @@ class ExclusionCalculator(object):
             raise s.GlaesError("Working availability must be boolean type")
 
         # polygonize availability
-        geoms, values = gk.raster.polygonize(workingAvailability, bounds=s.region.extent, noDataValue=0)
+        geoms, values = gk.raster.polygonize(workingAvailability, bounds=s.region.extent, noDataValue=0, shrink=True)
         
         # partition each of the new geometries
         newGeoms = []
-        newValues = []
-        for g in geoms:
+        st = time.clock()
+        for gi in range(0, len(geoms)):
+            g = geoms[gi]
             
             gArea = g.Area()
             if gArea <= targetArea*1.6:
                 newGeoms.append(g.Clone())
-                newValues.append(0)
-
-            else:
-                idealPartitions = np.round(gArea/targetArea)
-                fudgedTargetArea = gArea/idealPartitions
-
-                if fudgedTargetArea > targetArea: fudgedTargetArea = min(fudgedTargetArea, 1.2*targetArea)
-                elif fudgedTargetArea < targetArea: fudgedTargetArea = max(fudgedTargetArea, 0.8*targetArea)
-
-                gTmp, vTmp = gk.geom.partitionArea(g, targetArea=fudgedTargetArea, resolution=s.region.pixelSize, **kwargs)
                 
+            else:
+                #gTmp, vTmp = gk.geom.partitionArea(g, targetArea=fudgedTargetArea, resolution=s.region.pixelSize, **kwargs)
+                try:
+                    gTmp = gk.geom.partitionArea3(g, targetArea=targetArea, growStep=s.region.pixelSize*3)
+                except Exception as e:
+                    print(gi)
+                    raise e 
+
                 newGeoms.extend(gTmp)
-                newValues.extend(vTmp)
+        ed = time.clock()
+        print(gk._core.geomutil.CLOCK/((ed-st)*1e9))
                 
         # finalize geom list
         def inRange(x):
             area = x.Area()
-            if area >= (0.6*targetArea) and area <= (2.1 * targetArea):
+            if area >= (0.5*targetArea) and area <= (2.1 * targetArea):
                 return True
             else:
                 return False
