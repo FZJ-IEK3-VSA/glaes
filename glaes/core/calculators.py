@@ -4,7 +4,6 @@ from glob import glob
 import re
 import numpy as np
 from collections import namedtuple, OrderedDict
-import time
 
 from .priors import Priors, PriorSource
 from .util import GlaesError
@@ -281,101 +280,7 @@ class ExclusionCalculator(object):
         # Done!
         s.itemCoords = coords
         return coords
-    '''
-    def distributeAreas(s, targetArea=2000000, radiusSteps=10, minAvailabilityRatio=0.3, preprocessor=lambda x: x>=0.5):
-        
-        # convert area to pixel area
-        targetPixelArea = targetArea/s.region.pixelHeight/s.region.pixelWidth
-
-        # get minimum/maximum pixel radius
-        minRadius = np.sqrt(targetPixelArea/np.pi)
-        #minRadius = np.sqrt(targetPixelArea)/2
-        maxArea = targetPixelArea/minAvailabilityRatio
-        maxRadius = np.sqrt(maxArea/np.pi)
-        #maxRadius = np.sqrt(maxArea)/2
-        mRI = int(np.ceil(maxRadius))
-
-        # Get the working availability
-        workingAvailability = preprocessor(s.availability)
-        if not workingAvailability.dtype == 'bool':
-            raise s.GlaesError("Working availability must be boolean type")
-
-        # pad the availability matrix so that we can evaluate the kernel on the edges
-        yN, xN = workingAvailability.shape
-        tmp = np.zeros((yN+2*mRI, xN+2*mRI), dtype=bool)
-        tmp[mRI:-mRI, mRI:-mRI] = workingAvailability
-        workingAvailability = tmp
-
-        # make a set of inclusion stamps
-        y = x = np.arange(-mRI,mRI+1)
-        xx,yy = np.meshgrid(x,y)
-
-        stamps = [ np.sqrt(xx*xx+yy*yy)<=radius for radius in np.linspace(minRadius,maxRadius,radiusSteps) ]
-        #stamps = [ np.logical_and(np.abs(xx)<=radius,np.abs(yy)<=radius) for radius in np.linspace(minRadius,maxRadius,radiusSteps) ]
-        stampSizes = [stamp.sum() for stamp in stamps]
-
-        # Make an empty areas matrix
-        noData = 2**30-1
-        isOkay = 2**30
-        areas = np.zeros(workingAvailability.shape, dtype=np.int32)+noData
-        areas[workingAvailability] = isOkay 
-        
-        # Loop over all available points which are not too close to the borders
-        count = 0
-        coordinates = []
-        for yi in range(yN):
-            for xi, in np.argwhere(workingAvailability[yi,:]): # The comma is needed to extract xi as an integer!
-
-                # Be sure index isn't already taken by something
-                if not areas[yi,xi] == isOkay: continue
-
-
-                for stamp in stamps:
-                    # start searching for an acceptable areas
-                    areaMat = np.logical_and(workingAvailability[yi-mRI:yi+mRI+1, xi-mRI:xi+mRI+1], stamp)
-                    area = areaMat.sum()
-
-                    if area >= targetPixelArea: # break out if we have found an area which satisfies the target area
-                        coordinates.append((xi,yi))
-        
-                        # Now that we know something has been found, add the areas to areas matrix indicated by the count
-                        areas[yi-mRI:yi+mRI+1, xi-mRI:xi+mRI+1][areaMat] = count
-                        count += 1
-
-                        # also remove these pixels from the availability matrix
-                        workingAvailability[yi-mRI:yi+mRI+1, xi-mRI:xi+mRI+1][areaMat] = 0
-                        break
-
-        # unpad the areas matrix
-        areas = areas[mRI:-mRI, mRI:-mRI]
-
-        # polygonize the result
-        geoms, values = gk.raster.polygonize(areas, bounds=s.region.extent, noDataValue=noData, flat=False)
-        #gk.vector.createVector(geoms, fieldVals=dict(v=values), output="circles.shp", overwrite=True)
-        #print(geoms.shape)
-        # Flatten everything that is NOT the isOkay value
-        flatGeoms = []
-        for val in set(values):
-            if val == isOkay: continue
-
-            geomList = geoms[values==val]
-            if geomList.size==1:
-                flatGeoms.append(geomList[0].Clone())
-            else:
-                flatGeoms.append(gk.geom.flatten(geomList))
-
-        # search for geoms with the isOkay val that are at least 70% but not more than 130% of the target size
-        for g in geoms[values==isOkay]:
-            gArea = g.Area()
-            if gArea>=0.7*targetArea and gArea<=1.3*targetArea:
-                flatGeoms.append(g.Clone())
-
-        flatGeoms = np.array(flatGeoms)
-        #print(flatGeoms.shape)
-        # get centroids and return
-        return Areas( np.array([g.Centroid().GetPoints() for g in flatGeoms]), flatGeoms)
-    '''
-
+    
     def distributeAreas(s, targetArea=2000000, preprocessor=lambda x: x>=0.5, **kwargs):
         # Get the working availability
         workingAvailability = preprocessor(s.availability)
@@ -387,7 +292,6 @@ class ExclusionCalculator(object):
         
         # partition each of the new geometries
         newGeoms = []
-        st = time.clock()
         for gi in range(0, len(geoms)):
             g = geoms[gi]
             
@@ -398,14 +302,12 @@ class ExclusionCalculator(object):
             else:
                 #gTmp, vTmp = gk.geom.partitionArea(g, targetArea=fudgedTargetArea, resolution=s.region.pixelSize, **kwargs)
                 try:
-                    gTmp = gk.geom.partitionArea3(g, targetArea=targetArea, growStep=s.region.pixelSize*3)
+                    gTmp = gk.geom.partition(g, targetArea=targetArea, growStep=s.region.pixelSize*3)
                 except Exception as e:
                     print(gi)
                     raise e 
 
                 newGeoms.extend(gTmp)
-        ed = time.clock()
-        print(gk._core.geomutil.CLOCK/((ed-st)*1e9))
                 
         # finalize geom list
         def inRange(x):
