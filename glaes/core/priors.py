@@ -203,6 +203,17 @@ class PriorSource(object):
         # return
         return vecDS
 
+    def extractValues(s, points, **kwargs):
+        values = s.values.tolist()
+        values.append(s.untouchedTight)
+
+        indicies = gk.raster.extractValues(s.path, points=points, **kwargs)
+        
+        if isinstance(indicies, list): 
+            return np.array([values[i.data] for i in indicies ])
+        else: 
+            return values[indicies.data]
+        
 # Load priors
 class _Priors(object):pass
 class PriorSet(object):
