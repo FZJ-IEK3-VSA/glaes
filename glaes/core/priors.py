@@ -140,7 +140,7 @@ class PriorSource(object):
             return False
 
     #### Make a datasource generator
-    def generateRaster(s, extent, untouched='Tight' ):
+    def generateRaster(s, extent, untouched='Tight', **kwargs):
         
         # make better values
         values = s.values
@@ -165,7 +165,7 @@ class PriorSource(object):
 
         # mutate main source
         clipDS = extent.clipRaster(s.path)
-        mutDS = gk.raster.mutateValues(clipDS, processor=mutator, noData=s.noDataValue)
+        mutDS = gk.raster.mutateValues(clipDS, processor=mutator, noData=s.noDataValue, **kwargs)
 
         # return
         return mutDS
