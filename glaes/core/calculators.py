@@ -273,7 +273,7 @@ class ExclusionCalculator(object):
         # exclude the indicated area from the total availability
         s._availability = np.min([s._availability, 1-areas],0)
 
-    def excludeVectorType(s, source, where=None, **kwargs):
+    def excludeVectorType(s, source, where=None, invert=False, **kwargs):
         """Exclude areas based off the features in a vector datasource
 
         Inputs:
@@ -287,7 +287,9 @@ class ExclusionCalculator(object):
                 * For example...
                     - If the datasource had features which each have an attribute called 'type' and only features with the type "protected" are wanted, the correct statement would be: 
                         where="type='protected'"
-
+            
+            invert - T/F : Flag causing the exclusion of all unindicated areas, instead of all indicated areas 
+            
             kwargs
                 * All other keyword arguments are passed on to a call to geokit.RegionMask.indicateFeatures
                 * Most importantly...
@@ -302,7 +304,10 @@ class ExclusionCalculator(object):
         areas = s.region.indicateFeatures(source, where=where, **kwargs)
         
         # exclude the indicated area from the total availability
-        s._availability = np.min([s._availability, 1-areas],0)
+        if invert:
+            s._availability = np.min([s._availability, areas],0)
+        else:
+            s._availability = np.min([s._availability, 1-areas],0)
 
     def excludePrior(s, prior, value=None, valueMin=None, valueMax=None, **kwargs):
         """Exclude areas based off the values in one of the Prior datasources
