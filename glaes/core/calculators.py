@@ -113,17 +113,27 @@ class ExclusionCalculator(object):
         s.maskPixels = s.region.mask.sum()
 
         # Make the total availability matrix
-        s._availability = np.array(s.region.mask)
+        s._availability = np.array(s.region.mask, dtype=np.uint8)*100
+        #s._availability[~s.region.mask] = 255
 
         # Make a list of item coords
         s.itemCoords=None
     
-    def save(s, output, **kwargs):
+    def save(s, output, threshold=None, **kwargs):
         """Save the current availability matrix to a raster file
+        
+        Output will be a byte-valued raster with the following convention:
+            0 -> unavailable 
+            50 -> Semi-available
+            100 -> fully eligibile
+            255 -> "no data" (out of region)
 
         Inputs:
             output - str : The path of the output raster file
-
+            
+            threshold - float : The acceptable threshold indicating an available pixel
+                * Use this to process the availability matrix before saving it (will save a little bit of space)
+                
             kwargs: 
                 * All keyword arguments are passed on to a call to geokit.RegionMask.createRaster
                 * Most notably:
@@ -132,7 +142,19 @@ class ExclusionCalculator(object):
                     - 'overwrite' is used to force overwrite an existing file
 
         """
-        s.region.createRaster(output=output, data=s.availability, **kwargs)
+
+        meta={
+            "description":"The availability of each pixel for the contextual purpose",
+            "units":"percent-available"
+        }
+
+        data = s.availability
+        if not threshold is None:
+            data = (data>=threshold).astype(np.uint8)*100
+
+        data[~s.region.mask] = 255
+        s.region.createRaster(output=output, data=data, noData=255, meta=meta, **kwargs)
+
 
     def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#005b82", excludedColor="#8c0000"):
         """Draw the current availability matrix on a matplotlib figure
@@ -188,7 +210,7 @@ class ExclusionCalculator(object):
 
         # plot the availability
         a2b = LinearSegmentedColormap.from_list('alpha_to_blue',[(1,1,1,0),goodColor])
-        gk.raster.drawImage(s.availability, bounds=s.region.extent, ax=ax, scaling=dataScaling, cmap=a2b)
+        gk.raster.drawImage(s.availability, bounds=s.region.extent, ax=ax, scaling=dataScaling, cmap=a2b, vmax=100)
 
         # Draw the region boundaries
         s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc='None', ec='k', linewidth=3)
@@ -224,13 +246,13 @@ class ExclusionCalculator(object):
     @property
     def percentAvailable(s): 
         """The percent of the region which remains available"""
-        return 100*s.availability.sum()/s.region.mask.sum()
+        return 100*s.availability.sum(dtype=np.int64)/100/s.region.mask.sum()
 
     @property
     def areaAvailable(s): 
         """The area of the region which remains available
             * Units are defined by the srs used to initialize the ExclusionCalculator"""
-        return s.availability.sum()*s.region.pixelWidth*s.region.pixelHeight
+        return s.availability.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
 
     ## General excluding functions
     def excludeRasterType(s, source, value=None, valueMin=None, valueMax=None, **kwargs):
@@ -268,10 +290,10 @@ class ExclusionCalculator(object):
 
         # Indicate on the source
         if not (valueMin is None and valueMax is None): value = (valueMin,valueMax)
-        areas = s.region.indicateValues(source, value, **kwargs)
+        areas = (s.region.indicateValues(source, value, **kwargs)*100).astype(np.uint8)
         
         # exclude the indicated area from the total availability
-        s._availability = np.min([s._availability, 1-areas],0)
+        s._availability = np.min([s._availability, 100-areas],0)
 
     def excludeVectorType(s, source, where=None, invert=False, **kwargs):
         """Exclude areas based off the features in a vector datasource
@@ -301,13 +323,13 @@ class ExclusionCalculator(object):
             source = source.generateVectorFromEdge( s.region.extent, edgeIndex=edgeI )
 
         # Indicate on the source
-        areas = s.region.indicateFeatures(source, where=where, **kwargs)
+        areas = (s.region.indicateFeatures(source, where=where, **kwargs)*100).astype(np.uint8)
         
         # exclude the indicated area from the total availability
         if invert:
             s._availability = np.min([s._availability, areas],0)
         else:
-            s._availability = np.min([s._availability, 1-areas],0)
+            s._availability = np.min([s._availability, 100-areas],0)
 
     def excludePrior(s, prior, value=None, valueMin=None, valueMax=None, **kwargs):
         """Exclude areas based off the values in one of the Prior datasources
@@ -377,7 +399,7 @@ class ExclusionCalculator(object):
         # Call the excluder
         s.excludeRasterType( source, value=value, **kwargs)
 
-    def distributeItems(s, separation, pixelDivision=5, preprocessor=lambda x: x>=0.5, maxItems=10000000):
+    def distributeItems(s, separation, pixelDivision=5, preprocessor=lambda x: x>=50, maxItems=10000000, outputSRS=None):
         """Distribute the maximal number of minimally separated items within the available areas
         
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -471,9 +493,15 @@ class ExclusionCalculator(object):
 
         # Done!
         s.itemCoords = coords
-        return coords
+
+        if outputSRS is None:
+            return coords
+        else:
+            newCoords = gk.srs.xyTransform(coords, fromSRS=s.region.srs, toSRS=outputSRS)
+            newCoords = np.column_stack( [ [v[0] for v in newCoords], [v[1] for v in newCoords]] )
+            return newCoords
     
-    def distributeAreas(s, targetArea=2000000, preprocessor=lambda x: x>=0.5):
+    def distributeAreas(s, targetArea=2000000, preprocessor=lambda x: x>=50):
         """Distribute the maximal number of roughly equal sized partitions within the available areas
         
         Returns a list of tuples, each containing x/y coordinates (in the ExclusionCalculator's srs) of a partition as well as the partition's geometry
