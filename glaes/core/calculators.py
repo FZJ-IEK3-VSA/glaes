@@ -238,7 +238,7 @@ class ExclusionCalculator(object):
     @property
     def availability(s): 
         """A matrix containing the availability of each location after all applied exclusions.
-            * A value of 1 is interpreted as fully available
+            * A value of 100 is interpreted as fully available
             * A value of 0 is interpreted as completely excluded
             * In between values are...in between"""
         return s._availability 
@@ -420,7 +420,7 @@ class ExclusionCalculator(object):
         workingAvailability = preprocessor(s.availability)
         if not workingAvailability.dtype == 'bool':
             raise s.GlaesError("Working availability must be boolean type")
-
+        workingAvailability[~s.region.mask] = False
         # Turn separation into pixel distances
         separation = separation / s.region.pixelSize
         sep2 = separation**2
