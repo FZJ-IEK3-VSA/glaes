@@ -5,5 +5,6 @@
 #                   WeightedCriterionCalculator)
 
 from .core.priors import Priors
-from .core.calculators import ExclusionCalculator, WeightedCriterionCalculator
+from .core.ExclusionCalculator import ExclusionCalculator
+from .core.WeightedCriterionCalculator import WeightedCriterionCalculator
 from .predefinedExclusions import ExclusionSets
