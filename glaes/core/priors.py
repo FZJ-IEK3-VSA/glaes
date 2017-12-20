@@ -215,7 +215,6 @@ class PriorSource(object):
             return values[indicies.data]
         
 # Load priors
-class _Priors(object):pass
 class PriorSet(object):
     def __init__(s,path):
         s.path = path
