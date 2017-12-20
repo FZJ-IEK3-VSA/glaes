@@ -9,6 +9,8 @@ setup(
     install_requires = [
         "gdal>=2.1.0",
         "numpy>=1.11.2",
-        "geokit>=1.0.0",
+        "geokit>=1.0.1",
+        "pandas",
+        "scipy",
     ]
 )
