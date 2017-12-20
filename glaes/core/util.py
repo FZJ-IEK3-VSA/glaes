@@ -1,0 +1,1 @@
+class GlaesError(Exception): pass
