@@ -255,7 +255,7 @@ class ExclusionCalculator(object):
         return s.availability.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
 
     ## General excluding functions
-    def excludeRasterType(s, source, value=None, valueMin=None, valueMax=None, **kwargs):
+    def excludeRasterType(s, source, value=None, valueMin=None, valueMax=None, prewarp=False, **kwargs):
         """Exclude areas based off the values in a raster datasource
 
         Inputs:
@@ -277,6 +277,11 @@ class ExclusionCalculator(object):
             valueMax - Numeric : A convenience input when the desired exclusion range is all values below 
                 a maximal value
                 * This is equivalent to value=(None, valueMax)
+            
+            prewarp: When not False, the source will be warped to the calculator's mask context before processing
+                T/F : If True, warping will be performed using the bilieanr resample algorithm
+                str : Warp using the indicated resampleAlgorithm (options: near, bilinear, cubic, average)
+                dict : A dictionary of arguments corresponding to geokit.RegionMask.warp
 
             kwargs
                 * All other keyword arguments are passed on to a call to geokit.RegionMask.indicateValues
@@ -287,6 +292,14 @@ class ExclusionCalculator(object):
         """
         if value is None and valueMin is None and valueMax is None:
             raise GlaesError("One of value, valueMin, or valueMax must be given")
+
+        # Do prewarp, if needed
+        if prewarp:
+            prewarpArgs = dict(resampleAlg="bilinear")
+            if isinstance(prewarp, str): prewarpArgs["resampleAlg"] = prewarp
+            elif isinstance(prewarp, dict): prewarpArgs.update(prewarp)
+            
+            source = s.region.warp(source, returnAsSource=True, **prewarpArgs)
 
         # Indicate on the source
         if not (valueMin is None and valueMax is None): value = (valueMin,valueMax)
@@ -406,7 +419,7 @@ class ExclusionCalculator(object):
     	newAvail = (s.region.indicateGeoms(geom, **kwargs)*100).astype(np.uint8)
     	s._availability = newAvail
 
-    def distributeItems(s, separation, pixelDivision=5, preprocessor=lambda x: x>=50, maxItems=10000000, outputSRS=None):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None):
         """Distribute the maximal number of minimally separated items within the available areas
         
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -416,15 +429,17 @@ class ExclusionCalculator(object):
 
             pixelDivision - int : The inter-pixel fidelity to use when deciding where items can be placed
 
-            preprocessor : A preprocessing function to convert the accessibility matrix to boolean values
-                - lambda function
-                - function handle
+            threshold : The minimal availability value to allow placing an item on
 
             maxItems - int : The maximal number of items to place in the area
                 * Used to initialize a placement list and prevent using too much memory when the number of placements gets absurd
+
+            outputSRS : The output SRS system to use
+
+            output : A path to an output shapefile
         """
         # Preprocess availability
-        workingAvailability = preprocessor(s.availability)
+        workingAvailability = s.availability >= threshold
         if not workingAvailability.dtype == 'bool':
             raise s.GlaesError("Working availability must be boolean type")
         workingAvailability[~s.region.mask] = False
@@ -498,17 +513,25 @@ class ExclusionCalculator(object):
         coords[:,0] = s.region.extent.xMin + (x[:cnt]+0.5)*s.region.pixelWidth # shifted by 0.5 so that index corresponds to the center of the pixel
         coords[:,1] = s.region.extent.yMax - (y[:cnt]+0.5)*s.region.pixelHeight # shifted by 0.5 so that index corresponds to the center of the pixel
 
-        # Done!
+        # Transform coords
         s.itemCoords = coords
 
-        if outputSRS is None:
-            return coords
-        else:
+        if not outputSRS is None:
             newCoords = gk.srs.xyTransform(coords, fromSRS=s.region.srs, toSRS=outputSRS)
             newCoords = np.column_stack( [ [v[0] for v in newCoords], [v[1] for v in newCoords]] )
-            return newCoords
+            coords = newCoords
+
+        # Make shapefile
+        if not output is None:
+            srs = outputSRS if not outputSRS is None else s.region.srs
+            geoms = [gk.geom.point(loc, srs=srs) for loc in coords]
+            gk.vector.createVector(geoms, output)
+
+        # Done!
+        return coords
+
     
-    def distributeAreas(s, targetArea=2000000, preprocessor=lambda x: x>=50):
+    def distributeAreas(s, targetArea=2000000, threshold=50):
         """Distribute the maximal number of roughly equal sized partitions within the available areas
         
         Returns a list of tuples, each containing x/y coordinates (in the ExclusionCalculator's srs) of a partition as well as the partition's geometry
@@ -516,12 +539,10 @@ class ExclusionCalculator(object):
         Inputs:
             targetArea - float : The desired area (in units of the ExclusionCalculator's srs) for each partition
 
-            preprocessor : A preprocessing function to convert the accessibility matrix to boolean values
-                - lambda function
-                - function handle
+            threshold : The minimal availability value to allow placing an item on
         """
         # Get the working availability
-        workingAvailability = preprocessor(s.availability)
+        workingAvailability = s.availability >= threshold
         if not workingAvailability.dtype == 'bool':
             raise s.GlaesError("Working availability must be boolean type")
 

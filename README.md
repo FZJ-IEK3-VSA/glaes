@@ -9,6 +9,7 @@ Except in the context of Europe, GLAES only provides a framework for conducting 
 Fortunately, GLAES is built on top of the Geospatial Data Abstraction Library (<a href="https://www.gdal.org">GDAL</a>) and so is capable of incorporating information from any geospatial dataset which GDAL can interpret; including common GIS formats such as .shp and .tif files.
 In this way, GLAES affords a high degree of flexibility such that very specific considerations, while still maintaining a consistent application method between studies.
 
+[![DOI](https://zenodo.org/badge/114907468.svg)](https://zenodo.org/badge/latestdoi/114907468)
 
 ## Features
 * Standardized approach to land eligibility analyses
