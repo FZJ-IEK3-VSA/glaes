@@ -118,6 +118,7 @@ class ExclusionCalculator(object):
 
         # Make a list of item coords
         s.itemCoords=None
+        s._itemCoords=None
     
     def save(s, output, threshold=None, **kwargs):
         """Save the current availability matrix to a raster file
@@ -216,8 +217,8 @@ class ExclusionCalculator(object):
         s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc='None', ec='k', linewidth=3)
 
         # Draw Items?
-        if not s.itemCoords is None:
-            ax.plot(s.itemCoords[:,0], s.itemCoords[:,1], 'ok')
+        if not s._itemCoords is None:
+            ax.plot(s._itemCoords[:,0], s._itemCoords[:,1], 'ok')
 
         # Done!
         if doShow:
@@ -419,7 +420,7 @@ class ExclusionCalculator(object):
     	newAvail = (s.region.indicateGeoms(geom, **kwargs)*100).astype(np.uint8)
     	s._availability = newAvail
 
-    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None):
         """Distribute the maximal number of minimally separated items within the available areas
         
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -435,6 +436,7 @@ class ExclusionCalculator(object):
                 * Used to initialize a placement list and prevent using too much memory when the number of placements gets absurd
 
             outputSRS : The output SRS system to use
+                * The default (4326) corresponds to regular lat/lon
 
             output : A path to an output shapefile
         """
@@ -513,13 +515,13 @@ class ExclusionCalculator(object):
         coords[:,0] = s.region.extent.xMin + (x[:cnt]+0.5)*s.region.pixelWidth # shifted by 0.5 so that index corresponds to the center of the pixel
         coords[:,1] = s.region.extent.yMax - (y[:cnt]+0.5)*s.region.pixelHeight # shifted by 0.5 so that index corresponds to the center of the pixel
 
-        # Transform coords
-        s.itemCoords = coords
+        s._itemCoords = coords
 
         if not outputSRS is None:
             newCoords = gk.srs.xyTransform(coords, fromSRS=s.region.srs, toSRS=outputSRS)
             newCoords = np.column_stack( [ [v[0] for v in newCoords], [v[1] for v in newCoords]] )
             coords = newCoords
+        s.itemCoords = coords
 
         # Make shapefile
         if not output is None:
@@ -530,7 +532,6 @@ class ExclusionCalculator(object):
         # Done!
         return coords
 
-    
     def distributeAreas(s, targetArea=2000000, threshold=50):
         """Distribute the maximal number of roughly equal sized partitions within the available areas
         
