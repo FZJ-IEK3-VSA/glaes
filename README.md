@@ -99,10 +99,11 @@ Examples of Land Eligibility evaluation and applications:
 If you decide to use GLAES anywhere in a published work, please kindly cite us using the following
 
 ```bibtex
-@article{ryberg_land_eligibility_2017,
-  title={Determining the Land Eligibility of Renewable Energy Technologies with Application to European Wind Energy},
-  author={David Severin Ryberg, Zena Tulemat, Martin Robinius, Detlef Stolten},
-  year={2017},
+@article{ryberg2017methodological,
+  title={Methodological Framework for Determining the Land Eligibility of Renewable Energy Sources},
+  author={Ryberg, David Severin and Robinius, Martin and Stolten, Detlef},
+  journal={arXiv preprint arXiv:1712.07840},
+  year={2017}
 }
 ```
 
