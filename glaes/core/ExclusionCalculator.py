@@ -157,7 +157,7 @@ class ExclusionCalculator(object):
         s.region.createRaster(output=output, data=data, noData=255, meta=meta, **kwargs)
 
 
-    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#005b82", excludedColor="#8c0000"):
+    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#005b82", excludedColor="#8c0000", figsize=(8,8), legendargs={}):
         """Draw the current availability matrix on a matplotlib figure
 
         Inputs:
@@ -198,7 +198,7 @@ class ExclusionCalculator(object):
             import matplotlib.pyplot as plt
 
             # make a figure and axis
-            plt.figure(figsize=(12,12))
+            plt.figure(figsize=figsize)
             ax = plt.subplot(111)
         else: doShow=False
 
@@ -214,14 +214,30 @@ class ExclusionCalculator(object):
         gk.raster.drawImage(s.availability, bounds=s.region.extent, ax=ax, scaling=dataScaling, cmap=a2b, vmax=100)
 
         # Draw the region boundaries
-        s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc='None', ec='k', linewidth=3)
+        edge = s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc='None', ec='k', linewidth=3)
 
         # Draw Items?
         if not s._itemCoords is None:
-            ax.plot(s._itemCoords[:,0], s._itemCoords[:,1], 'ok')
+            items = ax.plot(s._itemCoords[:,0], s._itemCoords[:,1], 'ok')
 
         # Done!
         if doShow:
+            from matplotlib.patches import Patch
+            p = s.percentAvailable
+            a = int(s.region.mask.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight/1000/1000)
+            patches = [
+                Patch( ec="k", fc="None", linewidth=3, label="Region: {:,d} $km^2$".format(a)),
+                Patch( color=excludedColor, label="Excluded: %.2f%%"%(100-p) ),
+                Patch( color=goodColor, label="Eligible: %.2f%%"%(p) ),
+            ]
+            if not s._itemCoords is None:
+                h = plt.plot([],[],'ok', label="Items: {:,d}".format(s._itemCoords.shape[0]) )
+                patches.append( h[0] )
+
+            _legendargs = dict(loc="lower right", fontsize=14)
+            _legendargs.update(legendargs)
+            plt.legend(handles=patches, **_legendargs)
+
             ax.set_aspect('equal')
             ax.autoscale(enable=True)
 
