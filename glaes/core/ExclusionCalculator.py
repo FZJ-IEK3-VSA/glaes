@@ -117,7 +117,7 @@ class ExclusionCalculator(object):
         #s._availability[~s.region.mask] = 255
 
         # Make a list of item coords
-        s.itemCoords=None
+        s._itemCoords=None
     
     def save(s, output, threshold=None, **kwargs):
         """Save the current availability matrix to a raster file
