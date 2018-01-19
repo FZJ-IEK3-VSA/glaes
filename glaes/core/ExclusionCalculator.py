@@ -225,9 +225,27 @@ class ExclusionCalculator(object):
         if doShow:
             from matplotlib.patches import Patch
             p = s.percentAvailable
-            a = int(s.region.mask.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight/1000/1000)
+            a = s.region.mask.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
+            areaLabel = s.region.srs.GetAttrValue("Unit").lower()
+            if areaLabel=="metre" or areaLabel=="meter":
+                a = a/1000000
+                areaLabel = "km"
+            elif areaLabel=="feet" or areaLabel=="foot":
+                areaLabel = "ft"
+            elif areaLabel=="degree":
+                areaLabel = "deg"
+
+            if a<0.001:
+                regionLabel = "{0:.3e} ${1}^2$".format(a, areaLabel)
+            elif a<0: 
+                regionLabel = "{0:.4f} ${1}^2$".format(a, areaLabel)
+            elif a<1000: 
+                regionLabel = "{0:.2f} ${1}^2$".format(a, areaLabel)
+            else: 
+                regionLabel = "{0:,.0f} ${1}^2$".format(a, areaLabel)
+
             patches = [
-                Patch( ec="k", fc="None", linewidth=3, label="Region: {:,d} $km^2$".format(a)),
+                Patch( ec="k", fc="None", linewidth=3, label=regionLabel),
                 Patch( color=excludedColor, label="Excluded: %.2f%%"%(100-p) ),
                 Patch( color=goodColor, label="Eligible: %.2f%%"%(p) ),
             ]
