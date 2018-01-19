@@ -156,7 +156,7 @@ class ExclusionCalculator(object):
         s.region.createRaster(output=output, data=data, noData=255, meta=meta, **kwargs)
 
 
-    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#005b82", excludedColor="#8c0000"):
+    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#005b82", excludedColor="#8c0000", figsize=(8,8), legendargs={}):
         """Draw the current availability matrix on a matplotlib figure
 
         Inputs:
@@ -197,7 +197,7 @@ class ExclusionCalculator(object):
             import matplotlib.pyplot as plt
 
             # make a figure and axis
-            plt.figure(figsize=(12,12))
+            plt.figure(figsize=figsize)
             ax = plt.subplot(111)
         else: doShow=False
 
@@ -213,14 +213,48 @@ class ExclusionCalculator(object):
         gk.raster.drawImage(s.availability, bounds=s.region.extent, ax=ax, scaling=dataScaling, cmap=a2b, vmax=100)
 
         # Draw the region boundaries
-        s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc='None', ec='k', linewidth=3)
+        edge = s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc='None', ec='k', linewidth=3)
 
         # Draw Items?
-        if not s.itemCoords is None:
-            ax.plot(s.itemCoords[:,0], s.itemCoords[:,1], 'ok')
+        if not s._itemCoords is None:
+            items = ax.plot(s._itemCoords[:,0], s._itemCoords[:,1], 'ok')
 
         # Done!
         if doShow:
+            from matplotlib.patches import Patch
+            p = s.percentAvailable
+            a = s.region.mask.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
+            areaLabel = s.region.srs.GetAttrValue("Unit").lower()
+            if areaLabel=="metre" or areaLabel=="meter":
+                a = a/1000000
+                areaLabel = "km"
+            elif areaLabel=="feet" or areaLabel=="foot":
+                areaLabel = "ft"
+            elif areaLabel=="degree":
+                areaLabel = "deg"
+
+            if a<0.001:
+                regionLabel = "{0:.3e} ${1}^2$".format(a, areaLabel)
+            elif a<0: 
+                regionLabel = "{0:.4f} ${1}^2$".format(a, areaLabel)
+            elif a<1000: 
+                regionLabel = "{0:.2f} ${1}^2$".format(a, areaLabel)
+            else: 
+                regionLabel = "{0:,.0f} ${1}^2$".format(a, areaLabel)
+
+            patches = [
+                Patch( ec="k", fc="None", linewidth=3, label=regionLabel),
+                Patch( color=excludedColor, label="Excluded: %.2f%%"%(100-p) ),
+                Patch( color=goodColor, label="Eligible: %.2f%%"%(p) ),
+            ]
+            if not s._itemCoords is None:
+                h = plt.plot([],[],'ok', label="Items: {:,d}".format(s._itemCoords.shape[0]) )
+                patches.append( h[0] )
+
+            _legendargs = dict(loc="lower right", fontsize=14)
+            _legendargs.update(legendargs)
+            plt.legend(handles=patches, **_legendargs)
+
             ax.set_aspect('equal')
             ax.autoscale(enable=True)
 
@@ -255,7 +289,7 @@ class ExclusionCalculator(object):
         return s.availability.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
 
     ## General excluding functions
-    def excludeRasterType(s, source, value=None, valueMin=None, valueMax=None, **kwargs):
+    def excludeRasterType(s, source, value=None, valueMin=None, valueMax=None, prewarp=False, **kwargs):
         """Exclude areas based off the values in a raster datasource
 
         Inputs:
@@ -277,6 +311,11 @@ class ExclusionCalculator(object):
             valueMax - Numeric : A convenience input when the desired exclusion range is all values below 
                 a maximal value
                 * This is equivalent to value=(None, valueMax)
+            
+            prewarp: When not False, the source will be warped to the calculator's mask context before processing
+                T/F : If True, warping will be performed using the bilieanr resample algorithm
+                str : Warp using the indicated resampleAlgorithm (options: near, bilinear, cubic, average)
+                dict : A dictionary of arguments corresponding to geokit.RegionMask.warp
 
             kwargs
                 * All other keyword arguments are passed on to a call to geokit.RegionMask.indicateValues
@@ -287,6 +326,14 @@ class ExclusionCalculator(object):
         """
         if value is None and valueMin is None and valueMax is None:
             raise GlaesError("One of value, valueMin, or valueMax must be given")
+
+        # Do prewarp, if needed
+        if prewarp:
+            prewarpArgs = dict(resampleAlg="bilinear")
+            if isinstance(prewarp, str): prewarpArgs["resampleAlg"] = prewarp
+            elif isinstance(prewarp, dict): prewarpArgs.update(prewarp)
+            
+            source = s.region.warp(source, returnAsSource=True, **prewarpArgs)
 
         # Indicate on the source
         if not (valueMin is None and valueMax is None): value = (valueMin,valueMax)
