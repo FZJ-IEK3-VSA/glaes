@@ -110,6 +110,7 @@ class ExclusionCalculator(object):
 
         # load the region
         s.region = gk.RegionMask.load(region, **kwargs)
+        s.srs = s.region.srs
         s.maskPixels = s.region.mask.sum()
 
         # Make the total availability matrix
@@ -435,6 +436,19 @@ class ExclusionCalculator(object):
     	geom = geom.Buffer(dist)
     	newAvail = (s.region.indicateGeoms(geom, **kwargs)*100).astype(np.uint8)
     	s._availability = newAvail
+
+    def pruneIsolatedAreas(s, minSize, threshold=50):
+        """Removes areas which are smaller than 'minSize'
+
+        * minSize is given in units of the calculator's srs
+        """ 
+        # Create a vector file of geometries larger than 'minSize'
+        geoms = gk.geom.convertMask( s.availability>=threshold, bounds=s.region.extent, srs=s.region.srs)
+        geoms = list(filter( lambda x: x.Area()>=minSize, geoms ))
+        vec = gk.vector.createVector(geoms)
+
+        # Replace current availability matrix
+        s._availability = s.region.rasterize( vec).astype(np.uint8 )*100
 
     def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None):
         """Distribute the maximal number of minimally separated items within the available areas
