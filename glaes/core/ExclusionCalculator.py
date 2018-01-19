@@ -158,7 +158,7 @@ class ExclusionCalculator(object):
         s.region.createRaster(output=output, data=data, noData=255, meta=meta, **kwargs)
 
 
-    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#005b82", excludedColor="#8c0000", figsize=(8,8), legendargs={}):
+    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#005b82", excludedColor="#8c0000", figsize=(8,8), legend=True, legendargs={}):
         """Draw the current availability matrix on a matplotlib figure
 
         Inputs:
@@ -253,9 +253,10 @@ class ExclusionCalculator(object):
                 h = plt.plot([],[],'ok', label="Items: {:,d}".format(s._itemCoords.shape[0]) )
                 patches.append( h[0] )
 
-            _legendargs = dict(loc="lower right", fontsize=14)
-            _legendargs.update(legendargs)
-            plt.legend(handles=patches, **_legendargs)
+            if legend:
+                _legendargs = dict(loc="lower right", fontsize=14)
+                _legendargs.update(legendargs)
+                plt.legend(handles=patches, **_legendargs)
 
             ax.set_aspect('equal')
             ax.autoscale(enable=True)
@@ -468,7 +469,7 @@ class ExclusionCalculator(object):
         # Replace current availability matrix
         s._availability = s.region.rasterize( vec).astype(np.uint8 )*100
 
-    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None, asArea=False):
         """Distribute the maximal number of minimally separated items within the available areas
         
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -573,12 +574,46 @@ class ExclusionCalculator(object):
 
         # Make shapefile
         if not output is None:
-            srs = outputSRS if not outputSRS is None else s.region.srs
-            geoms = [gk.geom.point(loc, srs=srs) for loc in coords]
-            gk.vector.createVector(geoms, output)
+            srs = gk.srs.loadSRS(outputSRS) if not outputSRS is None else s.region.srs
+            # Should the locations be converted to areas?
+            if asArea:
+                # Do Voronoi
+                from scipy.spatial import Voronoi
+                pts = np.concatenate([s._itemCoords,
+                    [ (s.region.extent.xMin*0.95,s.region.extent.yMin*0.95,), (s.region.extent.xMin*0.95,s.region.extent.yMax*1.05,),
+                      (s.region.extent.xMax*1.05,s.region.extent.yMin*0.95,), (s.region.extent.xMax*1.05,s.region.extent.yMax*1.05,), ]])
 
-        # Done!
-        return coords
+                v = Voronoi(pts)
+                
+                # Create regions
+                geoms = []
+                for reg in v.regions:
+                    path = []
+                    if -1 in reg or len(reg)==0: continue
+                    for pid in reg:
+                        path.append(v.vertices[pid])
+                    path.append(v.vertices[reg[0]])
+                        
+                    geoms.append( gk.geom.polygon(path, srs=s.region.srs ))
+
+                if not len(geoms) == len(s._itemCoords):
+                    raise GlaesError("Mismatching geometry count")
+
+                # Create a list of geometry from each region WITH availability
+                vec = gk.vector.createVector(geoms, fieldVals={"pid":range(1,len(geoms)+1)})
+                areaMap = s.region.rasterize(vec, attribute="pid", dtype=int) * (s._availability>threshold)
+
+                geoms = gk.geom.convertMask(areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True)
+                if not srs.IsSame(s.region.srs):
+                    geoms = gk.geom.transform(geoms, fromSRS=s.region.srs, toSRS=srs)
+
+            else: # Just write the points                
+                geoms = [gk.geom.point(loc, srs=srs) for loc in coords]
+            
+            gk.vector.createVector(geoms, output=output)
+
+        else:
+            return coords
 
     def distributeAreas(s, targetArea=2000000, threshold=50):
         """Distribute the maximal number of roughly equal sized partitions within the available areas
