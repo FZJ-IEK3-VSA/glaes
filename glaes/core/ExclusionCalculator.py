@@ -292,7 +292,7 @@ class ExclusionCalculator(object):
         return s.availability.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
 
     ## General excluding functions
-    def excludeRasterType(s, source, value=None, valueMin=None, valueMax=None, prewarp=False, **kwargs):
+    def excludeRasterType(s, source, value=None, valueMin=None, valueMax=None, prewarp=False, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in a raster datasource
 
         Inputs:
@@ -343,9 +343,15 @@ class ExclusionCalculator(object):
         areas = (s.region.indicateValues(source, value, **kwargs)*100).astype(np.uint8)
         
         # exclude the indicated area from the total availability
-        s._availability = np.min([s._availability, 100-areas],0)
+        if mode == "exclude":
+            s._availability = np.min([s._availability, areas if invert else 100-areas],axis=0)
+        elif mode == "include":
+            s._availability = np.max([s._availability, 100-areas if invert else areas],axis=0)
+            s._availability[~s.region.mask] = 0
+        else:
+            raise GlaesError("mode must be 'exclude' or 'include'")
 
-    def excludeVectorType(s, source, where=None, invert=False, **kwargs):
+    def excludeVectorType(s, source, where=None, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the features in a vector datasource
 
         Inputs:
@@ -376,12 +382,15 @@ class ExclusionCalculator(object):
         areas = (s.region.indicateFeatures(source, where=where, **kwargs)*100).astype(np.uint8)
         
         # exclude the indicated area from the total availability
-        if invert:
-            s._availability = np.min([s._availability, areas],0)
+        if mode == "exclude":
+            s._availability = np.min([s._availability, areas if invert else 100-areas],axis=0)
+        elif mode == "include":
+            s._availability = np.max([s._availability, 100-areas if invert else areas],axis=0)
+            s._availability[~s.region.mask] = 0
         else:
-            s._availability = np.min([s._availability, 100-areas],0)
+            raise GlaesError("mode must be 'exclude' or 'include'")
 
-    def excludePrior(s, prior, value=None, valueMin=None, valueMax=None, **kwargs):
+    def excludePrior(s, prior, value=None, valueMin=None, valueMax=None, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in one of the Prior datasources
 
             * The Prior datasources are currently only defined over Europe
@@ -447,7 +456,7 @@ class ExclusionCalculator(object):
         source = prior.generateRaster( s.region.extent )
 
         # Call the excluder
-        s.excludeRasterType( source, value=value, **kwargs)
+        s.excludeRasterType( source, value=value, invert=invert, mode=mode, **kwargs)
 
     def shrinkAvailability(s, dist, threshold=50, **kwargs):
     	"""Shrinks the current availability by a given distance in the given SRS"""

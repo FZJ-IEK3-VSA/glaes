@@ -226,11 +226,13 @@ class PriorSet(object):
             try:
                 p = PriorSource(f)
                 s.sources[p.displayName] = p
+                setattr(s, p.displayName, p)
                 if p.alternateName != "NONE":
                     # make a new prior and update the displayName
                     p2 = PriorSource(f)
                     p2.displayName = p.alternateName
                     s.sources[p.alternateName] = p2
+                    setattr(s, p.alternateName, p2)
 
             except PriorSource._LoadFail:
                 print("WARNING: Could not parse file: %s"%(basename(f)))
@@ -254,6 +256,12 @@ class PriorSet(object):
     def sources(s): 
         """An easily indexable/searchable list of the PriorSet's sources"""
         return s._sources
+
+    @property
+    def listKeys(s):
+        k = list(s._sources.keys())
+        k.sort()
+        for _k in k: print(_k)
 
     def __getitem__(s,prior):
         try:
