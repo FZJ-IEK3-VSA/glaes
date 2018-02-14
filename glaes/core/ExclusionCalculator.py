@@ -478,7 +478,7 @@ class ExclusionCalculator(object):
         # Replace current availability matrix
         s._availability = s.region.rasterize( vec).astype(np.uint8 )*100
 
-    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None, asArea=False):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None, asArea=False, minArea=100000):
         """Distribute the maximal number of minimally separated items within the available areas
         
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -613,6 +613,8 @@ class ExclusionCalculator(object):
                 areaMap = s.region.rasterize(vec, attribute="pid", dtype=int) * (s._availability>threshold)
 
                 geoms = gk.geom.convertMask(areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True)
+                geoms = list(filter(lambda x:x.Area()>=minArea, geoms))
+
                 if not srs.IsSame(s.region.srs):
                     geoms = gk.geom.transform(geoms, fromSRS=s.region.srs, toSRS=srs)
 
