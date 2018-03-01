@@ -12,5 +12,6 @@ setup(
         "geokit>=1.0.1",
         "pandas",
         "scipy",
+        "descartes"
     ]
 )

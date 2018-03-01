@@ -8,9 +8,10 @@ import json
 from warnings import warn
 from difflib import SequenceMatcher as SM
 
+from .util import GlaesError
 
 # Sort out the data paths
-priordir = join(dirname(__file__), "..", "..", "data", "priors")
+defaultPriorDir = join(dirname(dirname(dirname(__file__))), "data", "priors")
 
 # Typical criteria
 Criterion = namedtuple("Criteria","doc typicalExclusion unit excludeDirection evaluationName untouchedValue noDataValue")
@@ -217,7 +218,9 @@ class PriorSource(object):
 # Load priors
 class PriorSet(object):
     def __init__(s,path):
-        s.path = path
+        s._loadDirectory(path)
+
+    def _loadDirectory(s,path):
         s._sources = OrderedDict()
 
         for f in glob(join(path,"*.tif")):
@@ -226,11 +229,13 @@ class PriorSet(object):
             try:
                 p = PriorSource(f)
                 s.sources[p.displayName] = p
+                setattr(s, p.displayName, p)
                 if p.alternateName != "NONE":
                     # make a new prior and update the displayName
                     p2 = PriorSource(f)
                     p2.displayName = p.alternateName
                     s.sources[p.alternateName] = p2
+                    setattr(s, p.alternateName, p2)
 
             except PriorSource._LoadFail:
                 print("WARNING: Could not parse file: %s"%(basename(f)))
@@ -255,7 +260,15 @@ class PriorSet(object):
         """An easily indexable/searchable list of the PriorSet's sources"""
         return s._sources
 
+    @property
+    def listKeys(s):
+        k = list(s._sources.keys())
+        k.sort()
+        for _k in k: print(_k)
+
     def __getitem__(s,prior):
+        if len(s.sources)==0:
+            raise GlaesError("No priors have been installed. Use gl.setPriorDirectory( <path> ) or else place the files directly in the default prior data directory (%s)"%defaultPriorDir)
         try:
             output = s.sources[prior]
         except KeyError:
@@ -290,4 +303,6 @@ class PriorSet(object):
 
 
 # MAKE THE PRIORS!
-Priors = PriorSet(priordir)
+Priors = PriorSet(defaultPriorDir)
+def setPriorDirectory(path):
+    Priors._loadDirectory(path)

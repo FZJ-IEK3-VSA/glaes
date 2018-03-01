@@ -110,6 +110,7 @@ class ExclusionCalculator(object):
 
         # load the region
         s.region = gk.RegionMask.load(region, **kwargs)
+        s.srs = s.region.srs
         s.maskPixels = s.region.mask.sum()
 
         # Make the total availability matrix
@@ -117,6 +118,7 @@ class ExclusionCalculator(object):
         #s._availability[~s.region.mask] = 255
 
         # Make a list of item coords
+        s.itemCoords=None
         s._itemCoords=None
     
     def save(s, output, threshold=None, **kwargs):
@@ -156,7 +158,7 @@ class ExclusionCalculator(object):
         s.region.createRaster(output=output, data=data, noData=255, meta=meta, **kwargs)
 
 
-    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#005b82", excludedColor="#8c0000", figsize=(8,8), legendargs={}):
+    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#9bbb59", excludedColor="#a6161a", figsize=(8,8), legend=True, legendargs={"loc":"lower left"}, pad={"left":0.25}):
         """Draw the current availability matrix on a matplotlib figure
 
         Inputs:
@@ -251,12 +253,31 @@ class ExclusionCalculator(object):
                 h = plt.plot([],[],'ok', label="Items: {:,d}".format(s._itemCoords.shape[0]) )
                 patches.append( h[0] )
 
-            _legendargs = dict(loc="lower right", fontsize=14)
-            _legendargs.update(legendargs)
-            plt.legend(handles=patches, **_legendargs)
+            if legend:
+                _legendargs = dict(loc="lower right", fontsize=14)
+                _legendargs.update(legendargs)
+                plt.legend(handles=patches, **_legendargs)
 
             ax.set_aspect('equal')
             ax.autoscale(enable=True)
+            if not pad is None:
+                yMin,yMax = ax.get_ylim()
+                xMin,xMax = ax.get_xlim()
+
+                _yMin,_yMax = ax.get_ylim()
+                _xMin,_xMax = ax.get_xlim()
+
+                if "left" in pad:   
+                    _xMin = xMin - pad["left"]*(xMax-xMin)
+                if "right" in pad:   
+                    _xMax = xMax + pad["right"]*(xMax-yMin)
+                if "down" in pad:   
+                    _yMin = yMin - pad["down"]*(yMax-yMin)
+                if "up" in pad:   
+                    _yMax = yMax + pad["up"]*(yMax-yMin)
+
+                ax.set_ylim(_yMin, _yMax)
+                ax.set_xlim(_xMin, _xMax)
 
             if noBorder:
                 plt.axis('off')
@@ -289,7 +310,7 @@ class ExclusionCalculator(object):
         return s.availability.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
 
     ## General excluding functions
-    def excludeRasterType(s, source, value=None, valueMin=None, valueMax=None, prewarp=False, **kwargs):
+    def excludeRasterType(s, source, value=None, valueMin=None, valueMax=None, prewarp=False, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in a raster datasource
 
         Inputs:
@@ -340,9 +361,15 @@ class ExclusionCalculator(object):
         areas = (s.region.indicateValues(source, value, **kwargs)*100).astype(np.uint8)
         
         # exclude the indicated area from the total availability
-        s._availability = np.min([s._availability, 100-areas],0)
+        if mode == "exclude":
+            s._availability = np.min([s._availability, areas if invert else 100-areas],axis=0)
+        elif mode == "include":
+            s._availability = np.max([s._availability, 100-areas if invert else areas],axis=0)
+            s._availability[~s.region.mask] = 0
+        else:
+            raise GlaesError("mode must be 'exclude' or 'include'")
 
-    def excludeVectorType(s, source, where=None, invert=False, **kwargs):
+    def excludeVectorType(s, source, where=None, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the features in a vector datasource
 
         Inputs:
@@ -373,12 +400,15 @@ class ExclusionCalculator(object):
         areas = (s.region.indicateFeatures(source, where=where, **kwargs)*100).astype(np.uint8)
         
         # exclude the indicated area from the total availability
-        if invert:
-            s._availability = np.min([s._availability, areas],0)
+        if mode == "exclude":
+            s._availability = np.min([s._availability, areas if invert else 100-areas],axis=0)
+        elif mode == "include":
+            s._availability = np.max([s._availability, 100-areas if invert else areas],axis=0)
+            s._availability[~s.region.mask] = 0
         else:
-            s._availability = np.min([s._availability, 100-areas],0)
+            raise GlaesError("mode must be 'exclude' or 'include'")
 
-    def excludePrior(s, prior, value=None, valueMin=None, valueMax=None, **kwargs):
+    def excludePrior(s, prior, value=None, valueMin=None, valueMax=None, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in one of the Prior datasources
 
             * The Prior datasources are currently only defined over Europe
@@ -444,7 +474,7 @@ class ExclusionCalculator(object):
         source = prior.generateRaster( s.region.extent )
 
         # Call the excluder
-        s.excludeRasterType( source, value=value, **kwargs)
+        s.excludeRasterType( source, value=value, invert=invert, mode=mode, **kwargs)
 
     def shrinkAvailability(s, dist, threshold=50, **kwargs):
         """Shrinks the current availability by a given distance in the given SRS"""
