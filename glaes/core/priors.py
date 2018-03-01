@@ -10,7 +10,7 @@ from difflib import SequenceMatcher as SM
 
 
 # Sort out the data paths
-priordir = join(dirname(__file__), "..", "..", "data", "priors")
+priordir = join(dirname(dirname(dirname(__file__))), "data", "priors")
 
 # Typical criteria
 Criterion = namedtuple("Criteria","doc typicalExclusion unit excludeDirection evaluationName untouchedValue noDataValue")
@@ -217,7 +217,9 @@ class PriorSource(object):
 # Load priors
 class PriorSet(object):
     def __init__(s,path):
-        s.path = path
+        s._loadDirectory(path)
+
+    def _loadDirectory(s,path):
         s._sources = OrderedDict()
 
         for f in glob(join(path,"*.tif")):
@@ -264,6 +266,8 @@ class PriorSet(object):
         for _k in k: print(_k)
 
     def __getitem__(s,prior):
+        if len(s.sources)==0:
+            raise GlaesError("No priors have been installed. Use gl.setPriorDirectory( <path> ) or else place the files directly in the default prior data directory (%s)"%defaultPriorDir)
         try:
             output = s.sources[prior]
         except KeyError:
@@ -298,4 +302,6 @@ class PriorSet(object):
 
 
 # MAKE THE PRIORS!
-Priors = PriorSet(priordir)
+Priors = PriorSet(defaultPriorDir)
+def setPriorDirectory(path):
+    Priors._loadDirectory(path)
