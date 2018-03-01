@@ -1,15 +1,16 @@
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
     name='glaes',
-    version='1.0.0',
+    version='1.0.1',
     author='Severin Ryberg',
-    url='https://github.com/FZJ-IEK3-VSA/glaes',
-    packages = ["glaes"],
+    url='http://www.fz-juelich.de/iek/iek-3/EN/Home/home_node.html',
+    packages = find_packages(),
+    include_package_data=True,
     install_requires = [
         "gdal>=2.1.0",
         "numpy>=1.11.2",
-        "geokit>=1.0.1",
+        "geokit>=1.0.3",
         "pandas",
         "scipy",
         "descartes"
