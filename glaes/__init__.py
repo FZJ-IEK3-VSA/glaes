@@ -12,4 +12,4 @@ from .core.WeightedCriterionCalculator import WeightedCriterionCalculator
 from .predefinedExclusions import ExclusionSets
 
 from os.path import join as _join, dirname as _dirname
-_test_data_ = _join(_dirname(_dirname(__file__)), "testing", "data")
+_test_data_ = _join(_dirname(__file__), "test", "data")

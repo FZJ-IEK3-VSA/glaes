@@ -1,0 +1,4 @@
+recursive-include glaes *.py
+recursive-include glaes/test *
+recursive-include glaes/data *
+recursive-include glaes/core *.py

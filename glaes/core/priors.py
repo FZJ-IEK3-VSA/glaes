@@ -10,7 +10,7 @@ from difflib import SequenceMatcher as SM
 
 
 # Sort out the data paths
-priordir = join(dirname(dirname(dirname(__file__))), "data", "priors")
+defaultPriorDir = join(dirname(dirname(__file__)), "data", "priors")
 
 # Typical criteria
 Criterion = namedtuple("Criteria","doc typicalExclusion unit excludeDirection evaluationName untouchedValue noDataValue")

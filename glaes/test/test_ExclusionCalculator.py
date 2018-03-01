@@ -31,27 +31,25 @@ def test_excludeRasterType():
     # exclude single value
     ec = gl.ExclusionCalculator(aachenShape)
     ec.excludeRasterType(clcRaster, 12)
-
-    if not (isclose(ec.availability.mean(), 32.497469, 1e-6) and isclose(ec.availability.std(), 46.836540, 1e-6)):
+    if not (isclose(ec.availability.mean(), 33.03565403216736, 1e-6) and isclose(ec.availability.std(), 47.03414680722593, 1e-6)):
         raise RuntimeError("excludeRasterType: Single value exclusion - FAIL")
 
     # exclude value range
     ec = gl.ExclusionCalculator(aachenShape)
     ec.excludeRasterType(clcRaster, (5,12))
 
-    if not (isclose(ec.availability.mean(), 31.626365, 1e-6) and isclose(ec.availability.std(), 46.501717, 1e-6)):
+    if not (isclose(ec.availability.mean(), 32.38105949836914, 1e-6) and isclose(ec.availability.std(), 46.79287270087178, 1e-6)):
         raise RuntimeError("excludeRasterType: Value range exclusion - FAIL")
     
     # exclude value maximum
     ec = gl.ExclusionCalculator(aachenShape)
     ec.excludeRasterType(clcRaster, (None,12))
 
-    if not (isclose(ec.availability.mean(), 23.848273, 1e-6) and isclose(ec.availability.std(), 42.615572, 1e-6)):
+    if not (isclose(ec.availability.mean(), 23.348892138117197, 1e-6) and isclose(ec.availability.std(), 42.305064114527575, 1e-6)):
         raise RuntimeError("excludeRasterType: Value maximum exclusion - FAIL")
     
     ecMax12 = gl.ExclusionCalculator(aachenShape)
     ecMax12.excludeRasterType(clcRaster, valueMax=12)
-
     if not np.abs(ecMax12.availability-ec.availability).sum()/ec.availability.size < 0.000001:
         raise RuntimeError("excludeRasterType: valueMax argument - FAIL")
 
@@ -59,7 +57,7 @@ def test_excludeRasterType():
     ec = gl.ExclusionCalculator(aachenShape)
     ec.excludeRasterType(clcRaster, (13,None))
 
-    if not (isclose(ec.availability.mean(), 16.048251, 1e-6) and isclose(ec.availability.std(), 36.705297, 1e-6)):
+    if not (isclose(ec.availability.mean(), 16.54763243729614, 1e-6) and isclose(ec.availability.std(), 37.16098901334246, 1e-6)):
         raise RuntimeError("excludeRasterType: Value minimum exclusion - FAIL")
     
     ecMin13 = gl.ExclusionCalculator(aachenShape)
@@ -135,8 +133,8 @@ def test_multiple_exclusions():
     ec.excludePrior(pr, valueMax=400)   
     ec.excludeVectorType(cddaVector, where="YEAR>2000")
     ec.excludeRasterType(clcRaster, valueMax=12)
-
-    if not (isclose(ec.availability.mean(), 15.2027443482, 1e-6) and isclose(ec.availability.std(), 35.6248783489, 1e-6)):
+    
+    if not (isclose(ec.availability.mean(), 14.79785738387133, 1e-6) and isclose(ec.availability.std(), 35.249694265461024, 1e-6)):
         raise RuntimeError("Multiple Exclusions - FAIL")
 
 def test_distributeItems():
