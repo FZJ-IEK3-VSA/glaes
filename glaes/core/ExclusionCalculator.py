@@ -158,7 +158,7 @@ class ExclusionCalculator(object):
         s.region.createRaster(output=output, data=data, noData=255, meta=meta, **kwargs)
 
 
-    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#005b82", excludedColor="#8c0000", figsize=(8,8), legend=True, legendargs={}):
+    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#9bbb59", excludedColor="#a6161a", figsize=(8,8), legend=True, legendargs={"loc":"lower left"}, pad={"left":0.25}):
         """Draw the current availability matrix on a matplotlib figure
 
         Inputs:
@@ -260,6 +260,24 @@ class ExclusionCalculator(object):
 
             ax.set_aspect('equal')
             ax.autoscale(enable=True)
+            if not pad is None:
+                yMin,yMax = ax.get_ylim()
+                xMin,xMax = ax.get_xlim()
+
+                _yMin,_yMax = ax.get_ylim()
+                _xMin,_xMax = ax.get_xlim()
+
+                if "left" in pad:   
+                    _xMin = xMin - pad["left"]*(xMax-xMin)
+                if "right" in pad:   
+                    _xMax = xMax + pad["right"]*(xMax-yMin)
+                if "down" in pad:   
+                    _yMin = yMin - pad["down"]*(yMax-yMin)
+                if "up" in pad:   
+                    _yMax = yMax + pad["up"]*(yMax-yMin)
+
+                ax.set_ylim(_yMin, _yMax)
+                ax.set_xlim(_xMin, _xMax)
 
             if noBorder:
                 plt.axis('off')
