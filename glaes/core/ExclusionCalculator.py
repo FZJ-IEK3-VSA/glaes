@@ -638,8 +638,8 @@ class ExclusionCalculator(object):
                     geoms = gk.geom.transform(geoms, fromSRS=s.region.srs, toSRS=srs)
 
                 # Add 'area' column
-                geoms = pd.DataFrame({"geom":geoms})
-                geoms["areas"] = [g.Area() for g in geoms]
+                areas = [g.Area() for g in geoms]
+                geoms = pd.DataFrame({"geom":geoms, "area":areas})
 
             else: # Just write the points                
                 geoms = [gk.geom.point(loc, srs=srs) for loc in coords]
