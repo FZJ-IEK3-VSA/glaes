@@ -630,11 +630,15 @@ class ExclusionCalculator(object):
                 vec = gk.vector.createVector(geoms, fieldVals={"pid":range(1,len(geoms)+1)})
                 areaMap = s.region.rasterize(vec, attribute="pid", dtype=int) * (s._availability>threshold)
 
-                geoms = gk.geom.convertMask(areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True)
+                geoms = gk.geom.vectorize(areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True)
                 geoms = list(filter(lambda x:x.Area()>=minArea, geoms))
 
                 if not srs.IsSame(s.region.srs):
                     geoms = gk.geom.transform(geoms, fromSRS=s.region.srs, toSRS=srs)
+
+                # Add 'area' column
+                geoms = pd.DataFrame({"geom":geoms})
+                geoms["areas"] = [g.Area() for g in geoms]
 
             else: # Just write the points                
                 geoms = [gk.geom.point(loc, srs=srs) for loc in coords]
