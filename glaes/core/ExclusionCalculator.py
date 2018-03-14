@@ -3,6 +3,7 @@ from os.path import join, dirname, basename, isfile
 from glob import glob
 import re
 import numpy as np
+import pandas as pd
 from collections import namedtuple, OrderedDict
 
 from .priors import Priors, PriorSource
