@@ -81,22 +81,20 @@ If you would like to install the Prior datasets:
 
 ## Associated papers
 
-If you would like to see a **much** more detailed discussion on land eligibility analysis and see why a framework such as GLAES is not only helpful, but a requirement, please see:
-
-<a href="the-background-paper">The Background Paper</a>
+If you would like to see a **much** more detailed discussion on land eligibility analysis and see why a framework such as GLAES is not only helpful, but a requirement, please see [the background paper](https://arxiv.org/abs/1712.07840)
 
 Examples of Land Eligibility evaluation and applications:
 
 * [Determining the Land Eligibility of Renewable Energy Technologies with Application to European Wind Energy](link-will-go-here)
 
-* [Spatio-Temporal Optimization of a Future Energy System for Power-to-Hydrogen Applications in Germany](link-will-go-here)
+* [Spatio-Temporal Optimization of a Future Energy System for Power-to-Hydrogen Applications in Germany](https://linkinghub.elsevier.com/retrieve/pii/S036054421830879X)
 
 * [Linking the Power and Transport Sectors—Part 2: Modelling a Sector Coupling Scenario for Germany](http://www.mdpi.com/1996-1073/10/7/957/htm)
 
 ---
 ## Citation
 
-If you decide to use GLAES anywhere in a published work, please kindly cite us using the following
+If you decide to use GLAES anywhere in a published work, please kindly cite us using the following:
 
 ```bibtex
 @Article{glaes,
