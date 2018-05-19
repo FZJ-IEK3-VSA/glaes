@@ -497,13 +497,15 @@ class ExclusionCalculator(object):
         # Replace current availability matrix
         s._availability = s.region.rasterize( vec).astype(np.uint8 )*100
 
-    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None, asArea=False, minArea=100000):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None, asArea=False, minArea=100000, axialDirection=None):
         """Distribute the maximal number of minimally separated items within the available areas
         
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
 
         Inputs:
-            separation - float : The minimal distance between two items
+            separation : The minimal distance between two items
+                - float : The separation distance when axialDirection is None
+                - (float, float) : The separation distance in the axial and transverse direction
 
             pixelDivision - int : The inter-pixel fidelity to use when deciding where items can be placed
 
@@ -516,18 +518,61 @@ class ExclusionCalculator(object):
                 * The default (4326) corresponds to regular lat/lon
 
             output : A path to an output shapefile
+
+            axialDirection : The axial direction in degrees
+                - float : The direction to apply to all points
+                - np.ndarray : The directions at each pixel (must match availability matrix shape)
+                - str : A path to a raster file containing axial directions 
         """
         # Preprocess availability
         workingAvailability = s.availability >= threshold
         if not workingAvailability.dtype == 'bool':
             raise s.GlaesError("Working availability must be boolean type")
+
         workingAvailability[~s.region.mask] = False
+
+        # Handle a gradient file, if one is given
+        if not axialDirection is None:
+            if isinstance(axialDirection, str): # Assume a path to a raster file is given
+                axialDirection = s.region.warp(axialDirection)
+            elif isinstance(axialDirection, np.ndarray): # Assume a path to a raster file is given
+                if not axialDirection.shape == rm.mask.shape:
+                    raise GlaesError("axialDirection matrix does not match context")
+            else: # axialDirection should be a single value
+                axialDirection = -np.radians(float(axialDirection))
+
+            useGradient = True
+        else:
+            useGradient = False
+
         # Turn separation into pixel distances
-        separation = separation / s.region.pixelSize
-        sep2 = separation**2
-        sepFloor = max(separation-1,0)
-        sepFloor2 = sepFloor**2
-        sepCeil = separation+1
+        if useGradient: 
+            try:
+                sepA, sepT = separation
+            except:
+                raise GlaesError("When giving gradient data, a separation tuple is expected")
+
+            sepA = sepA / s.region.pixelSize
+            sepT = sepT / s.region.pixelSize
+
+            sepA2 = sepA**2
+            sepT2 = sepT**2
+
+            sepFloorA = sepA-1
+            sepFloorT = sepT-1
+            if sepFloorA<1 or sepFloorT<1: raise GlaesError("Seperations are too small compared to pixel size")
+
+            sepFloorA2 = sepFloorA**2
+            sepFloorT2 = sepFloorT**2
+
+            sepCeil = max(sepA,sepT)+1
+
+        else:
+            separation = separation / s.region.pixelSize
+            sep2 = separation**2
+            sepFloor = max(separation-1,0)
+            sepFloor2 = sepFloor**2
+            sepCeil = separation+1
 
         # Make geom list
         x = np.zeros((maxItems))
@@ -556,25 +601,49 @@ class ExclusionCalculator(object):
                 yClip = y[bot:cnt]
 
                 # calculate distances
-                xDist = np.abs(xClip-xi)
-                yDist = np.abs(yClip-yi)
+                xDist = xClip-xi
+                yDist = yClip-yi
 
                 # Get the indicies in the possible range
-                possiblyInRange = np.argwhere( xDist <= sepCeil ) # all y values should already be within the sepCeil 
+                pir = np.argwhere( np.abs(xDist) <= sepCeil ) # pir => Possibly In Range, 
+                                                              # all y values should already be within the sepCeil 
 
                 # only continue if there are no points in the immediate range of the whole pixel
-                immidiateRange = (xDist[possiblyInRange]*xDist[possiblyInRange]) + (yDist[possiblyInRange]*yDist[possiblyInRange]) <= sepFloor2
-                if immidiateRange.any(): continue
+                if useGradient:
+                    if isinstance(axialDirection, np.ndarray):
+                        grad = -np.radians(axialDirection[yi,xi])
+                    else:
+                        grad = axialDirection
+
+                    cG = np.cos(grad)
+                    sG = np.sin(grad)
+                    
+                    dist = np.power((xDist[pir]*cG + yDist[pir]*sG),2)/sepFloorA2 +\
+                           np.power((xDist[pir]*sG - yDist[pir]*cG),2)/sepFloorT2
+
+                    immidiatelyInRange = dist <= 1
+
+                else:
+                    immidiatelyInRange = np.power(xDist[pir],2) + np.power(yDist[pir],2) <= sepFloor2
+                
+                if immidiatelyInRange.any(): continue
 
                 # Start searching in the 'sub pixel'
                 found = False
                 for xsp in substeps+xi:
-                    xSubDist = np.abs(xClip[possiblyInRange]-xsp)
+                    xSubDist = xClip[pir]-xsp
                     for ysp in substeps+yi:
-                        ySubDist = np.abs(yClip[possiblyInRange]-ysp)
+                        ySubDist = yClip[pir]-ysp
 
                         # Test if any points in the range are overlapping
-                        overlapping = (xSubDist*xSubDist + ySubDist*ySubDist) <= sep2
+                        if useGradient: # Test if in rotated ellipse
+                            dist = (np.power((xSubDist*cG + ySubDist*sG),2)/sepA2) +\
+                                   (np.power((xSubDist*sG - ySubDist*cG),2)/sepT2)
+                            overlapping = dist <= 1
+
+                        else: # test if in circle
+                            overlapping = (np.power(xSubDist,2) + np.power(ySubDist,2)) <= sep2
+                        
                         if not overlapping.any():
                             found = True
                             break
@@ -586,6 +655,7 @@ class ExclusionCalculator(object):
                     x[cnt] = xsp
                     y[cnt] = ysp
                     cnt += 1
+
                  
         # Convert identified points back into the region's coordinates
         coords = np.zeros((cnt,2))
@@ -648,52 +718,3 @@ class ExclusionCalculator(object):
 
         else:
             return coords
-
-    def distributeAreas(s, targetArea=2000000, threshold=50):
-        """Distribute the maximal number of roughly equal sized partitions within the available areas
-        
-        Returns a list of tuples, each containing x/y coordinates (in the ExclusionCalculator's srs) of a partition as well as the partition's geometry
-
-        Inputs:
-            targetArea - float : The desired area (in units of the ExclusionCalculator's srs) for each partition
-
-            threshold : The minimal availability value to allow placing an item on
-        """
-        # Get the working availability
-        workingAvailability = s.availability >= threshold
-        if not workingAvailability.dtype == 'bool':
-            raise s.GlaesError("Working availability must be boolean type")
-
-        # polygonize availability
-        geoms, values = gk.raster.polygonize(workingAvailability, bounds=s.region.extent, noDataValue=0, shrink=True)
-        
-        # partition each of the new geometries
-        newGeoms = []
-        for gi in range(0, len(geoms)):
-            g = geoms[gi]
-            
-            gArea = g.Area()
-            if gArea <= targetArea*1.6:
-                newGeoms.append(g.Clone())
-                
-            else:
-                #gTmp, vTmp = gk.geom.partitionArea(g, targetArea=fudgedTargetArea, resolution=s.region.pixelSize, **kwargs)
-                try:
-                    gTmp = gk.geom.partition(g, targetArea=targetArea, growStep=s.region.pixelSize*3)
-                except Exception as e:
-                    print(gi)
-                    raise e 
-
-                newGeoms.extend(gTmp)
-                
-        # finalize geom list
-        def inRange(x):
-            area = x.Area()
-            if area >= (0.5*targetArea) and area <= (2.1 * targetArea):
-                return True
-            else:
-                return False
-        newGeoms = np.array(list(filter(inRange, newGeoms)))
-
-        # get centroids and return
-        return Areas( np.array([g.Centroid().GetPoints() for g in newGeoms]), newGeoms)
