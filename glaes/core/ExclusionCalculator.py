@@ -534,7 +534,7 @@ class ExclusionCalculator(object):
         # Handle a gradient file, if one is given
         if not axialDirection is None:
             if isinstance(axialDirection, str): # Assume a path to a raster file is given
-                axialDirection = s.region.warp(axialDirection)
+                axialDirection = s.region.warp(axialDirection, resampleAlg='near')
             elif isinstance(axialDirection, np.ndarray): # Assume a path to a raster file is given
                 if not axialDirection.shape == s.region.mask.shape:
                     raise GlaesError("axialDirection matrix does not match context")
@@ -618,8 +618,8 @@ class ExclusionCalculator(object):
                     cG = np.cos(grad)
                     sG = np.sin(grad)
                     
-                    dist = np.power((xDist[pir]*cG + yDist[pir]*sG),2)/sepFloorA2 +\
-                           np.power((xDist[pir]*sG - yDist[pir]*cG),2)/sepFloorT2
+                    dist = np.power((xDist[pir]*cG - yDist[pir]*sG),2)/sepFloorA2 +\
+                           np.power((xDist[pir]*sG + yDist[pir]*cG),2)/sepFloorT2
 
                     immidiatelyInRange = dist <= 1
 
@@ -637,8 +637,8 @@ class ExclusionCalculator(object):
 
                         # Test if any points in the range are overlapping
                         if useGradient: # Test if in rotated ellipse
-                            dist = (np.power((xSubDist*cG + ySubDist*sG),2)/sepA2) +\
-                                   (np.power((xSubDist*sG - ySubDist*cG),2)/sepT2)
+                            dist = (np.power((xSubDist*cG - ySubDist*sG),2)/sepA2) +\
+                                   (np.power((xSubDist*sG + ySubDist*cG),2)/sepT2)
                             overlapping = dist <= 1
 
                         else: # test if in circle
