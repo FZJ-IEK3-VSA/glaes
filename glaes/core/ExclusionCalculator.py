@@ -536,7 +536,7 @@ class ExclusionCalculator(object):
             if isinstance(axialDirection, str): # Assume a path to a raster file is given
                 axialDirection = s.region.warp(axialDirection)
             elif isinstance(axialDirection, np.ndarray): # Assume a path to a raster file is given
-                if not axialDirection.shape == rm.mask.shape:
+                if not axialDirection.shape == s.region.mask.shape:
                     raise GlaesError("axialDirection matrix does not match context")
             else: # axialDirection should be a single value
                 axialDirection = -np.radians(float(axialDirection))
@@ -611,7 +611,7 @@ class ExclusionCalculator(object):
                 # only continue if there are no points in the immediate range of the whole pixel
                 if useGradient:
                     if isinstance(axialDirection, np.ndarray):
-                        grad = -np.radians(axialDirection[yi,xi])
+                        grad = np.radians(axialDirection[yi,xi])
                     else:
                         grad = axialDirection
 
