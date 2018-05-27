@@ -364,41 +364,56 @@ class ExclusionCalculator(object):
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, prewarp=False, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in a raster datasource
 
-        Inputs:
-            source : The raster datasource defining the values for each location
-                - str : A path to a raster data source
-                - gdal Dataset : An open gdal dataset object held in memory
+        Parameters:
+        -----------
+        source : str or gdal.Dataset
+            The raster datasource defining the criteria values for each location
             
-            value : The exact value, or value range to exclude
-                - Numeric : The exact value to exclude
-                    * Generally this should only be done when the raster datasource contains integer values, 
-                      otherwise a range of values should be used to avoid float comparison errors
-                - ( Numeric, Numeric ) : The low and high boundary describing the range of values to exclude
-                    * If either boundary is given as None, then it is interpreted as unlimited
+        value : tuple, or numeric 
+            The exact value, or value range to exclude
+            * If Numeric, should be The exact value to exclude
+                * Generally this should only be done when the raster datasource 
+                  contains integer values, otherwise a range of values should be 
+                  used to avoid float comparison errors
+            * If ( Numeric, Numeric ), the low and high boundary describing the 
+              range of values to exclude
+                * If either boundary is given as None, then it is interpreted as 
+                  unlimited
 
-            buffer : float; optional
-                A buffer region to add around the indicated pixels
-                * Units are in the RegionMask's srs
-                * The buffering occurs AFTER the indication and warping step and
-                  so it may not represent the original dataset exactly
-                  - Buffering can be made more accurate by increasing the 
-                    'resolutionDiv' input
-            
-            resolutionDiv : int
-                The factor by which to divide the RegionMask's native resolution
-                * This is useful if you need to represent very fine details
-            
-            prewarp: When not False, the source will be warped to the calculator's mask context before processing
-                T/F : If True, warping will be performed using the bilieanr resample algorithm
-                str : Warp using the indicated resampleAlgorithm (options: near, bilinear, cubic, average)
-                dict : A dictionary of arguments corresponding to geokit.RegionMask.warp
+        buffer : float; optional
+            A buffer region to add around the indicated pixels
+            * Units are in the RegionMask's srs
+            * The buffering occurs AFTER the indication and warping step and
+              so it may not represent the original dataset exactly
+              - Buffering can be made more accurate by increasing the 
+                'resolutionDiv' input
+        
+        resolutionDiv : int; optional
+            The factor by which to divide the RegionMask's native resolution
+            * This is useful if you need to represent very fine details
+        
+        prewarp : bool or str or dict; optional
+            When given, the source will be warped to the calculator's mask context 
+            before processing
+            * If True, warping will be performed using the bilinear scheme
+            * If str, warp using the indicated resampleAlgorithm 
+              - options: 'near', 'bilinear', 'cubic', 'average'
+            * If dict, a dictionary of arguments is expected
+              - These are passed along to geokit.RegionMask.warp
 
-            kwargs
-                * All other keyword arguments are passed on to a call to geokit.RegionMask.indicateValues
-                * Most importantly...
-                    - 'resampeAlg' is used to define how the indication matrix is warped to fit the region mask
-                    - 'resolutionDiv' is used to increase the resolution of the working matrix during processing
-                    - 'buffer' is used to add a buffer region (given in units of the ExclusionCalculator's srs) around the raw indicated areas
+        invert: bool; optional
+            If True, flip indications
+
+        mode: string; optional
+            * If 'exclude', then the indicated pixels are subtracted from the 
+              current availability matrix
+            * If 'include', then the indicated pixel are added back into the
+              availability matrix
+
+        kwargs
+            * All other keyword arguments are passed on to a call to 
+              geokit.RegionMask.indicateValues
+
         """
         # Do prewarp, if needed
         if prewarp:
@@ -422,48 +437,59 @@ class ExclusionCalculator(object):
 
     def excludeVectorType(s, source, where=None, buffer=None, bufferMethod='geom', invert=False, mode="exclude", resolutionDiv=1, **kwargs):
         """Exclude areas based off the features in a vector datasource
+        
+        Parameters:
+        -----------
+        source : str or gdal.Dataset
+            The raster datasource defining the criteria values for each location
+            
+        where : str
+            A filtering statement to apply to the datasource before the indication
+            * This is an SQL like statement which can operate on features in the 
+              datasource
+            * For tips, see "http://www.gdal.org/ogr_sql.html"
+            * For example...
+              - If the datasource had features which each have an attribute 
+                called 'type' and only features with the type "protected" are 
+                wanted, the correct statement would be: 
+                    where="type='protected'"
+        
+        buffer : float; optional
+            A buffer region to add around the indicated pixels
+            * Units are in the RegionMask's srs
 
-        Inputs:
-            source : The raster datasource defining the features to indicate from
-                - str : A path to a vector data source
-                - gdal Dataset : An open gdal dataset object held in memory
-            
-            where - str : A filtering statement to apply to the datasource before the initial indication
-                * This is an SQL like statement which can operate on features in the datasource
-                * For tips, see "http://www.gdal.org/ogr_sql.html"
-                * For example...
-                    - If the datasource had features which each have an attribute called 'type' and only features with the type "protected" are wanted, the correct statement would be: 
-                        where="type='protected'"
-            
-            buffer : float; optional
-                A buffer region to add around the indicated pixels
-                * Units are in the RegionMask's srs
+        bufferMethod : str; optional
+            An indicator determining the method to use when buffereing
+            * Options are: 'geom' and 'area'
+            * If 'geom', the function will attempt to grow each of the geometries
+              directly using the ogr library
+              - This can fail sometimes when the geometries are particularly 
+                complex or if some of the geometries are not valid (as in, they 
+                have self-intersections)
+            * If 'area', the function will first rasterize the raw geometries and
+              will then apply the buffer to the indicated pixels
+              - This is the safer option although is not as accurate as the 'geom'
+                option since it does not capture the exact edges of the geometries
+              - This method can be made more accurate by increasing the 
+                'resolutionDiv' input
+        
+        resolutionDiv : int; optional
+            The factor by which to divide the RegionMask's native resolution
+            * This is useful if you need to represent very fine details
 
-            bufferMethod : str; optional
-                An indicator determining the method to use when buffereing
-                * Options are: 'geom' and 'area'
-                * If 'geom', the function will attempt to grow each of the geometries
-                  directly using the ogr library
-                  - This can fail sometimes when the geometries are particularly 
-                    complex or if some of the geometries are not valid (as in, they 
-                    have self-intersections)
-                * If 'area', the function will first rasterize the raw geometries and
-                  will then apply the buffer to the indicated pixels
-                  - This is the safer option although is not as accurate as the 'geom'
-                    option since it does not capture the exact edges of the geometries
-                  - This method can be made more accurate by increasing the 
-                    'resolutionDiv' input
-            
-            resolutionDiv : int; optional
-                The factor by which to divide the RegionMask's native resolution
-                * This is useful if you need to represent very fine details
-            invert - T/F : Flag causing the exclusion of all unindicated areas, instead of all indicated areas 
-            
-            kwargs
-                * All other keyword arguments are passed on to a call to geokit.RegionMask.indicateFeatures
-                * Most importantly...
-                    - 'resolutionDiv' is used to increase the resolution of the working matrix during processing
-                    - 'buffer' is used to add a buffer region (given in units of the ExclusionCalculator's srs) around the raw indicated features
+        invert: bool; optional
+            If True, flip indications
+
+        mode: string; optional
+            * If 'exclude', then the indicated pixels are subtracted from the 
+              current availability matrix
+            * If 'include', then the indicated pixel are added back into the
+              availability matrix
+
+        kwargs
+            * All other keyword arguments are passed on to a call to 
+              geokit.RegionMask.indicateFeatures
+        
         """
         if isinstance(source, PriorSource):
             edgeI = kwargs.pop("edgeIndex", np.argwhere(source.edges==source.typicalExclusion))
@@ -483,34 +509,52 @@ class ExclusionCalculator(object):
             raise GlaesError("mode must be 'exclude' or 'include'")
 
     def excludePrior(s, prior, value=None, buffer=None, invert=False, mode="exclude", **kwargs):
-        """Exclude areas based off the values in one of the Prior datasources
+        """Exclude areas based off the values in one of the Prior data sources
 
-            * The Prior datasources are currently only defined over Europe
-            * All Prior datasources are defined in the EPSG3035 projection system with 100x100 meter resolution
-            * For each call to excludePrior, a temporary raster datasource is generated around the ExclusionCalculator's region, after which a call to ExclusionCalculator.excludeRasterType is made, therefore all the same inputs apply here as well
+        * The Prior datasources are currently only defined over Europe
+        * All Prior datasources are defined in the EPSG3035 projection system 
+          with 100x100 meter resolution
+        * For each call to excludePrior, a temporary raster datasource is generated
+          around the ExclusionCalculator's region, after which a call to 
+          ExclusionCalculator.excludeRasterType is made, therefore all the same 
+          inputs apply here as well
 
-        Inputs:
-            source - str : The name of the Prior datasource defining the values for each location
-                * If the name does not exactly match one of the Prior datasources, the best fitting name will be used (and you will be informed about which one is chosen)
-                * See the ExclusionCalculator.typicalExclusions dictionary for the Prior dataset names and what a typical exclusion threshold would be
-                * A list of Prior datasets names can also be found in Priors.sources
+        Parameters:
+        -----------
+        source : str or gdal.Dataset
+            The raster datasource defining the criteria values for each location
             
-            value : The exact value, or value range to exclude
-                - Numeric : The exact value to exclude
-                    * Generally this should only be done when the raster datasource contains integer values, 
-                      otherwise a range of values should be used to avoid float comparison errors
-                - ( Numeric, Numeric ) : The low and high boundary describing the range of values to exclude
-                    * If either boundary is given as None, then it is interpreted as unlimited
-                * If value, valueMin, and valueMax are all None, the typical exclusion threshold given from ExclusionCalculator.typicalExclusions is used
+        value : tuple or numeric 
+            The exact value, or value range to exclude
+            * If Numeric, should be The exact value to exclude
+                * Generally this should only be done when the raster datasource 
+                  contains integer values, otherwise a range of values should be 
+                  used to avoid float comparison errors
+            * If ( Numeric, Numeric ), the low and high boundary describing the 
+              range of values to exclude
+                * If either boundary is given as None, then it is interpreted as 
+                  unlimited
 
-            buffer : float; optional
-                A buffer region to add around the indicated pixels
-                * Units are in the RegionMask's srs
+        buffer : float; optional
+            A buffer region to add around the indicated pixels
+            * Units are in the RegionMask's srs
+            * The buffering occurs AFTER the indication and warping step and
+              so it may not represent the original dataset exactly
+              - Buffering can be made more accurate by increasing the 
+                'resolutionDiv' input
 
-            kwargs
-                * All other keyword arguments are passed on to a call to geokit.RegionMask.indicateValues
-                * Most importantly...
-                    - 'buffer' is used to add a buffer region (given in units of the ExclusionCalculator's srs) around the raw indicated areas
+        invert: bool; optional
+            If True, flip indications
+
+        mode: string; optional
+            * If 'exclude', then the indicated pixels are subtracted from the 
+              current availability matrix
+            * If 'include', then the indicated pixel are added back into the
+              availability matrix
+
+        kwargs
+            * All other keyword arguments are passed on to a call to 
+              geokit.RegionMask.indicateValues
         """
 
         # make sure we have a Prior object
