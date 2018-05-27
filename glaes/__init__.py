@@ -1,3 +1,7 @@
+"""The Geospatial Land Availability for Energy Systems (GLAES) model is intended for land eligbility analysis in any context"""
+
+__version__ = "1.1.1"
+
 from .core import util
 from .core.priors import Priors
 from .core.ExclusionCalculator import ExclusionCalculator
