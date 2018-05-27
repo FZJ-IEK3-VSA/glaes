@@ -309,6 +309,5 @@ class WindTurbineExclusionSets(object):
         
         # All done
         return ec
-        
 class ExclusionSets(object):
     Wind = WindTurbineExclusionSets()

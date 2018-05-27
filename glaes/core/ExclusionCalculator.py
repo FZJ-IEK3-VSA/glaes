@@ -1,48 +1,68 @@
-import geokit as gk
-from os.path import join, dirname, basename, isfile
-from glob import glob
-import re
-import numpy as np
-from collections import namedtuple, OrderedDict
-
-from .priors import Priors, PriorSource
-from .util import GlaesError
+from .util import *
+from .priors import *
 
 Areas = namedtuple('Areas', "coordinates geoms")
 
 ###############################
 # Make an Exclusion Calculator
 class ExclusionCalculator(object):
-    """The ExclusionCalculator object makes land eligibility (LE) analyses easy and quick. Once initialized to a particular region, the ExclusionCalculator object can be used to incorporate any geospatial dataset (so long as it is interpretable by GDAL) into the LE analysis. 
+    """The ExclusionCalculator object makes land eligibility (LE) analyses easy 
+    and quick. Once initialized to a particular region, the ExclusionCalculator 
+    object can be used to incorporate any geospatial dataset (so long as it is 
+    interpretable by GDAL) into the LE analysis. 
 
 
-    NOTE: By default, ExclusionCalculator is always initialized at 100x100 meter resolution in the EPSG3035 projection system. This is well suited to LE analyses in Europe, however if another region is being investigated or else if another resolution or projection system is desired for any other reason, this can be incorporated as well during the initialization stage.
+    Note:
+    ----- 
+    By default, ExclusionCalculator is always initialized at 100x100 meter 
+    resolution in the EPSG3035 projection system. This is well-suited to LE 
+    analyses in Europe, however if another region is being investigated or else 
+    if another resolution or projection system is desired for any other reason, 
+    this can be incorporated as well during the initialization stage.
+
+    If you need to find a new projection system for your analyses, the following 
+    website is helpful: http://spatialreference.org/ref/epsg/
 
 
     Initialization:
-        * ExclusionCalculator can be initialized by passing a specific shapefile describing the investigation region:
+    ---------------
+    * ExclusionCalculator can be initialized by passing a specific vector file
+      describing the investigation region:
 
-            >>> ec = ExclusionCalculator(<path>)
-        
-        * Or a specific srs and resolution can be used:
+        >>> ec = ExclusionCalculator(<path>)
+    
+    * A particular srs and resolution can be used:
 
-            >>> ec = ExclusionCalculator(<path>, pixelSize=0.001, srs='latlon')
+        >>> ec = ExclusionCalculator(<path>, pixelRes=0.001, srs='latlon')
 
-        * In fact, the ExclusionCalculator initialization is simply a call to geokit.RegionMask.load, so see that for more information. This also means that any geokit.RegoinMask object can be used to initialize the ExclusionCalculator
+    * In fact, the ExclusionCalculator initialization is simply a call to 
+      geokit.RegionMask.load, so see that for more information. This also means 
+      that any geokit.RegoinMask object can be used to initialize the 
+      ExclusionCalculator
 
-            >>> rm = geokit.RegionMask.load(<path>, pad=..., srs=..., pixelSize=..., ...)
-            >>> ec = ExclusionCalculator(rm)
+        >>> rm = geokit.RegionMask.load(<path>, pad=..., srs=..., pixelRes=..., ...)
+        >>> ec = ExclusionCalculator(rm)
 
     Usage:
-        * The ExclusionCalculator object contains a member name "availability", which contains the most up to date result of the LE analysis
-            - Just after initialization, the the availability matrix is filled with 1's, meaning that all locations are available
-            - After excluding locations based off various geospatial datasets, cells in the availability matrix are changed to a value between 0 and 1, where 0 means completely unavailable, 1 means fully available, and intermediate values indicate a pixel which is only partly excluded.
-        * Exclusions can be applied by using one of the 'excludeVectorType', 'excludeRasterType', or 'excludePrior' methods
-            - The correct method to use depends on the format of the datasource used for exclusions
-        * After all exclusions have been applied...
-            - The 'draw' method can be used to visualize the result
-            - The 'save' method will save the result to a raster file on disc
-            - The 'availability' member can be used to extract the availability matrix as a NumPy matrix for further usage
+    ------
+    * The ExclusionCalculator object contains a member name "availability", which
+      contains the most up to date result of the LE analysis
+        - Just after initialization, the the availability matrix is filled with 
+          100's, meaning that all locations are available
+        - After excluding locations based off various geospatial datasets, cells
+          in the availability matrix are changed to a value between 0 and 100, 
+          where 0 means completely unavailable, 100 means fully available, and 
+          intermediate values indicate a pixel which is only partly excluded.
+
+    * Exclusions can be applied by using one of the 'excludeVectorType', 
+      'excludeRasterType', or 'excludePrior' methods
+        - The correct method to use depends on the format of the datasource used
+          for exclusions
+    * After all exclusions have been applied...
+        - The 'draw' method can be used to visualize the result
+        - The 'save' method will save the result to a raster file on disc
+        - The 'availability' member can be used to extract the availability matrix
+          as a NumPy matrix for further usage
     """
     typicalExclusions = {
         "access_distance": (5000, None ),
@@ -54,9 +74,9 @@ class ExclusionCalculator(object):
         "airfield_proximity": (None, 3000 ),
         "airport_proximity": (None, 5000 ),
         "connection_distance": (10000, None ),
-        "dni_threshold": (None, 5.0 ),
+        "dni_threshold": (None, 3.0 ),
         "elevation_threshold": (1800, None ),
-        "ghi_threshold": (None, 5.0 ),
+        "ghi_threshold": (None, 3.0 ),
         "industrial_proximity": (None, 300 ),
         "lake_proximity": (None, 400 ),
         "mining_proximity": (None, 100 ),
@@ -92,24 +112,54 @@ class ExclusionCalculator(object):
         "woodland_deciduous_proximity": (None, 300 ),
         "woodland_mixed_proximity": (None, 300 )}
 
-    def __init__(s, region, **kwargs):
+    def __init__(s, region, srs=3035, pixelRes=100, where=None, padExtent=0, **kwargs):
         """Initialize the ExclusionCalculator
 
-        Inputs:
-            region : The region definition for which land exclusions will be calculated
-                - str : A path to a vector file containing the region definition
-                - geokit.RegionMask : A preinitialized RegionMask object
+        Parameters:
+        -----------
+        region : str, geokit.RegionMask 
+            The regional definition for the land eligibility analysis
+            * If given as a string, must be a path to a vector file
+            * If given as a RegionMask, it is taken directly despite other 
+              arguments
 
-            kwargs: 
-                * All keyword arguments are passed on to a call to geokit.RegionMask.load
-                * Most notably (most only operate when region is a path):
-                    - 'srs' can be used to define the reference system to use
-                    - 'pixelSize' can be used to define the resolution (in units of the srs)
-                    - 'select' can be used to filter the vector source and extract a particular feature
+        srs : Anything acceptable to geokit.srs.loadSRS()
+            The srs context of the generated RegionMask object
+            * The default srs EPSG3035 is only valid for a European context
+            * If an integer is given, it is treated as an EPSG identifier
+              - Look here for options: http://spatialreference.org/ref/epsg/
+              * Only effective if 'region' is a path to a vector
+
+        pixelRes : float or tuple
+            The generated RegionMask's native pixel size(s)
+            * If float : A pixel size to apply to both the X and Y dimension
+            * If (float float) : An X-dimension and Y-dimension pixel size
+            * Only effective if 'region' is a path to a vector
+
+        where : str, int; optional
+            If string -> An SQL-like where statement to apply to the source
+            If int -> The feature's ID within the vector dataset
+            * Feature attribute name do not need quotes
+            * String values should be wrapped in 'single quotes'
+            * Only effective if 'region' is a path to a vector
+            Example: If the source vector has a string attribute called "ISO" and 
+                     a integer attribute called "POP", you could use....
+
+                where = "ISO='DEU' AND POP>1000"
+
+
+        padExtent : float; optional
+            An amount by which to pad the extent before generating the RegionMask
+            * Only effective if 'region' is a path to a vector
+
+        kwargs: 
+            * Keyword arguments are passed on to a call to geokit.RegionMask.load
+            * Only take effect when the 'region' argument is a string
+    
         """
 
         # load the region
-        s.region = gk.RegionMask.load(region, **kwargs)
+        s.region = gk.RegionMask.load(region, srs=srs, pixelRes=pixelRes, where=where, padExtent=padExtent, **kwargs)
         s.srs = s.region.srs
         s.maskPixels = s.region.mask.sum()
 
@@ -120,33 +170,39 @@ class ExclusionCalculator(object):
         # Make a list of item coords
         s.itemCoords=None
         s._itemCoords=None
+        s._areas=None
     
     def save(s, output, threshold=None, **kwargs):
         """Save the current availability matrix to a raster file
         
         Output will be a byte-valued raster with the following convention:
-            0 -> unavailable 
-            50 -> Semi-available
-            100 -> fully eligibile
-            255 -> "no data" (out of region)
+            0     -> unavailable 
+            1..99 -> Semi-available
+            100   -> fully eligibile
+            255   -> "no data" (out of region)
 
-        Inputs:
-            output - str : The path of the output raster file
+        Parameters:
+        -----------
+        output : str
+            The path of the output raster file
+            * Must end in ".tif"
+        
+        threshold : float; optional
+            The acceptable threshold indicating an available pixel
+            * Use this to process the availability matrix before saving it (will 
+              save a little bit of space)
             
-            threshold - float : The acceptable threshold indicating an available pixel
-                * Use this to process the availability matrix before saving it (will save a little bit of space)
-                
-            kwargs: 
-                * All keyword arguments are passed on to a call to geokit.RegionMask.createRaster
-                * Most notably:
-                    - 'noDataValue' is used to define the no data value
-                    - 'dtype' is used to define the data type of the resulting raster
-                    - 'overwrite' is used to force overwrite an existing file
+        kwargs: 
+            * All keyword arguments are passed on to a call to 
+              geokit.RegionMask.createRaster
+            * Most notably:
+                - 'dtype' is used to define the data type of the resulting raster
+                - 'overwrite' is used to force overwrite an existing file
 
         """
 
         meta={
-            "description":"The availability of each pixel for the contextual purpose",
+            "description":"The availability of each pixel",
             "units":"percent-available"
         }
 
@@ -158,71 +214,94 @@ class ExclusionCalculator(object):
         s.region.createRaster(output=output, data=data, noData=255, meta=meta, **kwargs)
 
 
-    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, noBorder=True, goodColor="#9bbb59", excludedColor="#a6161a", figsize=(8,8), legend=True, legendargs={"loc":"lower left"}, pad={"left":0.25}):
+    def draw(s, ax=None, goodColor="#9bbb59", excludedColor="#a6161a", legend=True, legendargs={"loc":"lower left"}, dataScalingFactor=1, geomSimplificationFactor=5000, **kwargs):
         """Draw the current availability matrix on a matplotlib figure
 
-        Inputs:
-            ax - matplotlib axis object : The axis to draw the figure onto
-                * If given as 'None', then a fresh axis will be produced and displayed or saved immediately
-                * When not 'None', then this function returns a handle to the drawn image which can be used however you see fit
+        Note:
+        -----
+        To save the result somewhere, call 'plt.savefig(...)' immediately 
+        calling this function. To directly view the result, call 'plt.show()'
 
-            dataScaling - int : A down scaling factor to apply to the visualized matrix
-                * Use this when visualizing a large area consumes too much memory
+        Parameters:
+        -----------
+        ax: matplotlib axis object; optional
+            The axis to draw the figure onto
+            * If given as 'None', then a fresh axis will be produced and displayed
+              or saved immediately
 
-            geomSimplify - int : A down scaling factor to apply when drawing the geometry borders of the ExclusionCalculator's region
-                * Use this when the region's geometry is extremely detailed compared to the scale over which it is drawn
+        goodColor: A matplotlib color
+            The color to apply to 'good' locations (having a value of 100)
+            
+        excludedColor: A matplotlib color
+            The color to apply to 'excluded' locations (having a value of 0)
+            
+        legend: bool; optional
+            If True, a legend will be drawn
 
-            output - str : A path to save the output figure to
-                * Only applies when 'ax' is None
-                * If this is None and 'ax' is None, the figure is displayed immediately
+        legendargs: dict; optional
+            Arguments to pass to the drawn legend (via axes.legend(...))
 
-            noBorder - T/F : A flag determining whether or not to show the borders of the plot's axis
-                * Only useful when 'ax' is None
+        dataScalingFactor: int; optional
+            A down scaling factor to apply to the visualized availability matrix
+            * Use this when visualizing a large areas
+            * seting this to 1 will apply no scaling
 
-            goodColor : The color to apply to 'good' locations (having a value of 1)
-                - str : An HTML color code, or any other string interpretable by matplotlib
-                - (r,g,b) : Red, green, blue values given as a tuple
-                    * Each must be between 0..1
+        geomSimplificationFactor: int
+            A down scaling factor to apply when drawing the geometry borders of 
+            the ExclusionCalculator's region
+            * Use this when the region's geometry is extremely detailed compared 
+              to the scale over which it is drawn
+            * Setting this to None will apply no simplification
+        
+        **kwargs:
+            All keyword arguments are passed on to a call to geokit.drawImage
 
-            excludedColor : The color to apply to 'excluded' locations (having a value of 0)
-                * See above for options
-    
+        Returns:
+        --------
+        matplotlib axes object
+        
+
         """
-
         # import some things
         from matplotlib.colors import LinearSegmentedColormap
         
-        # Do we need to make an axis?
-        if ax is None:
-            doShow = True
-            # import some things
-            import matplotlib.pyplot as plt
+        # First draw the availability matrix
+        b2g = LinearSegmentedColormap.from_list('bad_to_good',[excludedColor,goodColor])
 
-            # make a figure and axis
-            plt.figure(figsize=figsize)
-            ax = plt.subplot(111)
-        else: doShow=False
+        if not "figsize" in kwargs:
+            ratio = s.region.mask.shape[1]/s.region.mask.shape[0]
+            kwargs["figsize"] = (8*ratio*1.2, 8)
 
-        # fix bad inputs
-        if dataScaling: dataScaling = -1*abs(dataScaling)
-        if geomSimplify: geomSimplify = abs(geomSimplify)
+        kwargs["topMargin"] = kwargs.get("topMargin", 0.01)
+        kwargs["bottomMargin"] = kwargs.get("bottomMargin", 0.02)
+        kwargs["rightMargin"] = kwargs.get("rightMargin", 0.01)
+        kwargs["leftMargin"] = kwargs.get("leftMargin", 0.02)
+        kwargs["hideAxis"] = kwargs.get("hideAxis", True)
+        kwargs["cmap"] = kwargs.get("cmap", b2g)
+        kwargs["cbar"] = kwargs.get("cbar", False)
+        kwargs["vmin"] = kwargs.get("vmin", 0)
+        kwargs["vmax"] = kwargs.get("vmax", 100)
+        kwargs["cbarTitle"] = kwargs.get("cbarTitle", "Pixel Availability")
 
-        # plot the region background
-        s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc=excludedColor, ec='None', zorder=0)
+        axh1 = s.region.drawImage( s.availability, ax=ax, drawSelf=False, scaling=dataScalingFactor, **kwargs)
 
-        # plot the availability
-        a2b = LinearSegmentedColormap.from_list('alpha_to_blue',[(1,1,1,0),goodColor])
-        gk.raster.drawImage(s.availability, bounds=s.region.extent, ax=ax, scaling=dataScaling, cmap=a2b, vmax=100)
+        # # Draw the mask to blank out the out of region areas
+        # w2a = LinearSegmentedColormap.from_list('white_to_alpha',[(1,1,1,1),(1,1,1,0)])
+        # axh2 = s.region.drawImage( s.region.mask, ax=axh1, drawSelf=False, cmap=w2a, cbar=False)
 
-        # Draw the region boundaries
-        edge = s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc='None', ec='k', linewidth=3)
-
-        # Draw Items?
+        # Draw the Regional geometry
+        axh3 = s.region.drawSelf( fc='None', ax=axh1, linewidth=2, simplificationFactor=geomSimplificationFactor )        
+        
+        # Draw Points, maybe?
         if not s._itemCoords is None:
-            items = ax.plot(s._itemCoords[:,0], s._itemCoords[:,1], 'ok')
+            axh1.ax.plot(s._itemCoords[:,0],s._itemCoords[:,1],'ok')
+            
+        # Draw Areas, maybe?
+        if not s._areas is None:
+            gk.drawGeoms( s._areas, srs=s.region.srs, ax=axh1, fc='None', ec="k", linewidth=1, simplificationFactor=None )
 
-        # Done!
-        if doShow:
+        # Make legend?
+        if legend:
             from matplotlib.patches import Patch
             p = s.percentAvailable
             a = s.region.mask.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
@@ -250,45 +329,15 @@ class ExclusionCalculator(object):
                 Patch( color=goodColor, label="Eligible: %.2f%%"%(p) ),
             ]
             if not s._itemCoords is None:
-                h = plt.plot([],[],'ok', label="Items: {:,d}".format(s._itemCoords.shape[0]) )
+                h = axh1.ax.plot([],[],'ok', label="Items: {:,d}".format(s._itemCoords.shape[0]) )
                 patches.append( h[0] )
 
-            if legend:
-                _legendargs = dict(loc="lower right", fontsize=14)
-                _legendargs.update(legendargs)
-                plt.legend(handles=patches, **_legendargs)
+            _legendargs = dict(loc="lower right", fontsize=14)
+            _legendargs.update(legendargs)
+            axh1.ax.legend(handles=patches, **_legendargs)        
 
-            ax.set_aspect('equal')
-            ax.autoscale(enable=True)
-            if not pad is None:
-                yMin,yMax = ax.get_ylim()
-                xMin,xMax = ax.get_xlim()
-
-                _yMin,_yMax = ax.get_ylim()
-                _xMin,_xMax = ax.get_xlim()
-
-                if "left" in pad:   
-                    _xMin = xMin - pad["left"]*(xMax-xMin)
-                if "right" in pad:   
-                    _xMax = xMax + pad["right"]*(xMax-yMin)
-                if "down" in pad:   
-                    _yMin = yMin - pad["down"]*(yMax-yMin)
-                if "up" in pad:   
-                    _yMax = yMax + pad["up"]*(yMax-yMin)
-
-                ax.set_ylim(_yMin, _yMax)
-                ax.set_xlim(_xMin, _xMax)
-
-            if noBorder:
-                plt.axis('off')
-
-            if output: 
-                plt.savefig(output, dpi=200)
-                plt.close()
-            else: 
-                plt.show()
-        else:
-            return ax
+        # Done!!
+        return axh1.ax
 
     @property
     def availability(s): 
@@ -296,58 +345,76 @@ class ExclusionCalculator(object):
             * A value of 100 is interpreted as fully available
             * A value of 0 is interpreted as completely excluded
             * In between values are...in between"""
-        return s._availability 
+        tmp = s._availability.astype(np.float32)
+        tmp[~s.region.mask] = np.nan
+        return tmp
 
     @property
     def percentAvailable(s): 
         """The percent of the region which remains available"""
-        return 100*s.availability.sum(dtype=np.int64)/100/s.region.mask.sum()
+        return s._availability.sum(dtype=np.int64)/s.region.mask.sum()
 
     @property
     def areaAvailable(s): 
         """The area of the region which remains available
             * Units are defined by the srs used to initialize the ExclusionCalculator"""
-        return s.availability.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
+        return s._availability.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
 
     ## General excluding functions
-    def excludeRasterType(s, source, value=None, valueMin=None, valueMax=None, prewarp=False, invert=False, mode="exclude", **kwargs):
+    def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, prewarp=False, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in a raster datasource
 
-        Inputs:
-            source : The raster datasource defining the values for each location
-                - str : A path to a raster data source
-                - gdal Dataset : An open gdal dataset object held in memory
+        Parameters:
+        -----------
+        source : str or gdal.Dataset
+            The raster datasource defining the criteria values for each location
             
-            value : The exact value, or value range to exclude
-                - Numeric : The exact value to exclude
-                    * Generally this should only be done when the raster datasource contains integer values, 
-                      otherwise a range of values should be used to avoid float comparison errors
-                - ( Numeric, Numeric ) : The low and high boundary describing the range of values to exclude
-                    * If either boundary is given as None, then it is interpreted as unlimited
+        value : tuple, or numeric 
+            The exact value, or value range to exclude
+            * If Numeric, should be The exact value to exclude
+                * Generally this should only be done when the raster datasource 
+                  contains integer values, otherwise a range of values should be 
+                  used to avoid float comparison errors
+            * If ( Numeric, Numeric ), the low and high boundary describing the 
+              range of values to exclude
+                * If either boundary is given as None, then it is interpreted as 
+                  unlimited
 
-            valueMin - Numeric : A convenience input when the desired exclusion range is all values above 
-                a minimal value
-                * This is equivalent to value=(valueMin, None)
+        buffer : float; optional
+            A buffer region to add around the indicated pixels
+            * Units are in the RegionMask's srs
+            * The buffering occurs AFTER the indication and warping step and
+              so it may not represent the original dataset exactly
+              - Buffering can be made more accurate by increasing the 
+                'resolutionDiv' input
+        
+        resolutionDiv : int; optional
+            The factor by which to divide the RegionMask's native resolution
+            * This is useful if you need to represent very fine details
+        
+        prewarp : bool or str or dict; optional
+            When given, the source will be warped to the calculator's mask context 
+            before processing
+            * If True, warping will be performed using the bilinear scheme
+            * If str, warp using the indicated resampleAlgorithm 
+              - options: 'near', 'bilinear', 'cubic', 'average'
+            * If dict, a dictionary of arguments is expected
+              - These are passed along to geokit.RegionMask.warp
 
-            valueMax - Numeric : A convenience input when the desired exclusion range is all values below 
-                a maximal value
-                * This is equivalent to value=(None, valueMax)
-            
-            prewarp: When not False, the source will be warped to the calculator's mask context before processing
-                T/F : If True, warping will be performed using the bilieanr resample algorithm
-                str : Warp using the indicated resampleAlgorithm (options: near, bilinear, cubic, average)
-                dict : A dictionary of arguments corresponding to geokit.RegionMask.warp
+        invert: bool; optional
+            If True, flip indications
 
-            kwargs
-                * All other keyword arguments are passed on to a call to geokit.RegionMask.indicateValues
-                * Most importantly...
-                    - 'resampeAlg' is used to define how the indication matrix is warped to fit the region mask
-                    - 'resolutionDiv' is used to increase the resolution of the working matrix during processing
-                    - 'buffer' is used to add a buffer region (given in units of the ExclusionCalculator's srs) around the raw indicated areas
+        mode: string; optional
+            * If 'exclude', then the indicated pixels are subtracted from the 
+              current availability matrix
+            * If 'include', then the indicated pixel are added back into the
+              availability matrix
+
+        kwargs
+            * All other keyword arguments are passed on to a call to 
+              geokit.RegionMask.indicateValues
+
         """
-        if value is None and valueMin is None and valueMax is None:
-            raise GlaesError("One of value, valueMin, or valueMax must be given")
-
         # Do prewarp, if needed
         if prewarp:
             prewarpArgs = dict(resampleAlg="bilinear")
@@ -357,8 +424,7 @@ class ExclusionCalculator(object):
             source = s.region.warp(source, returnAsSource=True, **prewarpArgs)
 
         # Indicate on the source
-        if not (valueMin is None and valueMax is None): value = (valueMin,valueMax)
-        areas = (s.region.indicateValues(source, value, **kwargs)*100).astype(np.uint8)
+        areas = (s.region.indicateValues(source, value, buffer=buffer, resolutionDiv=resolutionDiv, applyMask=False, **kwargs)*100).astype(np.uint8)
         
         # exclude the indicated area from the total availability
         if mode == "exclude":
@@ -369,35 +435,69 @@ class ExclusionCalculator(object):
         else:
             raise GlaesError("mode must be 'exclude' or 'include'")
 
-    def excludeVectorType(s, source, where=None, invert=False, mode="exclude", **kwargs):
+    def excludeVectorType(s, source, where=None, buffer=None, bufferMethod='geom', invert=False, mode="exclude", resolutionDiv=1, **kwargs):
         """Exclude areas based off the features in a vector datasource
+        
+        Parameters:
+        -----------
+        source : str or gdal.Dataset
+            The raster datasource defining the criteria values for each location
+            
+        where : str
+            A filtering statement to apply to the datasource before the indication
+            * This is an SQL like statement which can operate on features in the 
+              datasource
+            * For tips, see "http://www.gdal.org/ogr_sql.html"
+            * For example...
+              - If the datasource had features which each have an attribute 
+                called 'type' and only features with the type "protected" are 
+                wanted, the correct statement would be: 
+                    where="type='protected'"
+        
+        buffer : float; optional
+            A buffer region to add around the indicated pixels
+            * Units are in the RegionMask's srs
 
-        Inputs:
-            source : The raster datasource defining the features to indicate from
-                - str : A path to a vector data source
-                - gdal Dataset : An open gdal dataset object held in memory
-            
-            where - str : A filtering statement to apply to the datasource before the initial indication
-                * This is an SQL like statement which can operate on features in the datasource
-                * For tips, see "http://www.gdal.org/ogr_sql.html"
-                * For example...
-                    - If the datasource had features which each have an attribute called 'type' and only features with the type "protected" are wanted, the correct statement would be: 
-                        where="type='protected'"
-            
-            invert - T/F : Flag causing the exclusion of all unindicated areas, instead of all indicated areas 
-            
-            kwargs
-                * All other keyword arguments are passed on to a call to geokit.RegionMask.indicateFeatures
-                * Most importantly...
-                    - 'resolutionDiv' is used to increase the resolution of the working matrix during processing
-                    - 'buffer' is used to add a buffer region (given in units of the ExclusionCalculator's srs) around the raw indicated features
+        bufferMethod : str; optional
+            An indicator determining the method to use when buffereing
+            * Options are: 'geom' and 'area'
+            * If 'geom', the function will attempt to grow each of the geometries
+              directly using the ogr library
+              - This can fail sometimes when the geometries are particularly 
+                complex or if some of the geometries are not valid (as in, they 
+                have self-intersections)
+            * If 'area', the function will first rasterize the raw geometries and
+              will then apply the buffer to the indicated pixels
+              - This is the safer option although is not as accurate as the 'geom'
+                option since it does not capture the exact edges of the geometries
+              - This method can be made more accurate by increasing the 
+                'resolutionDiv' input
+        
+        resolutionDiv : int; optional
+            The factor by which to divide the RegionMask's native resolution
+            * This is useful if you need to represent very fine details
+
+        invert: bool; optional
+            If True, flip indications
+
+        mode: string; optional
+            * If 'exclude', then the indicated pixels are subtracted from the 
+              current availability matrix
+            * If 'include', then the indicated pixel are added back into the
+              availability matrix
+
+        kwargs
+            * All other keyword arguments are passed on to a call to 
+              geokit.RegionMask.indicateFeatures
+        
         """
         if isinstance(source, PriorSource):
             edgeI = kwargs.pop("edgeIndex", np.argwhere(source.edges==source.typicalExclusion))
             source = source.generateVectorFromEdge( s.region.extent, edgeIndex=edgeI )
 
         # Indicate on the source
-        areas = (s.region.indicateFeatures(source, where=where, **kwargs)*100).astype(np.uint8)
+        areas = (s.region.indicateFeatures(source, where=where, buffer=buffer, resolutionDiv=resolutionDiv, 
+                                           bufferMethod=bufferMethod, applyMask=False, **kwargs)*100).astype(np.uint8)
         
         # exclude the indicated area from the total availability
         if mode == "exclude":
@@ -408,41 +508,54 @@ class ExclusionCalculator(object):
         else:
             raise GlaesError("mode must be 'exclude' or 'include'")
 
-    def excludePrior(s, prior, value=None, valueMin=None, valueMax=None, invert=False, mode="exclude", **kwargs):
-        """Exclude areas based off the values in one of the Prior datasources
+    def excludePrior(s, prior, value=None, buffer=None, invert=False, mode="exclude", **kwargs):
+        """Exclude areas based off the values in one of the Prior data sources
 
-            * The Prior datasources are currently only defined over Europe
-            * All Prior datasources are defined in the EPSG3035 projection system with 100x100 meter resolution
-            * For each call to excludePrior, a temporary raster datasource is generated around the ExclusionCalculator's region, after which a call to ExclusionCalculator.excludeRasterType is made, therefore all the same inputs apply here as well
+        * The Prior datasources are currently only defined over Europe
+        * All Prior datasources are defined in the EPSG3035 projection system 
+          with 100x100 meter resolution
+        * For each call to excludePrior, a temporary raster datasource is generated
+          around the ExclusionCalculator's region, after which a call to 
+          ExclusionCalculator.excludeRasterType is made, therefore all the same 
+          inputs apply here as well
 
-        Inputs:
-            source - str : The name of the Prior datasource defining the values for each location
-                * If the name does not exactly match one of the Prior datasources, the best fitting name will be used (and you will be informed about which one is chosen)
-                * See the ExclusionCalculator.typicalExclusions dictionary for the Prior dataset names and what a typical exclusion threshold would be
-                * A list of Prior datasets names can also be found in Priors.sources
+        Parameters:
+        -----------
+        source : str or gdal.Dataset
+            The raster datasource defining the criteria values for each location
             
-            value : The exact value, or value range to exclude
-                - Numeric : The exact value to exclude
-                    * Generally this should only be done when the raster datasource contains integer values, 
-                      otherwise a range of values should be used to avoid float comparison errors
-                - ( Numeric, Numeric ) : The low and high boundary describing the range of values to exclude
-                    * If either boundary is given as None, then it is interpreted as unlimited
-                * If value, valueMin, and valueMax are all None, the typical exclusion threshold given from ExclusionCalculator.typicalExclusions is used
+        value : tuple or numeric 
+            The exact value, or value range to exclude
+            * If Numeric, should be The exact value to exclude
+                * Generally this should only be done when the raster datasource 
+                  contains integer values, otherwise a range of values should be 
+                  used to avoid float comparison errors
+            * If ( Numeric, Numeric ), the low and high boundary describing the 
+              range of values to exclude
+                * If either boundary is given as None, then it is interpreted as 
+                  unlimited
 
-            valueMin - Numeric : A convenience input when the desired exclusion range is all values above 
-                a minimal value
-                * This is equivalent to value=(valueMin, None)
+        buffer : float; optional
+            A buffer region to add around the indicated pixels
+            * Units are in the RegionMask's srs
+            * The buffering occurs AFTER the indication and warping step and
+              so it may not represent the original dataset exactly
+              - Buffering can be made more accurate by increasing the 
+                'resolutionDiv' input
 
-            valueMax - Numeric : A convenience input when the desired exclusion range is all values below 
-                a maximal value
-                * This is equivalent to value=(None, valueMax)
+        invert: bool; optional
+            If True, flip indications
 
-            kwargs
-                * All other keyword arguments are passed on to a call to geokit.RegionMask.indicateValues
-                * Most importantly...
-                    - 'buffer' is used to add a buffer region (given in units of the ExclusionCalculator's srs) around the raw indicated areas
+        mode: string; optional
+            * If 'exclude', then the indicated pixels are subtracted from the 
+              current availability matrix
+            * If 'include', then the indicated pixel are added back into the
+              availability matrix
+
+        kwargs
+            * All other keyword arguments are passed on to a call to 
+              geokit.RegionMask.indicateValues
         """
-        if not (valueMin is None and valueMax is None): value = (valueMin,valueMax)
 
         # make sure we have a Prior object
         if isinstance(prior, str): prior = Priors[prior]
@@ -466,20 +579,57 @@ class ExclusionCalculator(object):
             # Check edges
             if not value[0] is None: prior.valueOnEdge(value[0], True)
             if not value[1] is None: prior.valueOnEdge(value[1], True)
+
         else:
             if not value==0:
-                print("WARNING: It is advisable to exclude by a value range instead of a singular value")    
+                warn("It is advisable to exclude by a value range instead of a singular value when using the Prior datasets", UserWarning)
 
-        # Make the raster
-        source = prior.generateRaster( s.region.extent )
+        # Project to 'index space'
+        try:
+            v1, v2 = value
+            if not v1 is None:
+                v1 = np.interp(v1, prior._values_wide, np.arange(prior._values_wide.size)) 
+            if not v2 is None:
+                v2 = np.interp(v2, prior._values_wide, np.arange(prior._values_wide.size)) 
+
+            value = (v1,v2)
+        except TypeError:
+            if not value == 0:
+                value = np.interp(value, prior._values_wide, np.arange(prior._values_wide.size)) 
+        #source = prior.generateRaster( s.region.extent,)
 
         # Call the excluder
-        s.excludeRasterType( source, value=value, invert=invert, mode=mode, **kwargs)
+        s.excludeRasterType( prior.path, value=value, invert=invert, mode=mode, **kwargs)
 
-    def shrinkAvailability(s, dist, threshold=50, **kwargs):
-        """Shrinks the current availability by a given distance in the given SRS"""
-        geom = gk.geom.convertMask(s.availability>=threshold, bounds=s.region.extent, srs=s.region.srs, flat=True)
-        geom = geom.Buffer(dist)
-        newAvail = (s.region.indicateGeoms(geom, **kwargs)*100).astype(np.uint8)
-        s._availability = newAvail
+    def excludeRegionEdge(s, buffer):
+        """Exclude some distance from the region's edge
+        
+        Parameters:
+        -----------
+        buffer : float
+                A buffer region to add around the indicated pixels
+                * Units are in the RegionMask's srs
+        """
+        s.excludeVectorType(s.region.vector, buffer=-buffer, invert=True)
 
+    def shrinkAvailability(s, dist, threshold=50):
+    	"""Shrinks the current availability by a given distance in the given SRS"""
+    	geom = gk.geom.polygonizeMask(s._availability>=threshold, bounds=s.region.extent.xyXY, srs=s.region.srs, flat=False)
+    	geom = [g.Buffer(-dist) for g in geom]
+    	newAvail = (s.region.indicateGeoms(geom)*100).astype(np.uint8)
+    	s._availability = newAvail
+
+    def pruneIsolatedAreas(s, minSize, threshold=50):
+        """Removes contiguous areas which are smaller than 'minSize'
+
+        * minSize is given in units of the calculator's srs
+        """ 
+        # Create a vector file of geometries larger than 'minSize'
+        geoms = gk.geom.polygonizeMask( s._availability>=threshold, bounds=s.region.extent.xyXY, srs=s.region.srs, flat=False)
+        geoms = list(filter( lambda x: x.Area()>=minSize, geoms ))
+        vec = gk.core.util.quickVector(geoms)
+
+        # Replace current availability matrix
+        s._availability = s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8 )*100
+
+    
