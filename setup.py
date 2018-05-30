@@ -11,7 +11,7 @@ setup(
         "geokit>=1.1.1",
         "gdal>=2.0.0",
         "numpy>=1.13.2",
-        "descartes>1.1.0",
+        "descartes>=1.1.0",
         "pandas>=0.22.0",
         "scipy>=1.0.0",
         "matplotlib>=2.1.1",
