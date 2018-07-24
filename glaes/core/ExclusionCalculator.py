@@ -358,7 +358,7 @@ class ExclusionCalculator(object):
     def areaAvailable(s): 
         """The area of the region which remains available
             * Units are defined by the srs used to initialize the ExclusionCalculator"""
-        return s._availability.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
+        return s._availability[s.region.mask].sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight/100
 
     ## General excluding functions
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, prewarp=False, invert=False, mode="exclude", **kwargs):
@@ -632,7 +632,7 @@ class ExclusionCalculator(object):
         # Replace current availability matrix
         s._availability = s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8 )*100
 
-    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None, asArea=False, minArea=100000, axialDirection=None):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None, asArea=False, minArea=100000, axialDirection=None, sepScaling=None):
         """Distribute the maximal number of minimally separated items within the available areas
         
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -658,6 +658,11 @@ class ExclusionCalculator(object):
                 - float : The direction to apply to all points
                 - np.ndarray : The directions at each pixel (must match availability matrix shape)
                 - str : A path to a raster file containing axial directions 
+
+            sepScaling : An additional scaling factor which can be applied to each pixel
+                - float : The scaling to apply to all points
+                - np.ndarray : The scalings at each pixel (must match availability matrix shape)
+                - str : A path to a raster file containing scaling factors 
         """
         # Preprocess availability
         workingAvailability = s._availability >= threshold
@@ -680,6 +685,23 @@ class ExclusionCalculator(object):
         else:
             useGradient = False
 
+        # Read separation scaling file, if given
+        if not sepScaling is None:
+            if isinstance(sepScaling, str): # Assume a path to a raster file is given
+                sepScaling = s.region.warp(sepScaling, resampleAlg='near')
+                matrixScaling = True
+            elif isinstance(sepScaling, np.ndarray): # Assume a path to a raster file is given
+                if not sepScaling.shape == s.region.mask.shape:
+                    raise GlaesError("sepScaling matrix does not match context")
+                matrixScaling = True
+            else: # sepScaling should be a single value
+                matrixScaling = False
+            
+        else:
+            sepScaling = 1
+            matrixScaling = False
+
+
         # Turn separation into pixel distances
         if useGradient: 
             try:
@@ -687,27 +709,31 @@ class ExclusionCalculator(object):
             except:
                 raise GlaesError("When giving gradient data, a separation tuple is expected")
 
-            sepA = sepA / s.region.pixelRes
-            sepT = sepT / s.region.pixelRes
+            sepA = sepA*sepScaling  / s.region.pixelRes
+            sepT = sepT*sepScaling / s.region.pixelRes
 
             sepA2 = sepA**2
             sepT2 = sepT**2
 
             sepFloorA = sepA-1
             sepFloorT = sepT-1
-            if sepFloorA<1 or sepFloorT<1: raise GlaesError("Seperations are too small compared to pixel size")
+            if (matrixScaling and ((sepFloorA<1).any() or (sepFloorT<1).any())) or \
+               (not matrixScaling and (sepFloorA<1 or sepFloorT<1)): 
+                raise GlaesError("Seperations are too small compared to pixel size")
 
-            sepFloorA2 = sepFloorA**2
-            sepFloorT2 = sepFloorT**2
+            sepFloorA2 = np.power(sepFloorA,2)
+            sepFloorT2 = np.power(sepFloorT,2)
 
-            sepCeil = max(sepA,sepT)+1
+            sepCeil = np.maximum(sepA,sepT)+1
 
         else:
-            separation = separation / s.region.pixelRes
-            sep2 = separation**2
-            sepFloor = max(separation-1,0)
+            separation = separation*sepScaling / s.region.pixelRes
+            sep2 = np.power(separation,2)
+            sepFloor = np.maximum(separation-1,0)
             sepFloor2 = sepFloor**2
             sepCeil = separation+1
+
+        if isinstance(sepCeil, np.ndarray) and sepCeil.size>1: sepCeil = sepCeil.max()
 
         # Make geom list
         x = np.zeros((maxItems))
@@ -734,6 +760,25 @@ class ExclusionCalculator(object):
                 # Clip the total placement arrays
                 xClip = x[bot:cnt]
                 yClip = y[bot:cnt]
+                if matrixScaling:
+                    if useGradient:
+                        _sepFloorA2 = sepFloorA2[yi,xi]
+                        _sepFloorT2 = sepFloorT2[yi,xi]
+                        _sepA2 = sepA2[yi,xi]
+                        _sepT2 = sepT2[yi,xi]
+                    else:
+                        _sepFloor2 = sepFloor2[yi,xi]
+                        _sep2 = sep2[yi,xi]
+                else:
+                    if useGradient:
+                        _sepFloorA2 = sepFloorA2
+                        _sepFloorT2 = sepFloorT2
+                        _sepA2 = sepA2
+                        _sepT2 = sepT2
+                    else:
+                        _sepFloor2 = sepFloor2
+                        _sep2 = sep2
+
 
                 # calculate distances
                 xDist = xClip-xi
@@ -752,14 +797,14 @@ class ExclusionCalculator(object):
 
                     cG = np.cos(grad)
                     sG = np.sin(grad)
-                    
-                    dist = np.power((xDist[pir]*cG - yDist[pir]*sG),2)/sepFloorA2 +\
-                           np.power((xDist[pir]*sG + yDist[pir]*cG),2)/sepFloorT2
+                        
+                    dist = np.power((xDist[pir]*cG - yDist[pir]*sG),2)/_sepFloorA2 +\
+                           np.power((xDist[pir]*sG + yDist[pir]*cG),2)/_sepFloorT2
 
                     immidiatelyInRange = dist <= 1
 
                 else:
-                    immidiatelyInRange = np.power(xDist[pir],2) + np.power(yDist[pir],2) <= sepFloor2
+                    immidiatelyInRange = np.power(xDist[pir],2) + np.power(yDist[pir],2) <= _sepFloor2
                 
                 if immidiatelyInRange.any(): continue
 
@@ -772,12 +817,12 @@ class ExclusionCalculator(object):
 
                         # Test if any points in the range are overlapping
                         if useGradient: # Test if in rotated ellipse
-                            dist = (np.power((xSubDist*cG - ySubDist*sG),2)/sepA2) +\
-                                   (np.power((xSubDist*sG + ySubDist*cG),2)/sepT2)
+                            dist = (np.power((xSubDist*cG - ySubDist*sG),2)/_sepA2) +\
+                                   (np.power((xSubDist*sG + ySubDist*cG),2)/_sepT2)
                             overlapping = dist <= 1
 
                         else: # test if in circle
-                            overlapping = (np.power(xSubDist,2) + np.power(ySubDist,2)) <= sep2
+                            overlapping = (np.power(xSubDist,2) + np.power(ySubDist,2)) <= _sep2
                         
                         if not overlapping.any():
                             found = True
