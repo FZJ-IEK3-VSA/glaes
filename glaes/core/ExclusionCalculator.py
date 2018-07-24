@@ -701,7 +701,6 @@ class ExclusionCalculator(object):
             sepScaling = 1
             matrixScaling = False
 
-
         # Turn separation into pixel distances
         if useGradient: 
             try:
@@ -717,8 +716,7 @@ class ExclusionCalculator(object):
 
             sepFloorA = sepA-1
             sepFloorT = sepT-1
-            if (matrixScaling and ((sepFloorA<1).any() or (sepFloorT<1).any())) or \
-               (not matrixScaling and (sepFloorA<1 or sepFloorT<1)): 
+            if not matrixScaling and (sepFloorA<1 or sepFloorT<1): 
                 raise GlaesError("Seperations are too small compared to pixel size")
 
             sepFloorA2 = np.power(sepFloorA,2)
@@ -764,10 +762,14 @@ class ExclusionCalculator(object):
                     if useGradient:
                         _sepFloorA2 = sepFloorA2[yi,xi]
                         _sepFloorT2 = sepFloorT2[yi,xi]
+
+                        if _sepFloorA2<1 or _sepFloorT2<1: raise GlaesError("Seperations are too small compared to pixel size")
+
                         _sepA2 = sepA2[yi,xi]
                         _sepT2 = sepT2[yi,xi]
                     else:
                         _sepFloor2 = sepFloor2[yi,xi]
+                        if _sepFloor2<1: raise GlaesError("Seperations are too small compared to pixel size")
                         _sep2 = sep2[yi,xi]
                 else:
                     if useGradient:
