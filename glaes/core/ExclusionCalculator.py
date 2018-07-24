@@ -679,7 +679,7 @@ class ExclusionCalculator(object):
                 if not axialDirection.shape == s.region.mask.shape:
                     raise GlaesError("axialDirection matrix does not match context")
             else: # axialDirection should be a single value
-                axialDirection = -np.radians(float(axialDirection))
+                axialDirection = np.radians(float(axialDirection))
 
             useGradient = True
         else:
