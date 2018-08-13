@@ -632,7 +632,7 @@ class ExclusionCalculator(object):
         # Replace current availability matrix
         s._availability = s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8 )*100
 
-    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None, asArea=False, minArea=100000, axialDirection=None, sepScaling=None):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None, asArea=False, minArea=100000, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5):
         """Distribute the maximal number of minimally separated items within the available areas
         
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -855,11 +855,17 @@ class ExclusionCalculator(object):
             srs = gk.srs.loadSRS(outputSRS) if not outputSRS is None else s.region.srs
             # Should the locations be converted to areas?
             if asArea:
-                # Do Voronoi
+                ext = s.region.extent.pad(_voronoiBoundaryPadding, percent=True)
+
+                ### Do Voronoi
                 from scipy.spatial import Voronoi
+
+                # Add boundary points around the 'good' points so that we get bounded regions for each 'good' point 
                 pts = np.concatenate([s._itemCoords,
-                    [ (s.region.extent.xMin*0.95,s.region.extent.yMin*0.95,), (s.region.extent.xMin*0.95,s.region.extent.yMax*1.05,),
-                      (s.region.extent.xMax*1.05,s.region.extent.yMin*0.95,), (s.region.extent.xMax*1.05,s.region.extent.yMax*1.05,), ]])
+                                     [(x,ext.yMin) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
+                                     [(x,ext.yMax) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
+                                     [(ext.xMin,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:1],
+                                     [(ext.xMax,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:1],])
 
                 v = Voronoi(pts)
                 
