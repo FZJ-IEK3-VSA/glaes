@@ -866,8 +866,8 @@ class ExclusionCalculator(object):
                 pts = np.concatenate([s._itemCoords,
                                      [(x,ext.yMin) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
                                      [(x,ext.yMax) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
-                                     [(ext.xMin,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:1],
-                                     [(ext.xMax,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:1],])
+                                     [(ext.xMin,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],
+                                     [(ext.xMax,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],])
 
                 v = Voronoi(pts)
                 
