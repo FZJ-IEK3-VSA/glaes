@@ -632,7 +632,7 @@ class ExclusionCalculator(object):
         # Replace current availability matrix
         s._availability = s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8 )*100
 
-    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=4326, output=None, asArea=False, minArea=100000, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5):
         """Distribute the maximal number of minimally separated items within the available areas
         
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -650,7 +650,7 @@ class ExclusionCalculator(object):
                 * Used to initialize a placement list and prevent using too much memory when the number of placements gets absurd
 
             outputSRS : The output SRS system to use
-                * The default (4326) corresponds to regular lat/lon
+                * 4326 corresponds to regular lat/lon
 
             output : A path to an output shapefile
 
@@ -664,6 +664,9 @@ class ExclusionCalculator(object):
                 - np.ndarray : The scalings at each pixel (must match availability matrix shape)
                 - str : A path to a raster file containing scaling factors 
         """
+
+        # TODO: CLEAN UP THIS FUNCTION BY REMOVING AREA DISTRIBUTION AND FILE SAVING, AND ASSOCIATED PARAMETERS
+
         # Preprocess availability
         workingAvailability = s._availability >= threshold
         if not workingAvailability.dtype == 'bool':
@@ -852,49 +855,54 @@ class ExclusionCalculator(object):
             coords = newCoords
         s.itemCoords = coords
 
+        # Make areas
+        if asArea:
+            warn("Area distribution will soon be removed from 'distributeItems'. Use 'distributeArea' instead", DeprecationWarning)
+
+            ext = s.region.extent.pad(_voronoiBoundaryPadding, percent=True)
+
+            ### Do Voronoi
+            from scipy.spatial import Voronoi
+
+            # Add boundary points around the 'good' points so that we get bounded regions for each 'good' point 
+            pts = np.concatenate([s._itemCoords,
+                                 [(x,ext.yMin) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
+                                 [(x,ext.yMax) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
+                                 [(ext.xMin,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],
+                                 [(ext.xMax,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],])
+
+            v = Voronoi(pts)
+            
+            # Create regions
+            geoms = []
+            for reg in v.regions:
+                path = []
+                if -1 in reg or len(reg)==0: continue
+                for pid in reg:
+                    path.append(v.vertices[pid])
+                path.append(v.vertices[reg[0]])
+                    
+                geoms.append( gk.geom.polygon(path, srs=s.region.srs ))
+
+            if not len(geoms) == len(s._itemCoords):
+                raise GlaesError("Mismatching geometry count")
+
+            # Create a list of geometry from each region WITH availability
+            vec = gk.vector.createVector(geoms, fieldVals={"pid":range(1,len(geoms)+1)})
+            areaMap = s.region.rasterize(vec, value="pid", dtype=int) * (s._availability>threshold)
+
+            geoms = gk.geom.polygonizeMatrix(areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True)
+            geoms = list(filter(lambda x:x.Area()>=minArea, geoms.geom))
+
+            # Save in the s._areas container
+            s._areas = geoms
+
         # Make shapefile
         if not output is None:
+            warn("Shapefile output will soon be removed from 'distributeItems'. Use 'saveItems' or 'saveAreas' instead", DeprecationWarning)
             srs = gk.srs.loadSRS(outputSRS) if not outputSRS is None else s.region.srs
             # Should the locations be converted to areas?
             if asArea:
-                ext = s.region.extent.pad(_voronoiBoundaryPadding, percent=True)
-
-                ### Do Voronoi
-                from scipy.spatial import Voronoi
-
-                # Add boundary points around the 'good' points so that we get bounded regions for each 'good' point 
-                pts = np.concatenate([s._itemCoords,
-                                     [(x,ext.yMin) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
-                                     [(x,ext.yMax) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
-                                     [(ext.xMin,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],
-                                     [(ext.xMax,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],])
-
-                v = Voronoi(pts)
-                
-                # Create regions
-                geoms = []
-                for reg in v.regions:
-                    path = []
-                    if -1 in reg or len(reg)==0: continue
-                    for pid in reg:
-                        path.append(v.vertices[pid])
-                    path.append(v.vertices[reg[0]])
-                        
-                    geoms.append( gk.geom.polygon(path, srs=s.region.srs ))
-
-                if not len(geoms) == len(s._itemCoords):
-                    raise GlaesError("Mismatching geometry count")
-
-                # Create a list of geometry from each region WITH availability
-                vec = gk.vector.createVector(geoms, fieldVals={"pid":range(1,len(geoms)+1)})
-                areaMap = s.region.rasterize(vec, value="pid", dtype=int) * (s._availability>threshold)
-
-                geoms = gk.geom.polygonizeMatrix(areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True)
-                geoms = list(filter(lambda x:x.Area()>=minArea, geoms.geom))
-
-                # Save in the s._areas container
-                s._areas = geoms
-
                 if not srs.IsSame(s.region.srs):
                     geoms = gk.geom.transform(geoms, fromSRS=s.region.srs, toSRS=srs)
 
@@ -906,6 +914,99 @@ class ExclusionCalculator(object):
                 geoms = [gk.geom.point(loc, srs=srs) for loc in coords]
             
             gk.vector.createVector(geoms, output=output)
-
         else:
-            return coords
+            if asArea: return geoms
+            else: return coords
+
+    def distributeAreas(s, points=None, minArea=100000, threshold=50, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5):
+        if points is None: 
+            try:
+                points = s._itemCoords
+            except:
+                raise GlaesError("Point data could not be found. Have you ran 'distributeItems'?")
+        else:
+            points = np.array(points)
+            s = points[:,0] >= s.region.extent.xMin
+            s = s & (points[:,0] <= s.region.extent.xMax)
+            s = s & (points[:,1] >= s.region.extent.yMin)
+            s = s & (points[:,1] <= s.region.extent.yMax)
+
+            if not s.any(): raise GlaesError("None of the given points are in the extent")
+
+        ext = s.region.extent.pad(_voronoiBoundaryPadding, percent=True)
+
+        ### Do Voronoi
+        from scipy.spatial import Voronoi
+
+        # Add boundary points around the 'good' points so that we get bounded regions for each 'good' point 
+        pts = np.concatenate([points,
+                             [(x,ext.yMin) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
+                             [(x,ext.yMax) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
+                             [(ext.xMin,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],
+                             [(ext.xMax,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],])
+
+        v = Voronoi(pts)
+        
+        # Create regions
+        geoms = []
+        for reg in v.regions:
+            path = []
+            if -1 in reg or len(reg)==0: continue
+            for pid in reg:
+                path.append(v.vertices[pid])
+            path.append(v.vertices[reg[0]])
+                
+            geoms.append( gk.geom.polygon(path, srs=s.region.srs ))
+
+        if not len(geoms) == len(s._itemCoords):
+            raise RuntimeError("Mismatching geometry count")
+
+        # Create a list of geometry from each region WITH availability
+        vec = gk.vector.createVector(geoms, fieldVals={"pid":range(1,len(geoms)+1)})
+        areaMap = s.region.rasterize(vec, value="pid", dtype=int) * (s._availability>threshold)
+
+        geoms = gk.geom.polygonizeMatrix(areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True)
+        geoms = list(filter(lambda x:x.Area()>=minArea, geoms.geom))
+
+        # Save in the s._areas container
+        s._areas = geoms
+        return geoms
+
+    def saveItems(s, output, srs=None, data=None):
+        # Get srs
+        srs = gk.srs.loadSRS(srs) if not srs is None else s.region.srs
+
+        # transform?
+        if not srs.IsSame(s.region.srs):
+            points = gk.srs.xyTransform(s._itemCoords, fromSRS=s.region.srs, toSRS=srs, outputFormat="raw")
+        else:
+            points = s._itemCoords
+        points = [gk.geom.point(pt[0], pt[1], srs=srs) for pt in points]
+
+        # make shapefile
+        if data is None:
+            data = pd.DataFrame(dict(geom=points))
+        else:
+            data = pd.DataFrame(data)
+            data['geom'] = points
+
+        return gk.vector.createVector(data, output=output)
+
+    def saveAreas(s, output, srs=None, data=None):
+        # Get srs
+        srs = gk.srs.loadSRS(srs) if not srs is None else s.region.srs
+
+        # transform?
+        if not srs.IsSame(s.region.srs):
+            geoms = gk.geom.transform(s._areas, fromSRS=s.region.srs, toSRS=srs)
+        else:
+            geoms = s._areas
+
+        # make shapefile
+        if data is None:
+            data = pd.DataFrame(dict(geom=geoms))
+        else:
+            data = pd.DataFrame(data)
+            data['geom'] = geoms
+
+        return gk.vector.createVector(data, output=output)
