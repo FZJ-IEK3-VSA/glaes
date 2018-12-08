@@ -358,7 +358,7 @@ class ExclusionCalculator(object):
     def areaAvailable(s): 
         """The area of the region which remains available
             * Units are defined by the srs used to initialize the ExclusionCalculator"""
-        return s._availability.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
+        return s._availability.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight/100
 
     ## General excluding functions
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, prewarp=False, invert=False, mode="exclude", **kwargs):
