@@ -421,7 +421,7 @@ class ExclusionCalculator(object):
             if isinstance(prewarp, str): prewarpArgs["resampleAlg"] = prewarp
             elif isinstance(prewarp, dict): prewarpArgs.update(prewarp)
             
-            source = s.region.warp(source, returnAsSource=True, **prewarpArgs)
+            source = s.region.warp(source, returnMatrix=False, **prewarpArgs)
 
         # Indicate on the source
         areas = (s.region.indicateValues(source, value, buffer=buffer, resolutionDiv=resolutionDiv, applyMask=False, **kwargs)*100).astype(np.uint8)
