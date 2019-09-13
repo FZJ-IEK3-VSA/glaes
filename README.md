@@ -53,6 +53,7 @@ Objective:
 
 ### More Examples
 [Basic Workflow](Examples/00_basic_workflow.ipynb)
+[Placement Algorithm](Examples/01_Placement_algorithm.ipynb)
 
 ---
 ## Installation
