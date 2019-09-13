@@ -358,7 +358,7 @@ class ExclusionCalculator(object):
     def areaAvailable(s): 
         """The area of the region which remains available
             * Units are defined by the srs used to initialize the ExclusionCalculator"""
-        return s._availability.sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight
+        return s._availability[s.region.mask].sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight/100
 
     ## General excluding functions
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, prewarp=False, invert=False, mode="exclude", **kwargs):
@@ -421,7 +421,7 @@ class ExclusionCalculator(object):
             if isinstance(prewarp, str): prewarpArgs["resampleAlg"] = prewarp
             elif isinstance(prewarp, dict): prewarpArgs.update(prewarp)
             
-            source = s.region.warp(source, returnAsSource=True, **prewarpArgs)
+            source = s.region.warp(source, returnMatrix=False, **prewarpArgs)
 
         # Indicate on the source
         areas = (s.region.indicateValues(source, value, buffer=buffer, resolutionDiv=resolutionDiv, applyMask=False, **kwargs)*100).astype(np.uint8)
@@ -632,4 +632,381 @@ class ExclusionCalculator(object):
         # Replace current availability matrix
         s._availability = s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8 )*100
 
-    
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5):
+        """Distribute the maximal number of minimally separated items within the available areas
+        
+        Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
+
+        Inputs:
+            separation : The minimal distance between two items
+                - float : The separation distance when axialDirection is None
+                - (float, float) : The separation distance in the axial and transverse direction
+
+            pixelDivision - int : The inter-pixel fidelity to use when deciding where items can be placed
+
+            threshold : The minimal availability value to allow placing an item on
+
+            maxItems - int : The maximal number of items to place in the area
+                * Used to initialize a placement list and prevent using too much memory when the number of placements gets absurd
+
+            outputSRS : The output SRS system to use
+                * 4326 corresponds to regular lat/lon
+
+            output : A path to an output shapefile
+
+            axialDirection : The axial direction in degrees
+                - float : The direction to apply to all points
+                - np.ndarray : The directions at each pixel (must match availability matrix shape)
+                - str : A path to a raster file containing axial directions 
+
+            sepScaling : An additional scaling factor which can be applied to each pixel
+                - float : The scaling to apply to all points
+                - np.ndarray : The scalings at each pixel (must match availability matrix shape)
+                - str : A path to a raster file containing scaling factors 
+        """
+
+        # TODO: CLEAN UP THIS FUNCTION BY REMOVING AREA DISTRIBUTION AND FILE SAVING, AND ASSOCIATED PARAMETERS
+
+        # Preprocess availability
+        workingAvailability = s._availability >= threshold
+        if not workingAvailability.dtype == 'bool':
+            raise s.GlaesError("Working availability must be boolean type")
+
+        workingAvailability[~s.region.mask] = False
+
+        # Handle a gradient file, if one is given
+        if not axialDirection is None:
+            if isinstance(axialDirection, str): # Assume a path to a raster file is given
+                axialDirection = s.region.warp(axialDirection, resampleAlg='near')
+            elif isinstance(axialDirection, np.ndarray): # Assume a path to a raster file is given
+                if not axialDirection.shape == s.region.mask.shape:
+                    raise GlaesError("axialDirection matrix does not match context")
+            else: # axialDirection should be a single value
+                axialDirection = np.radians(float(axialDirection))
+
+            useGradient = True
+        else:
+            useGradient = False
+
+        # Read separation scaling file, if given
+        if not sepScaling is None:
+            if isinstance(sepScaling, str): # Assume a path to a raster file is given
+                sepScaling = s.region.warp(sepScaling, resampleAlg='near')
+                matrixScaling = True
+            elif isinstance(sepScaling, np.ndarray): # Assume a path to a raster file is given
+                if not sepScaling.shape == s.region.mask.shape:
+                    raise GlaesError("sepScaling matrix does not match context")
+                matrixScaling = True
+            else: # sepScaling should be a single value
+                matrixScaling = False
+            
+        else:
+            sepScaling = 1
+            matrixScaling = False
+
+        # Turn separation into pixel distances
+        if useGradient: 
+            try:
+                sepA, sepT = separation
+            except:
+                raise GlaesError("When giving gradient data, a separation tuple is expected")
+
+            sepA = sepA*sepScaling  / s.region.pixelRes
+            sepT = sepT*sepScaling / s.region.pixelRes
+
+            sepA2 = sepA**2
+            sepT2 = sepT**2
+
+            sepFloorA = sepA-1
+            sepFloorT = sepT-1
+            if not matrixScaling and (sepFloorA<1 or sepFloorT<1): 
+                raise GlaesError("Seperations are too small compared to pixel size")
+
+            sepFloorA2 = np.power(sepFloorA,2)
+            sepFloorT2 = np.power(sepFloorT,2)
+
+            sepCeil = np.maximum(sepA,sepT)+1
+
+        else:
+            separation = separation*sepScaling / s.region.pixelRes
+            sep2 = np.power(separation,2)
+            sepFloor = np.maximum(separation-1,0)
+            sepFloor2 = sepFloor**2
+            sepCeil = separation+1
+
+        if isinstance(sepCeil, np.ndarray) and sepCeil.size>1: sepCeil = sepCeil.max()
+
+        # Make geom list
+        x = np.zeros((maxItems))
+        y = np.zeros((maxItems))
+
+        bot = 0
+        cnt = 0
+
+        # start searching
+        yN, xN = workingAvailability.shape
+        substeps = np.linspace(-0.5, 0.5, pixelDivision)
+        substeps[0]+=0.0001 # add a tiny bit to the left/top edge (so that the point is definitely in the right pixel)
+        substeps[-1]-=0.0001 # subtract a tiny bit to the right/bottom edge for the same reason
+        
+        for yi in range(yN):
+            # update the "bottom" value
+            tooFarBehind = yi-y[bot:cnt] > sepCeil # find only those values which have a y-component greater than the separation distance
+            if tooFarBehind.size>0: 
+                bot += np.argmin(tooFarBehind) # since tooFarBehind is boolean, argmin should get the first index where it is false
+
+            #print("yi:", yi, "   BOT:", bot, "   COUNT:",cnt)
+
+            for xi in np.argwhere(workingAvailability[yi,:]):
+                # Clip the total placement arrays
+                xClip = x[bot:cnt]
+                yClip = y[bot:cnt]
+                if matrixScaling:
+                    if useGradient:
+                        _sepFloorA2 = sepFloorA2[yi,xi]
+                        _sepFloorT2 = sepFloorT2[yi,xi]
+
+                        if _sepFloorA2<1 or _sepFloorT2<1: raise GlaesError("Seperations are too small compared to pixel size")
+
+                        _sepA2 = sepA2[yi,xi]
+                        _sepT2 = sepT2[yi,xi]
+                    else:
+                        _sepFloor2 = sepFloor2[yi,xi]
+                        if _sepFloor2<1: raise GlaesError("Seperations are too small compared to pixel size")
+                        _sep2 = sep2[yi,xi]
+                else:
+                    if useGradient:
+                        _sepFloorA2 = sepFloorA2
+                        _sepFloorT2 = sepFloorT2
+                        _sepA2 = sepA2
+                        _sepT2 = sepT2
+                    else:
+                        _sepFloor2 = sepFloor2
+                        _sep2 = sep2
+
+
+                # calculate distances
+                xDist = xClip-xi
+                yDist = yClip-yi
+
+                # Get the indicies in the possible range
+                pir = np.argwhere( np.abs(xDist) <= sepCeil ) # pir => Possibly In Range, 
+                                                              # all y values should already be within the sepCeil 
+
+                # only continue if there are no points in the immediate range of the whole pixel
+                if useGradient:
+                    if isinstance(axialDirection, np.ndarray):
+                        grad = np.radians(axialDirection[yi,xi])
+                    else:
+                        grad = axialDirection
+
+                    cG = np.cos(grad)
+                    sG = np.sin(grad)
+                        
+                    dist = np.power((xDist[pir]*cG - yDist[pir]*sG),2)/_sepFloorA2 +\
+                           np.power((xDist[pir]*sG + yDist[pir]*cG),2)/_sepFloorT2
+
+                    immidiatelyInRange = dist <= 1
+
+                else:
+                    immidiatelyInRange = np.power(xDist[pir],2) + np.power(yDist[pir],2) <= _sepFloor2
+                
+                if immidiatelyInRange.any(): continue
+
+                # Start searching in the 'sub pixel'
+                found = False
+                for xsp in substeps+xi:
+                    xSubDist = xClip[pir]-xsp
+                    for ysp in substeps+yi:
+                        ySubDist = yClip[pir]-ysp
+
+                        # Test if any points in the range are overlapping
+                        if useGradient: # Test if in rotated ellipse
+                            dist = (np.power((xSubDist*cG - ySubDist*sG),2)/_sepA2) +\
+                                   (np.power((xSubDist*sG + ySubDist*cG),2)/_sepT2)
+                            overlapping = dist <= 1
+
+                        else: # test if in circle
+                            overlapping = (np.power(xSubDist,2) + np.power(ySubDist,2)) <= _sep2
+                        
+                        if not overlapping.any():
+                            found = True
+                            break
+
+                    if found: break
+
+                # Add if found
+                if found:
+                    x[cnt] = xsp
+                    y[cnt] = ysp
+                    cnt += 1
+
+                 
+        # Convert identified points back into the region's coordinates
+        coords = np.zeros((cnt,2))
+        coords[:,0] = s.region.extent.xMin + (x[:cnt]+0.5)*s.region.pixelWidth # shifted by 0.5 so that index corresponds to the center of the pixel
+        coords[:,1] = s.region.extent.yMax - (y[:cnt]+0.5)*s.region.pixelHeight # shifted by 0.5 so that index corresponds to the center of the pixel
+
+        s._itemCoords = coords
+
+        if not outputSRS is None:
+            newCoords = gk.srs.xyTransform(coords, fromSRS=s.region.srs, toSRS=outputSRS)
+            newCoords = np.column_stack( [ [v[0] for v in newCoords], [v[1] for v in newCoords]] )
+            coords = newCoords
+        s.itemCoords = coords
+
+        # Make areas
+        if asArea:
+            warn("Area distribution will soon be removed from 'distributeItems'. Use 'distributeArea' instead", DeprecationWarning)
+
+            ext = s.region.extent.pad(_voronoiBoundaryPadding, percent=True)
+
+            ### Do Voronoi
+            from scipy.spatial import Voronoi
+
+            # Add boundary points around the 'good' points so that we get bounded regions for each 'good' point 
+            pts = np.concatenate([s._itemCoords,
+                                 [(x,ext.yMin) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
+                                 [(x,ext.yMax) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
+                                 [(ext.xMin,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],
+                                 [(ext.xMax,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],])
+
+            v = Voronoi(pts)
+            
+            # Create regions
+            geoms = []
+            for reg in v.regions:
+                path = []
+                if -1 in reg or len(reg)==0: continue
+                for pid in reg:
+                    path.append(v.vertices[pid])
+                path.append(v.vertices[reg[0]])
+                    
+                geoms.append( gk.geom.polygon(path, srs=s.region.srs ))
+
+            if not len(geoms) == len(s._itemCoords):
+                raise GlaesError("Mismatching geometry count")
+
+            # Create a list of geometry from each region WITH availability
+            vec = gk.vector.createVector(geoms, fieldVals={"pid":range(1,len(geoms)+1)})
+            areaMap = s.region.rasterize(vec, value="pid", dtype=int) * (s._availability>threshold)
+
+            geoms = gk.geom.polygonizeMatrix(areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True)
+            geoms = list(filter(lambda x:x.Area()>=minArea, geoms.geom))
+
+            # Save in the s._areas container
+            s._areas = geoms
+
+        # Make shapefile
+        if not output is None:
+            warn("Shapefile output will soon be removed from 'distributeItems'. Use 'saveItems' or 'saveAreas' instead", DeprecationWarning)
+            srs = gk.srs.loadSRS(outputSRS) if not outputSRS is None else s.region.srs
+            # Should the locations be converted to areas?
+            if asArea:
+                if not srs.IsSame(s.region.srs):
+                    geoms = gk.geom.transform(geoms, fromSRS=s.region.srs, toSRS=srs)
+
+                # Add 'area' column
+                areas = [g.Area() for g in geoms]
+                geoms = pd.DataFrame({"geom":geoms, "area":areas})
+
+            else: # Just write the points                
+                geoms = [gk.geom.point(loc, srs=srs) for loc in coords]
+            
+            gk.vector.createVector(geoms, output=output)
+        else:
+            if asArea: return geoms
+            else: return coords
+
+    def distributeAreas(s, points=None, minArea=100000, threshold=50, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5):
+        if points is None: 
+            try:
+                points = s._itemCoords
+            except:
+                raise GlaesError("Point data could not be found. Have you ran 'distributeItems'?")
+        else:
+            points = np.array(points)
+            s = points[:,0] >= s.region.extent.xMin
+            s = s & (points[:,0] <= s.region.extent.xMax)
+            s = s & (points[:,1] >= s.region.extent.yMin)
+            s = s & (points[:,1] <= s.region.extent.yMax)
+
+            if not s.any(): raise GlaesError("None of the given points are in the extent")
+
+        ext = s.region.extent.pad(_voronoiBoundaryPadding, percent=True)
+
+        ### Do Voronoi
+        from scipy.spatial import Voronoi
+
+        # Add boundary points around the 'good' points so that we get bounded regions for each 'good' point 
+        pts = np.concatenate([points,
+                             [(x,ext.yMin) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
+                             [(x,ext.yMax) for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
+                             [(ext.xMin,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],
+                             [(ext.xMax,y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],])
+
+        v = Voronoi(pts)
+        
+        # Create regions
+        geoms = []
+        for reg in v.regions:
+            path = []
+            if -1 in reg or len(reg)==0: continue
+            for pid in reg:
+                path.append(v.vertices[pid])
+            path.append(v.vertices[reg[0]])
+                
+            geoms.append( gk.geom.polygon(path, srs=s.region.srs ))
+
+        if not len(geoms) == len(s._itemCoords):
+            raise RuntimeError("Mismatching geometry count")
+
+        # Create a list of geometry from each region WITH availability
+        vec = gk.vector.createVector(geoms, fieldVals={"pid":range(1,len(geoms)+1)})
+        areaMap = s.region.rasterize(vec, value="pid", dtype=int) * (s._availability>threshold)
+
+        geoms = gk.geom.polygonizeMatrix(areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True)
+        geoms = list(filter(lambda x:x.Area()>=minArea, geoms.geom))
+
+        # Save in the s._areas container
+        s._areas = geoms
+        return geoms
+
+    def saveItems(s, output, srs=None, data=None):
+        # Get srs
+        srs = gk.srs.loadSRS(srs) if not srs is None else s.region.srs
+
+        # transform?
+        if not srs.IsSame(s.region.srs):
+            points = gk.srs.xyTransform(s._itemCoords, fromSRS=s.region.srs, toSRS=srs, outputFormat="raw")
+        else:
+            points = s._itemCoords
+        points = [gk.geom.point(pt[0], pt[1], srs=srs) for pt in points]
+
+        # make shapefile
+        if data is None:
+            data = pd.DataFrame(dict(geom=points))
+        else:
+            data = pd.DataFrame(data)
+            data['geom'] = points
+
+        return gk.vector.createVector(data, output=output)
+
+    def saveAreas(s, output, srs=None, data=None):
+        # Get srs
+        srs = gk.srs.loadSRS(srs) if not srs is None else s.region.srs
+
+        # transform?
+        if not srs.IsSame(s.region.srs):
+            geoms = gk.geom.transform(s._areas, fromSRS=s.region.srs, toSRS=srs)
+        else:
+            geoms = s._areas
+
+        # make shapefile
+        if data is None:
+            data = pd.DataFrame(dict(geom=geoms))
+        else:
+            data = pd.DataFrame(data)
+            data['geom'] = geoms
+
+        return gk.vector.createVector(data, output=output)

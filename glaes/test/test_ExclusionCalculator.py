@@ -200,6 +200,48 @@ def test_ExclusionCalculator_pruneIsolatedAreas():
 
     print( "ExclusionCalculator_pruneIsolatedAreas passed")
 
+def test_ExclusionCalculator_distributeItems():
+    # make a prior source 
+    pr = gl.core.priors.PriorSource(priorSample)
+    ec = gl.ExclusionCalculator(aachenShape)
+    ec.excludePrior(pr, value=(400,None))
+
+    # Do a regular distribution
+    ec.distributeItems( 1000, output="results/distributeItems1.shp", outputSRS=3035)
+    geoms = gk.vector.extractFeatures("results/distributeItems1.shp")
+    compare(geoms.shape[0], 287, "Distributed items Count")
+    
+    minDist = 1000000
+    for gi in range(geoms.shape[0]-1):
+        for gj in range(gi+1,geoms.shape[0]):
+            d = geoms.geom[gi].Distance(geoms.geom[gj])
+            if d < minDist:
+                minDist = d
+                I=(gi,gj)
+    
+    compare(minDist >= 999, True, "Distributed distance")
+
+    # Do an axial distribution
+    ec.distributeItems( (1000,300), axialDirection=180, output="results/distributeItems2.shp", outputSRS=3035)
+    geoms = gk.vector.extractFeatures("results/distributeItems2.shp")
+    compare(geoms.shape[0], 882, "Distributed items Count")
+    
+    x = np.array([g.GetX() for g in geoms.geom])
+    y = np.array([g.GetY() for g in geoms.geom])
+
+    for gi in range(geoms.shape[0]-1):
+        d = ( x[gi]-x[gi+1:] )**2/1000**2 + ( y[gi]-y[gi+1:] )**2/300**2
+        if (d < 1).any(): raise RuntimeError( "Axial objects too close: %i"%(gi))
+
+    # Do make areas
+    ec.distributeItems( 2000, asArea=True, output="results/distributeItems3.shp", outputSRS=4326)
+    geoms = gk.vector.extractFeatures("results/distributeItems3.shp")
+
+    compareF(geoms.shape[0], 97, "Distribute as areas")
+    compareF(geoms.area.mean(), 0.000230714164474, "Distribute as areas")
+    compareF(geoms.area.std(), 8.2766693979e-05, "Distribute as areas")
+
+    print( "ExclusionCalculator_distributeItems passed")
 
 if __name__ == "__main__":
     test_ExclusionCalculator___init__()
@@ -211,3 +253,5 @@ if __name__ == "__main__":
     test_ExclusionCalculator_excludeRegionEdge()
     test_ExclusionCalculator_shrinkAvailability()
     test_ExclusionCalculator_pruneIsolatedAreas()
+    test_ExclusionCalculator_distributeItems()
+

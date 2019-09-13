@@ -78,37 +78,74 @@ If you would like to install the Prior datasets:
     $ unzip priors.zip
 
 ---
+## Docker
 
+We are trying to get GLAES to work within a Docker container. Try it out!
+
+* First pull the image with:
+```bash
+docker pull sevberg/glaes:latest
+```
+
+* You can then start a basic python interpreter with:
+```bash
+docker run -it sevberg/glaes:latest -c "python"
+```
+
+* Or you can start a jupyter notebook using:
+```bash
+docker run -it \
+    -p 8888:8888 \
+    sevberg/glaes:latest \
+    -c "jupyter notebook --ip='*' --port=8888 --no-browser --allow-root"
+```
+ - Which can then be connected to at the address "localhost:8888:<API-KEY>"
+ - The API Key can be found from the output of the earlier command
+
+* Finally, you might want to mount a volume to access geospatial data. For this you can use:
+```bash
+docker run -it \
+    --mount target=/notebooks,type=bind,src=<PATH-TO-DIRECTORY> \
+    -p 8888:8888 \
+    sevberg/glaes:latest  \
+    -c "jupyter notebook --notebook-dir=/notebooks --ip='*' --port=8888 --no-browser --allow-root"
+```
+
+---
 ## Associated papers
 
-If you would like to see a **much** more detailed discussion on land eligibility analysis and see why a framework such as GLAES is not only helpful, but a requirement, please see [the background paper](https://arxiv.org/abs/1712.07840)
+If you would like to see a **much** more detailed discussion on land eligibility analysis and see why a framework such as GLAES is not only helpful, but a requirement, please see:
+
+<a href="the-background-paper">The Background Paper</a>
 
 Examples of Land Eligibility evaluation and applications:
 
-* [Determining the Land Eligibility of Renewable Energy Technologies with Application to European Wind Energy](link-will-go-here)
+* [Uniformly constrained land eligibility for onshore European wind power](https://doi.org/10.1016/j.renene.2019.06.127)
 
-* [Spatio-Temporal Optimization of a Future Energy System for Power-to-Hydrogen Applications in Germany](https://linkinghub.elsevier.com/retrieve/pii/S036054421830879X)
+* [The techno-economic potential of offshore wind energy with optimized future turbine designs in Europe](https://doi.org/10.1016/j.apenergy.2019.113794)
 
 * [Linking the Power and Transport Sectors—Part 2: Modelling a Sector Coupling Scenario for Germany](http://www.mdpi.com/1996-1073/10/7/957/htm)
 
 ---
 ## Citation
 
-If you decide to use GLAES anywhere in a published work, please kindly cite us using the following:
+If you decide to use GLAES anywhere in a published work, please kindly cite us using the following
 
 ```bibtex
-@Article{glaes,
-    AUTHOR = {Ryberg, David Severin and Robinius, Martin and Stolten, Detlef},
-    TITLE = {Evaluating Land Eligibility Constraints of Renewable Energy Sources in Europe},
-    JOURNAL = {Energies},
-    VOLUME = {11},
-    YEAR = {2018},
-    NUMBER = {5},
-    ARTICLE NUMBER = {1246},
-    URL = {http://www.mdpi.com/1996-1073/11/5/1246},
-    ISSN = {1996-1073},
-    DOI = {10.3390/en11051246}
+@article{Ryberg2018,
+  author = {Ryberg, David and Robinius, Martin and Stolten, Detlef},
+  doi = {10.3390/en11051246},
+  issn = {1996-1073},
+  journal = {Energies},
+  month = {may},
+  number = {5},
+  pages = {1246},
+  title = {{Evaluating Land Eligibility Constraints of Renewable Energy Sources in Europe}},
+  url = {http://www.mdpi.com/1996-1073/11/5/1246},
+  volume = {11},
+  year = {2018}
 }
+
 
 ```
 
