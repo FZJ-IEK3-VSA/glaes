@@ -52,8 +52,8 @@ Objective:
 <img src="images/example_04.png" alt="Final eligibility result" width="700px">
 
 ### More Examples
-[Basic Workflow](Examples/00_basic_workflow.ipynb)
-[Placement Algorithm](Examples/01_Placement_algorithm.ipynb)
+1. [Basic Workflow](Examples/00_basic_workflow.ipynb)
+2. [Placement Algorithm](Examples/01_Placement_algorithm.ipynb)
 
 ---
 ## Installation
