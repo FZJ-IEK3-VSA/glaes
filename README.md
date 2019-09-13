@@ -78,7 +78,40 @@ If you would like to install the Prior datasets:
     $ unzip priors.zip
 
 ---
+## Docker
 
+We are trying to get GLAES to work within a Docker container. Try it out!
+
+* First pull the image with:
+```bash
+docker pull sevberg/glaes:latest
+```
+
+* You can then start a basic python interpreter with:
+```bash
+docker run -it sevberg/glaes:latest -c "python"
+```
+
+* Or you can start a jupyter notebook using:
+```bash
+docker run -it \
+    -p 8888:8888 \
+    sevberg/glaes:latest \
+    -c "jupyter notebook --ip='*' --port=8888 --no-browser --allow-root"
+```
+ - Which can then be connected to at the address "localhost:8888:<API-KEY>"
+ - The API Key can be found from the output of the earlier command
+
+* Finally, you might want to mount a volume to access geospatial data. For this you can use:
+```bash
+docker run -it \
+    --mount target=/notebooks,type=bind,src=<PATH-TO-DIRECTORY> \
+    -p 8888:8888 \
+    sevberg/glaes:latest  \
+    -c "jupyter notebook --notebook-dir=/notebooks --ip='*' --port=8888 --no-browser --allow-root"
+```
+
+---
 ## Associated papers
 
 If you would like to see a **much** more detailed discussion on land eligibility analysis and see why a framework such as GLAES is not only helpful, but a requirement, please see:
