@@ -120,9 +120,9 @@ If you would like to see a **much** more detailed discussion on land eligibility
 
 Examples of Land Eligibility evaluation and applications:
 
-* [Determining the Land Eligibility of Renewable Energy Technologies with Application to European Wind Energy](link-will-go-here)
+* [Uniformly constrained land eligibility for onshore European wind power](https://doi.org/10.1016/j.renene.2019.06.127)
 
-* [Spatio-Temporal Optimization of a Future Energy System for Power-to-Hydrogen Applications in Germany](link-will-go-here)
+* [The techno-economic potential of offshore wind energy with optimized future turbine designs in Europe](https://doi.org/10.1016/j.apenergy.2019.113794)
 
 * [Linking the Power and Transport Sectors—Part 2: Modelling a Sector Coupling Scenario for Germany](http://www.mdpi.com/1996-1073/10/7/957/htm)
 
@@ -132,11 +132,21 @@ Examples of Land Eligibility evaluation and applications:
 If you decide to use GLAES anywhere in a published work, please kindly cite us using the following
 
 ```bibtex
-@article{ryberg_land_eligibility_2017,
-  title={Determining the Land Eligibility of Renewable Energy Technologies with Application to European Wind Energy},
-  author={David Severin Ryberg, Zena Tulemat, Martin Robinius, Detlef Stolten},
-  year={2017},
+@article{Ryberg2018,
+  author = {Ryberg, David and Robinius, Martin and Stolten, Detlef},
+  doi = {10.3390/en11051246},
+  issn = {1996-1073},
+  journal = {Energies},
+  month = {may},
+  number = {5},
+  pages = {1246},
+  title = {{Evaluating Land Eligibility Constraints of Renewable Energy Sources in Europe}},
+  url = {http://www.mdpi.com/1996-1073/11/5/1246},
+  volume = {11},
+  year = {2018}
 }
+
+
 ```
 
 ---
