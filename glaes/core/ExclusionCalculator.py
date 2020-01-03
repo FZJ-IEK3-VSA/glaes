@@ -138,7 +138,8 @@ class ExclusionCalculator(object):
                 latitute and longitude of the center point of the new projection 
               - Specifying "LAEA" instructs the constructor to determine X and Y 
                 automatically from the given 'region' input
-                - NOTE: Only works when the 'region' input is an ogr.Geometry
+                - NOTE: Only works when the 'region' input is an ogr.Geometry or 
+                  a path to a vector file
               
         pixelRes : float or tuple
             The generated RegionMask's native pixel size(s)
@@ -183,8 +184,14 @@ class ExclusionCalculator(object):
                     centroid = region.Centroid()
                     center_x = centroid.GetX()
                     center_y = centroid.GetY()
+                elif isinstance(region, str):
+                    vi = gk.vector.vectorInfo(region)
+                    center_x = (vi.xMin+vi.xMax)/2
+                    center_y = (vi.yMin+vi.yMax)/2
+                    if not vi.srs.IsSame(gk.srs.EPSG4326):
+                        center_x, center_y, _ = gk.srs.xyTransform( (center_x,center_y), fromSRS=vi.srs, toSRS=gk.srs.EPSG4326 )
                 else:
-                    raise RuntimeError("Automatic center determination is only possible when the 'region' input is an ogr.Geometry Object")
+                    raise RuntimeError("Automatic center determination is only possible when the 'region' input is an ogr.Geometry Object or a path to a vector file")
             
             srs = osr.SpatialReference()
             srs.ImportFromProj4('+proj=laea +lat_0={} +lon_0={} +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'.format(center_y,center_x))
