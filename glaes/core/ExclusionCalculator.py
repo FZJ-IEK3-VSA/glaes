@@ -117,19 +117,29 @@ class ExclusionCalculator(object):
 
         Parameters:
         -----------
-        region : str, geokit.RegionMask 
+        region : str, ogr.Geometry, geokit.RegionMask 
             The regional definition for the land eligibility analysis
-            * If given as a string, must be a path to a vector file
+            * If given as a string, must be a path to a vector file. 
+              - NOTE: Either the vector file should contain exactly 1 feature,
+                a "where" statement should be used to select a specific feature, 
+                or "limitOne=False" should be specified (to join all features)
             * If given as a RegionMask, it is taken directly despite other 
               arguments
 
-        srs : Anything acceptable to geokit.srs.loadSRS()
+        srs : str, Anything acceptable to geokit.srs.loadSRS()
             The srs context of the generated RegionMask object
             * The default srs EPSG3035 is only valid for a European context
             * If an integer is given, it is treated as an EPSG identifier
               - Look here for options: http://spatialreference.org/ref/epsg/
               * Only effective if 'region' is a path to a vector
-
+            * If a string is specified, then a new srs can be automatically 
+              generated using the Lambert Azimuthal Equal Area projection type
+              - Must follow the form "LAEA" or "LAEA:Y,X" where X and Y are the 
+                latitute and longitude of the center point of the new projection 
+              - Specifying "LAEA" instructs the constructor to determine X and Y 
+                automatically from the given 'region' input
+                - NOTE: Only works when the 'region' input is an ogr.Geometry
+              
         pixelRes : float or tuple
             The generated RegionMask's native pixel size(s)
             * If float : A pixel size to apply to both the X and Y dimension
@@ -157,6 +167,27 @@ class ExclusionCalculator(object):
             * Only take effect when the 'region' argument is a string
     
         """
+        # Create spatial reference system (but only if a RegionMask isnt already given)
+        if not isinstance(region, gk.RegionMask) and isinstance(srs, str) and srs[0:4]=="LAEA":
+            import osr,ogr
+            if len(srs) > 4: # A center point was given
+                m = re.compile("LAEA:([0-9.]+),([0-9.]+)").match(srs)
+                if m is None: 
+                    raise RuntimeError("SRS string is not understandable. Must be parsable with: 'LAEA:([0-9.]+),([0-9.]+)'")
+                center_y, center_x = map(float, m.groups())
+
+            else: # A center point should be determined
+                if isinstance(region, ogr.Geometry):
+                    if not region.GetSpatialReference().IsSame(gk.srs.EPSG4326):
+                        region = gk.geom.transform(region, toSRS=gk.srs.EPSG4326)
+                    centroid = region.Centroid()
+                    center_x = centroid.GetX()
+                    center_y = centroid.GetY()
+                else:
+                    raise RuntimeError("Automatic center determination is only possible when the 'region' input is an ogr.Geometry Object")
+            
+            srs = osr.SpatialReference()
+            srs.ImportFromProj4('+proj=laea +lat_0={} +lon_0={} +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'.format(center_y,center_x))
 
         # load the region
         s.region = gk.RegionMask.load(region, srs=srs, pixelRes=pixelRes, where=where, padExtent=padExtent, **kwargs)
