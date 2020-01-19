@@ -5,11 +5,11 @@ setup(
     version='1.1.3',
     author='Severin Ryberg',
     url='https://github.com/FZJ-IEK3-VSA/glaes',
-    packages = find_packages(),
+    packages=find_packages(),
     include_package_data=True,
-    install_requires = [
+    install_requires=[
         "geokit>=1.1.3",
-        "gdal==2.4.1",
+        "gdal>2.0.0,<3.0.0",
         "numpy",
         "descartes",
         "pandas",
