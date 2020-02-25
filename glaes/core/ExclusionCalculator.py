@@ -175,7 +175,7 @@ class ExclusionCalculator(object):
             import osr
             import ogr
             if len(srs) > 4:  # A center point was given
-                m = re.compile("LAEA:([0-9.-]+),([0-9.]-+)").match(srs)
+                m = re.compile("LAEA:([0-9.-]+),([0-9.-]+)").match(srs)
                 if m is None:
                     raise RuntimeError(
                         "SRS string is not understandable. Must be parsable with: 'LAEA:([0-9.-]+),([0-9.-]+)'")
