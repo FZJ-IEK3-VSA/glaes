@@ -8,21 +8,21 @@ Areas = namedtuple('Areas', "coordinates geoms")
 
 
 class ExclusionCalculator(object):
-    """The ExclusionCalculator object makes land eligibility (LE) analyses easy 
-    and quick. Once initialized to a particular region, the ExclusionCalculator 
-    object can be used to incorporate any geospatial dataset (so long as it is 
-    interpretable by GDAL) into the LE analysis. 
+    """The ExclusionCalculator object makes land eligibility (LE) analyses easy
+    and quick. Once initialized to a particular region, the ExclusionCalculator
+    object can be used to incorporate any geospatial dataset (so long as it is
+    interpretable by GDAL) into the LE analysis.
 
 
     Note:
-    ----- 
-    By default, ExclusionCalculator is always initialized at 100x100 meter 
-    resolution in the EPSG3035 projection system. This is well-suited to LE 
-    analyses in Europe, however if another region is being investigated or else 
-    if another resolution or projection system is desired for any other reason, 
+    -----
+    By default, ExclusionCalculator is always initialized at 100x100 meter
+    resolution in the EPSG3035 projection system. This is well-suited to LE
+    analyses in Europe, however if another region is being investigated or else
+    if another resolution or projection system is desired for any other reason,
     this can be incorporated as well during the initialization stage.
 
-    If you need to find a new projection system for your analyses, the following 
+    If you need to find a new projection system for your analyses, the following
     website is helpful: http://spatialreference.org/ref/epsg/
 
 
@@ -37,9 +37,9 @@ class ExclusionCalculator(object):
 
         >>> ec = ExclusionCalculator(<path>, pixelRes=0.001, srs='latlon')
 
-    * In fact, the ExclusionCalculator initialization is simply a call to 
-      geokit.RegionMask.load, so see that for more information. This also means 
-      that any geokit.RegoinMask object can be used to initialize the 
+    * In fact, the ExclusionCalculator initialization is simply a call to
+      geokit.RegionMask.load, so see that for more information. This also means
+      that any geokit.RegoinMask object can be used to initialize the
       ExclusionCalculator
 
         >>> rm = geokit.RegionMask.load(<path>, pad=..., srs=..., pixelRes=..., ...)
@@ -49,14 +49,14 @@ class ExclusionCalculator(object):
     ------
     * The ExclusionCalculator object contains a member name "availability", which
       contains the most up to date result of the LE analysis
-        - Just after initialization, the the availability matrix is filled with 
+        - Just after initialization, the the availability matrix is filled with
           100's, meaning that all locations are available
         - After excluding locations based off various geospatial datasets, cells
-          in the availability matrix are changed to a value between 0 and 100, 
-          where 0 means completely unavailable, 100 means fully available, and 
+          in the availability matrix are changed to a value between 0 and 100,
+          where 0 means completely unavailable, 100 means fully available, and
           intermediate values indicate a pixel which is only partly excluded.
 
-    * Exclusions can be applied by using one of the 'excludeVectorType', 
+    * Exclusions can be applied by using one of the 'excludeVectorType',
       'excludeRasterType', or 'excludePrior' methods
         - The correct method to use depends on the format of the datasource used
           for exclusions
@@ -119,13 +119,13 @@ class ExclusionCalculator(object):
 
         Parameters:
         -----------
-        region : str, ogr.Geometry, geokit.RegionMask 
+        region : str, ogr.Geometry, geokit.RegionMask
             The regional definition for the land eligibility analysis
-            * If given as a string, must be a path to a vector file. 
+            * If given as a string, must be a path to a vector file.
               - NOTE: Either the vector file should contain exactly 1 feature,
-                a "where" statement should be used to select a specific feature, 
+                a "where" statement should be used to select a specific feature,
                 or "limitOne=False" should be specified (to join all features)
-            * If given as a RegionMask, it is taken directly despite other 
+            * If given as a RegionMask, it is taken directly despite other
               arguments
 
         srs : str, Anything acceptable to geokit.srs.loadSRS()
@@ -134,13 +134,13 @@ class ExclusionCalculator(object):
             * If an integer is given, it is treated as an EPSG identifier
               - Look here for options: http://spatialreference.org/ref/epsg/
               * Only effective if 'region' is a path to a vector
-            * If a string is specified, then a new srs can be automatically 
+            * If a string is specified, then a new srs can be automatically
               generated using the Lambert Azimuthal Equal Area projection type
-              - Must follow the form "LAEA" or "LAEA:Y,X" where X and Y are the 
-                latitute and longitude of the center point of the new projection 
-              - Specifying "LAEA" instructs the constructor to determine X and Y 
+              - Must follow the form "LAEA" or "LAEA:Y,X" where X and Y are the
+                latitute and longitude of the center point of the new projection
+              - Specifying "LAEA" instructs the constructor to determine X and Y
                 automatically from the given 'region' input
-                - NOTE: Only works when the 'region' input is an ogr.Geometry or 
+                - NOTE: Only works when the 'region' input is an ogr.Geometry or
                   a path to a vector file
 
         pixelRes : float or tuple
@@ -155,7 +155,7 @@ class ExclusionCalculator(object):
             * Feature attribute name do not need quotes
             * String values should be wrapped in 'single quotes'
             * Only effective if 'region' is a path to a vector
-            Example: If the source vector has a string attribute called "ISO" and 
+            Example: If the source vector has a string attribute called "ISO" and
                      a integer attribute called "POP", you could use....
 
                 where = "ISO='DEU' AND POP>1000"
@@ -165,7 +165,7 @@ class ExclusionCalculator(object):
             An amount by which to pad the extent before generating the RegionMask
             * Only effective if 'region' is a path to a vector
 
-        kwargs: 
+        kwargs:
             * Keyword arguments are passed on to a call to geokit.RegionMask.load
             * Only take effect when the 'region' argument is a string
 
@@ -212,7 +212,7 @@ class ExclusionCalculator(object):
 
         # Make the total availability matrix
         s._availability = np.array(s.region.mask, dtype=np.uint8)*100
-        #s._availability[~s.region.mask] = 255
+        # s._availability[~s.region.mask] = 255
 
         # Make a list of item coords
         s.itemCoords = None
@@ -223,7 +223,7 @@ class ExclusionCalculator(object):
         """Save the current availability matrix to a raster file
 
         Output will be a byte-valued raster with the following convention:
-            0     -> unavailable 
+            0     -> unavailable
             1..99 -> Semi-available
             100   -> fully eligibile
             255   -> "no data" (out of region)
@@ -236,11 +236,11 @@ class ExclusionCalculator(object):
 
         threshold : float; optional
             The acceptable threshold indicating an available pixel
-            * Use this to process the availability matrix before saving it (will 
+            * Use this to process the availability matrix before saving it (will
               save a little bit of space)
 
-        kwargs: 
-            * All keyword arguments are passed on to a call to 
+        kwargs:
+            * All keyword arguments are passed on to a call to
               geokit.RegionMask.createRaster
             * Most notably:
                 - 'dtype' is used to define the data type of the resulting raster
@@ -266,7 +266,7 @@ class ExclusionCalculator(object):
 
         Note:
         -----
-        To save the result somewhere, call 'plt.savefig(...)' immediately 
+        To save the result somewhere, call 'plt.savefig(...)' immediately
         calling this function. To directly view the result, call 'plt.show()'
 
         Parameters:
@@ -294,9 +294,9 @@ class ExclusionCalculator(object):
             * seting this to 1 will apply no scaling
 
         geomSimplificationFactor: int
-            A down scaling factor to apply when drawing the geometry borders of 
+            A down scaling factor to apply when drawing the geometry borders of
             the ExclusionCalculator's region
-            * Use this when the region's geometry is extremely detailed compared 
+            * Use this when the region's geometry is extremely detailed compared
               to the scale over which it is drawn
             * Setting this to None will apply no simplification
 
@@ -422,15 +422,15 @@ class ExclusionCalculator(object):
         source : str or gdal.Dataset
             The raster datasource defining the criteria values for each location
 
-        value : tuple, or numeric 
+        value : tuple, or numeric
             The exact value, or value range to exclude
             * If Numeric, should be The exact value to exclude
-                * Generally this should only be done when the raster datasource 
-                  contains integer values, otherwise a range of values should be 
+                * Generally this should only be done when the raster datasource
+                  contains integer values, otherwise a range of values should be
                   used to avoid float comparison errors
-            * If ( Numeric, Numeric ), the low and high boundary describing the 
+            * If ( Numeric, Numeric ), the low and high boundary describing the
               range of values to exclude
-                * If either boundary is given as None, then it is interpreted as 
+                * If either boundary is given as None, then it is interpreted as
                   unlimited
 
         buffer : float; optional
@@ -438,7 +438,7 @@ class ExclusionCalculator(object):
             * Units are in the RegionMask's srs
             * The buffering occurs AFTER the indication and warping step and
               so it may not represent the original dataset exactly
-              - Buffering can be made more accurate by increasing the 
+              - Buffering can be made more accurate by increasing the
                 'resolutionDiv' input
 
         resolutionDiv : int; optional
@@ -446,10 +446,10 @@ class ExclusionCalculator(object):
             * This is useful if you need to represent very fine details
 
         prewarp : bool or str or dict; optional
-            When given, the source will be warped to the calculator's mask context 
+            When given, the source will be warped to the calculator's mask context
             before processing
             * If True, warping will be performed using the bilinear scheme
-            * If str, warp using the indicated resampleAlgorithm 
+            * If str, warp using the indicated resampleAlgorithm
               - options: 'near', 'bilinear', 'cubic', 'average'
             * If dict, a dictionary of arguments is expected
               - These are passed along to geokit.RegionMask.warp
@@ -458,13 +458,13 @@ class ExclusionCalculator(object):
             If True, flip indications
 
         mode: string; optional
-            * If 'exclude', then the indicated pixels are subtracted from the 
+            * If 'exclude', then the indicated pixels are subtracted from the
               current availability matrix
             * If 'include', then the indicated pixel are added back into the
               availability matrix
 
         kwargs
-            * All other keyword arguments are passed on to a call to 
+            * All other keyword arguments are passed on to a call to
               geokit.RegionMask.indicateValues
 
         """
@@ -503,13 +503,13 @@ class ExclusionCalculator(object):
 
         where : str
             A filtering statement to apply to the datasource before the indication
-            * This is an SQL like statement which can operate on features in the 
+            * This is an SQL like statement which can operate on features in the
               datasource
             * For tips, see "http://www.gdal.org/ogr_sql.html"
             * For example...
-              - If the datasource had features which each have an attribute 
-                called 'type' and only features with the type "protected" are 
-                wanted, the correct statement would be: 
+              - If the datasource had features which each have an attribute
+                called 'type' and only features with the type "protected" are
+                wanted, the correct statement would be:
                     where="type='protected'"
 
         buffer : float; optional
@@ -521,14 +521,14 @@ class ExclusionCalculator(object):
             * Options are: 'geom' and 'area'
             * If 'geom', the function will attempt to grow each of the geometries
               directly using the ogr library
-              - This can fail sometimes when the geometries are particularly 
-                complex or if some of the geometries are not valid (as in, they 
+              - This can fail sometimes when the geometries are particularly
+                complex or if some of the geometries are not valid (as in, they
                 have self-intersections)
             * If 'area', the function will first rasterize the raw geometries and
               will then apply the buffer to the indicated pixels
               - This is the safer option although is not as accurate as the 'geom'
                 option since it does not capture the exact edges of the geometries
-              - This method can be made more accurate by increasing the 
+              - This method can be made more accurate by increasing the
                 'resolutionDiv' input
 
         resolutionDiv : int; optional
@@ -539,13 +539,13 @@ class ExclusionCalculator(object):
             If True, flip indications
 
         mode: string; optional
-            * If 'exclude', then the indicated pixels are subtracted from the 
+            * If 'exclude', then the indicated pixels are subtracted from the
               current availability matrix
             * If 'include', then the indicated pixel are added back into the
               availability matrix
 
         kwargs
-            * All other keyword arguments are passed on to a call to 
+            * All other keyword arguments are passed on to a call to
               geokit.RegionMask.indicateFeatures
 
         """
@@ -574,11 +574,11 @@ class ExclusionCalculator(object):
         """Exclude areas based off the values in one of the Prior data sources
 
         * The Prior datasources are currently only defined over Europe
-        * All Prior datasources are defined in the EPSG3035 projection system 
+        * All Prior datasources are defined in the EPSG3035 projection system
           with 100x100 meter resolution
         * For each call to excludePrior, a temporary raster datasource is generated
-          around the ExclusionCalculator's region, after which a call to 
-          ExclusionCalculator.excludeRasterType is made, therefore all the same 
+          around the ExclusionCalculator's region, after which a call to
+          ExclusionCalculator.excludeRasterType is made, therefore all the same
           inputs apply here as well
 
         Parameters:
@@ -586,15 +586,15 @@ class ExclusionCalculator(object):
         source : str or gdal.Dataset
             The raster datasource defining the criteria values for each location
 
-        value : tuple or numeric 
+        value : tuple or numeric
             The exact value, or value range to exclude
             * If Numeric, should be The exact value to exclude
-                * Generally this should only be done when the raster datasource 
-                  contains integer values, otherwise a range of values should be 
+                * Generally this should only be done when the raster datasource
+                  contains integer values, otherwise a range of values should be
                   used to avoid float comparison errors
-            * If ( Numeric, Numeric ), the low and high boundary describing the 
+            * If ( Numeric, Numeric ), the low and high boundary describing the
               range of values to exclude
-                * If either boundary is given as None, then it is interpreted as 
+                * If either boundary is given as None, then it is interpreted as
                   unlimited
 
         buffer : float; optional
@@ -602,20 +602,20 @@ class ExclusionCalculator(object):
             * Units are in the RegionMask's srs
             * The buffering occurs AFTER the indication and warping step and
               so it may not represent the original dataset exactly
-              - Buffering can be made more accurate by increasing the 
+              - Buffering can be made more accurate by increasing the
                 'resolutionDiv' input
 
         invert: bool; optional
             If True, flip indications
 
         mode: string; optional
-            * If 'exclude', then the indicated pixels are subtracted from the 
+            * If 'exclude', then the indicated pixels are subtracted from the
               current availability matrix
             * If 'include', then the indicated pixel are added back into the
               availability matrix
 
         kwargs
-            * All other keyword arguments are passed on to a call to 
+            * All other keyword arguments are passed on to a call to
               geokit.RegionMask.indicateValues
         """
 
@@ -669,7 +669,7 @@ class ExclusionCalculator(object):
             if not value == 0:
                 value = np.interp(value, prior._values_wide,
                                   np.arange(prior._values_wide.size))
-        #source = prior.generateRaster( s.region.extent,)
+        # source = prior.generateRaster( s.region.extent,)
 
         # Call the excluder
         s.excludeRasterType(prior.path, value=value,
@@ -709,7 +709,7 @@ class ExclusionCalculator(object):
         s._availability = s.region.indicateFeatures(
             vec, applyMask=False).astype(np.uint8)*100
 
-    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5, _stamping=True):
         """Distribute the maximal number of minimally separated items within the available areas
 
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -734,12 +734,12 @@ class ExclusionCalculator(object):
             axialDirection : The axial direction in degrees
                 - float : The direction to apply to all points
                 - np.ndarray : The directions at each pixel (must match availability matrix shape)
-                - str : A path to a raster file containing axial directions 
+                - str : A path to a raster file containing axial directions
 
             sepScaling : An additional scaling factor which can be applied to each pixel
                 - float : The scaling to apply to all points
                 - np.ndarray : The scalings at each pixel (must match availability matrix shape)
-                - str : A path to a raster file containing scaling factors 
+                - str : A path to a raster file containing scaling factors
         """
 
         # TODO: CLEAN UP THIS FUNCTION BY REMOVING AREA DISTRIBUTION AND FILE SAVING, AND ASSOCIATED PARAMETERS
@@ -787,6 +787,13 @@ class ExclusionCalculator(object):
             matrixScaling = False
 
         # Turn separation into pixel distances
+        if not s.region.pixelWidth == s.region.pixelHeight:
+            warn(
+                "Pixel width does not equal pixel height. Therefore, the average will be used to estimate distances")
+            pixelRes = (s.region.pixelWidth + s.region.pixelHeight)/2
+        else:
+            pixelRes = s.region.pixelWidth
+
         if useGradient:
             try:
                 sepA, sepT = separation
@@ -794,8 +801,8 @@ class ExclusionCalculator(object):
                 raise GlaesError(
                     "When giving gradient data, a separation tuple is expected")
 
-            sepA = sepA*sepScaling / s.region.pixelRes
-            sepT = sepT*sepScaling / s.region.pixelRes
+            sepA = sepA*sepScaling / pixelRes
+            sepT = sepT*sepScaling / pixelRes
 
             sepA2 = sepA**2
             sepT2 = sepT**2
@@ -811,12 +818,25 @@ class ExclusionCalculator(object):
 
             sepCeil = np.maximum(sepA, sepT)+1
 
+            stampWidth = int(np.floor(min(sepFloorA, sepFloorT)))
+            stampFloor = min(sepFloorA2, sepFloorT2)
         else:
-            separation = separation*sepScaling / s.region.pixelRes
+            separation = separation*sepScaling / pixelRes
             sep2 = np.power(separation, 2)
             sepFloor = np.maximum(separation-1, 0)
             sepFloor2 = sepFloor**2
             sepCeil = separation+1
+
+            stampWidth = int(np.ceil(sepCeil))
+            stampFloor = sepFloor2
+
+        if _stamping:
+            _xy = np.linspace(-stampWidth, stampWidth, stampWidth*2+1)
+            _xs, _ys = np.meshgrid(_xy, _xy)
+
+            print("STAMP FLOOR:", stampFloor)
+            stamp = (np.power(_xs, 2) + np.power(_ys, 2)
+                     ) >= (stampFloor - np.sqrt(stampFloor)*2)
 
         if isinstance(sepCeil, np.ndarray) and sepCeil.size > 1:
             sepCeil = sepCeil.max()
@@ -844,9 +864,13 @@ class ExclusionCalculator(object):
                 # since tooFarBehind is boolean, argmin should get the first index where it is false
                 bot += np.argmin(tooFarBehind)
 
-            #print("yi:", yi, "   BOT:", bot, "   COUNT:",cnt)
+            # print("yi:", yi, "   BOT:", bot, "   COUNT:",cnt)
 
             for xi in np.argwhere(workingAvailability[yi, :]):
+                # point could have been excluded from a previous stamp
+                if not workingAvailability[yi, xi]:
+                    continue
+
                 # Clip the total placement arrays
                 xClip = x[bot:cnt]
                 yClip = y[bot:cnt]
@@ -909,35 +933,80 @@ class ExclusionCalculator(object):
                 if immidiatelyInRange.any():
                     continue
 
-                # Start searching in the 'sub pixel'
-                found = False
-                for xsp in substeps+xi:
-                    xSubDist = xClip[pir]-xsp
-                    for ysp in substeps+yi:
-                        ySubDist = yClip[pir]-ysp
+                # Determine if a placement has been found
+                if pixelDivision == 1:
+                    found = True
+                    xsp = xi
+                    ysp = yi
+                else:
+                    # Start searching in the 'sub pixel'
+                    found = False
+                    for xsp in substeps+xi:
+                        xSubDist = xClip[pir]-xsp
+                        for ysp in substeps+yi:
+                            ySubDist = yClip[pir]-ysp
 
-                        # Test if any points in the range are overlapping
-                        if useGradient:  # Test if in rotated ellipse
-                            dist = (np.power((xSubDist*cG - ySubDist*sG), 2)/_sepA2) +\
-                                   (np.power((xSubDist*sG + ySubDist*cG), 2)/_sepT2)
-                            overlapping = dist <= 1
+                            # Test if any points in the range are overlapping
+                            if useGradient:  # Test if in rotated ellipse
+                                dist = (np.power((xSubDist*cG - ySubDist*sG), 2)/_sepA2) +\
+                                    (np.power((xSubDist*sG + ySubDist*cG), 2)/_sepT2)
+                                overlapping = dist <= 1
 
-                        else:  # test if in circle
-                            overlapping = (np.power(xSubDist, 2) +
-                                           np.power(ySubDist, 2)) <= _sep2
+                            else:  # test if in circle
+                                overlapping = (np.power(xSubDist, 2) +
+                                               np.power(ySubDist, 2)) <= _sep2
 
-                        if not overlapping.any():
-                            found = True
+                            if not overlapping.any():
+                                found = True
+                                break
+
+                        if found:
                             break
-
-                    if found:
-                        break
 
                 # Add if found
                 if found:
                     x[cnt] = xsp
                     y[cnt] = ysp
                     cnt += 1
+
+                    if _stamping:
+                        xspi = int(np.round(xsp))
+                        yspi = int(np.round(ysp))
+
+                        stamp_center = stampWidth
+                        if xspi-stampWidth < 0:
+                            _x_low = 0
+                            _x_low_stamp = stamp_center - xspi
+                        else:
+                            _x_low = xspi - stampWidth
+                            _x_low_stamp = 0
+
+                        if yspi-stampWidth < 0:
+                            _y_low = 0
+                            _y_low_stamp = stamp_center - yspi
+                        else:
+                            _y_low = yspi - stampWidth
+                            _y_low_stamp = 0
+
+                        if xspi+stampWidth > (xN-1):
+                            _x_high = xN-1
+                            _x_high_stamp = stamp_center + (xN - xspi - 1)
+                        else:
+                            _x_high = xspi + stampWidth
+                            _x_high_stamp = stamp_center + stampWidth
+
+                        if yspi+stampWidth > (yN-1):
+                            _y_high = yN-1
+                            _y_high_stamp = stamp_center + (yN - yspi - 1)
+                        else:
+                            _y_high = yspi + stampWidth
+                            _y_high_stamp = stamp_center + stampWidth
+
+                        _stamp = stamp[_y_low_stamp:_y_high_stamp+1,
+                                       _x_low_stamp:_x_high_stamp+1]
+
+                        workingAvailability[_y_low:_y_high+1,
+                                            _x_low:_x_high+1] *= _stamp
 
         # Convert identified points back into the region's coordinates
         coords = np.zeros((cnt, 2))
