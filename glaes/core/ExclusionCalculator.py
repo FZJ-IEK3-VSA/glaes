@@ -453,7 +453,7 @@ class ExclusionCalculator(object):
         # Done!!
         return axh1.ax
 
-    def drawWithSmopyBasemap(s, zoom=4, excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), ax=None, figsize=None, smopy_kwargs={}, **kwargs):
+    def drawWithSmopyBasemap(s, zoom=4, excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), ax=None, figsize=None, smopy_kwargs={}, attribution="© OpenStreetMap contributors", attribution_size=12, **kwargs):
         """
         This wrapper around the original ExclusionCalculator.draw function adds a basemap bethind the drawn eligibility map
 
@@ -461,6 +461,11 @@ class ExclusionCalculator(object):
         * The basemap is drawn using the Smopy python package. See here: https://github.com/rossant/smopy
         * Be careful to adhere to the usage guidelines of the chosen tile source
             - By default, this source is OSM. See here: https://wiki.openstreetmap.org/wiki/Tile_servers
+
+        !IMPORTANT! If you will publish any images drawn with this method, it's likely that the tile source
+        will require an attribution to be written on the image. For example, if using OSM tile (the default),
+        you have to write "© OpenStreetMap contributors" clearly on the map. But this is different for each
+        tile source!
 
         Tip:
         * Start with a low zoom value (e.g. 4) and zoom in until you find something reasonable
@@ -516,6 +521,9 @@ class ExclusionCalculator(object):
 
         ax, srs, bounds = s.region.extent.drawSmopyMap(zoom, ax=ax, **smopy_kwargs)
         s.draw(ax=ax, srs=srs, goodColor=[0, 0, 0, 0], excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), **kwargs)
+
+        if attribution is not None:
+            ax.text(1, 0, attribution, transform=ax.transAxes, ha="right", va="bottom", fontsize=attribution_size)
 
         return ax
 
