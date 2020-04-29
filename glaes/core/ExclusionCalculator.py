@@ -281,7 +281,7 @@ class ExclusionCalculator(object):
         s.region.createRaster(output=output, data=data,
                               noData=255, meta=meta, **kwargs)
 
-    def draw(s, ax=None, goodColor="#9bbb59", excludedColor="#a6161a", legend=True, legendargs={"loc": "lower left"}, dataScalingFactor=1, geomSimplificationFactor=5000, **kwargs):
+    def draw(s, ax=None, goodColor="#9bbb59", excludedColor="#a6161a", legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, **kwargs):
         """Draw the current availability matrix on a matplotlib figure
 
         Note:
@@ -336,40 +336,81 @@ class ExclusionCalculator(object):
         b2g = LinearSegmentedColormap.from_list(
             'bad_to_good', [excludedColor, goodColor])
 
-        if not "figsize" in kwargs:
+        if ax is None and not "figsize" in kwargs:
             ratio = s.region.mask.shape[1] / s.region.mask.shape[0]
             kwargs["figsize"] = (8 * ratio * 1.2, 8)
 
-        kwargs["topMargin"] = kwargs.get("topMargin", 0.01)
-        kwargs["bottomMargin"] = kwargs.get("bottomMargin", 0.02)
-        kwargs["rightMargin"] = kwargs.get("rightMargin", 0.01)
-        kwargs["leftMargin"] = kwargs.get("leftMargin", 0.02)
-        kwargs["hideAxis"] = kwargs.get("hideAxis", True)
         kwargs["cmap"] = kwargs.get("cmap", b2g)
         kwargs["cbar"] = kwargs.get("cbar", False)
         kwargs["vmin"] = kwargs.get("vmin", 0)
         kwargs["vmax"] = kwargs.get("vmax", 100)
         kwargs["cbarTitle"] = kwargs.get("cbarTitle", "Pixel Availability")
 
-        axh1 = s.region.drawImage(
-            s.availability, ax=ax, drawSelf=False, scaling=dataScalingFactor, **kwargs)
+        if srs is None:
+            kwargs["topMargin"] = kwargs.get("topMargin", 0.01)
+            kwargs["bottomMargin"] = kwargs.get("bottomMargin", 0.02)
+            kwargs["rightMargin"] = kwargs.get("rightMargin", 0.01)
+            kwargs["leftMargin"] = kwargs.get("leftMargin", 0.02)
+            kwargs["hideAxis"] = kwargs.get("hideAxis", True)
+
+            axh1 = s.region.drawImage(
+                s.availability,
+                ax=ax,
+                drawSelf=False,
+                scaling=dataScalingFactor,
+                **kwargs)
+
+            srs = s.region.srs
+        else:
+            mat = s._availability.copy()
+            no_data = 255
+            mat[~s.region.mask] = no_data
+            availability_raster = s.region.createRaster(data=mat, noData=no_data)
+            axh1 = gk.drawRaster(
+                availability_raster,
+                ax=ax,
+                srs=srs,
+                cutlineFillValue=no_data,
+                **kwargs)
 
         # # Draw the mask to blank out the out of region areas
         # w2a = LinearSegmentedColormap.from_list('white_to_alpha',[(1,1,1,1),(1,1,1,0)])
         # axh2 = s.region.drawImage( s.region.mask, ax=axh1, drawSelf=False, cmap=w2a, cbar=False)
 
         # Draw the Regional geometry
-        axh3 = s.region.drawSelf(
-            fc='None', ax=axh1, linewidth=2, simplificationFactor=geomSimplificationFactor)
+        axh3 = gk.drawGeoms(
+            s.region.geometry,
+            fc='None',
+            srs=srs,
+            ax=axh1,
+            linewidth=2,
+            simplificationFactor=geomSimplificationFactor)
 
         # Draw Points, maybe?
         if not s._itemCoords is None:
-            axh1.ax.plot(s._itemCoords[:, 0], s._itemCoords[:, 1], 'ok')
+            points = s._itemCoords
+            if not srs.IsSame(s.region.srs):
+                points = gk.srs.xyTransform(
+                    points,
+                    fromSRS=s.region.srs,
+                    toSRS=srs,
+                    outputFormet="xy"
+                )
+
+                points = np.column_stack([points.x, points.y])
+
+            axh1.ax.plot(points[:, 0], points[:, 1], 'ok')
 
         # Draw Areas, maybe?
         if not s._areas is None:
-            gk.drawGeoms(s._areas, srs=s.region.srs, ax=axh1, fc='None',
-                         ec="k", linewidth=1, simplificationFactor=None)
+            gk.drawGeoms(
+                s._areas,
+                srs=srs,
+                ax=axh1,
+                fc='None',
+                ec="k",
+                linewidth=1,
+                simplificationFactor=None)
 
         # Make legend?
         if legend:
@@ -411,6 +452,72 @@ class ExclusionCalculator(object):
 
         # Done!!
         return axh1.ax
+
+    def drawWithSmopyBasemap(s, zoom=4, excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), ax=None, figsize=None, smopy_kwargs={}, **kwargs):
+        """
+        This wrapper around the original ExclusionCalculator.draw function adds a basemap bethind the drawn eligibility map
+
+        NOTE:
+        * The basemap is drawn using the Smopy python package. See here: https://github.com/rossant/smopy
+        * Be careful to adhere to the usage guidelines of the chosen tile source
+            - By default, this source is OSM. See here: https://wiki.openstreetmap.org/wiki/Tile_servers
+
+        Tip:
+        * Start with a low zoom value (e.g. 4) and zoom in until you find something reasonable
+
+        Parameters:
+        -----------
+            zoom : int
+                The desired zoom level of the basemap
+                * Should be between 1 - 20
+                * The higher the number, the more you're zooming in
+                * Note that, for each increase in the zoom level, the numer of tiles 
+                    fetched increases by a factor of 4
+
+            excludeColor : (r, g, b, a)
+                The color to give to excluded points
+
+            ax : matplotlib axes 
+                The axes to draw on
+                * If not given, one will be generated
+
+            figsize : (width, height)
+                The size of the figure to draw
+                * Is only effective when ax=None
+
+            smopy_kwargs : dict
+                * Keyword arguments to pass on to gk.raster.drawSmopyMap
+
+            kwargs
+                * All other keyword arguments are passed on to ExclusionCalcularot.draw
+
+        Returns:
+        --------
+
+        matplotlib axes
+        """
+
+        if ax is None:
+            import matplotlib.pyplot as plt
+
+            if figsize is None:
+                ratio = s.region.mask.shape[1] / s.region.mask.shape[0]
+                plt.figure(figsize=(8 * ratio * 1.2, 8))
+            else:
+                plt.figure(figsize=figsize)
+
+            ax = plt.gca()
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.spines['bottom'].set_visible(False)
+            ax.spines['top'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+
+        ax, srs, bounds = s.region.extent.drawSmopyMap(zoom, ax=ax, **smopy_kwargs)
+        s.draw(ax=ax, srs=srs, goodColor=[0, 0, 0, 0], excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), **kwargs)
+
+        return ax
 
     @property
     def availability(s):
