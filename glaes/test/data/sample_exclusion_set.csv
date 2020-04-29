@@ -1,0 +1,4 @@
+name,type,value,buffer
+clc,raster,12-22,
+clc,raster,1-2,1000.0
+osm_roads,vector,type='motorway' OR type='primary' OR type='trunk',200.0

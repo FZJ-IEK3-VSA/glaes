@@ -191,8 +191,8 @@ class ExclusionCalculator(object):
                     center_y = centroid.GetY()
                 elif isinstance(region, str):
                     vi = gk.vector.vectorInfo(region)
-                    center_x = (vi.xMin+vi.xMax)/2
-                    center_y = (vi.yMin+vi.yMax)/2
+                    center_x = (vi.xMin + vi.xMax) / 2
+                    center_y = (vi.yMin + vi.yMax) / 2
                     if not vi.srs.IsSame(gk.srs.EPSG4326):
                         center_x, center_y, _ = gk.srs.xyTransform(
                             (center_x, center_y), fromSRS=vi.srs, toSRS=gk.srs.EPSG4326)
@@ -211,7 +211,7 @@ class ExclusionCalculator(object):
         s.maskPixels = s.region.mask.sum()
 
         # Make the total availability matrix
-        s._availability = np.array(s.region.mask, dtype=np.uint8)*100
+        s._availability = np.array(s.region.mask, dtype=np.uint8) * 100
         # s._availability[~s.region.mask] = 255
 
         # Make a list of item coords
@@ -255,7 +255,7 @@ class ExclusionCalculator(object):
 
         data = s.availability
         if not threshold is None:
-            data = (data >= threshold).astype(np.uint8)*100
+            data = (data >= threshold).astype(np.uint8) * 100
 
         data[~s.region.mask] = 255
         s.region.createRaster(output=output, data=data,
@@ -317,8 +317,8 @@ class ExclusionCalculator(object):
             'bad_to_good', [excludedColor, goodColor])
 
         if not "figsize" in kwargs:
-            ratio = s.region.mask.shape[1]/s.region.mask.shape[0]
-            kwargs["figsize"] = (8*ratio*1.2, 8)
+            ratio = s.region.mask.shape[1] / s.region.mask.shape[0]
+            kwargs["figsize"] = (8 * ratio * 1.2, 8)
 
         kwargs["topMargin"] = kwargs.get("topMargin", 0.01)
         kwargs["bottomMargin"] = kwargs.get("bottomMargin", 0.02)
@@ -356,10 +356,10 @@ class ExclusionCalculator(object):
             from matplotlib.patches import Patch
             p = s.percentAvailable
             a = s.region.mask.sum(dtype=np.int64) * \
-                s.region.pixelWidth*s.region.pixelHeight
+                s.region.pixelWidth * s.region.pixelHeight
             areaLabel = s.region.srs.GetAttrValue("Unit").lower()
             if areaLabel == "metre" or areaLabel == "meter":
-                a = a/1000000
+                a = a / 1000000
                 areaLabel = "km"
             elif areaLabel == "feet" or areaLabel == "foot":
                 areaLabel = "ft"
@@ -377,7 +377,7 @@ class ExclusionCalculator(object):
 
             patches = [
                 Patch(ec="k", fc="None", linewidth=3, label=regionLabel),
-                Patch(color=excludedColor, label="Excluded: %.2f%%" % (100-p)),
+                Patch(color=excludedColor, label="Excluded: %.2f%%" % (100 - p)),
                 Patch(color=goodColor, label="Eligible: %.2f%%" % (p)),
             ]
             if not s._itemCoords is None:
@@ -405,13 +405,13 @@ class ExclusionCalculator(object):
     @property
     def percentAvailable(s):
         """The percent of the region which remains available"""
-        return s._availability.sum(dtype=np.int64)/s.region.mask.sum()
+        return s._availability.sum(dtype=np.int64) / s.region.mask.sum()
 
     @property
     def areaAvailable(s):
         """The area of the region which remains available
             * Units are defined by the srs used to initialize the ExclusionCalculator"""
-        return s._availability[s.region.mask].sum(dtype=np.int64)*s.region.pixelWidth*s.region.pixelHeight/100
+        return s._availability[s.region.mask].sum(dtype=np.int64) * s.region.pixelWidth * s.region.pixelHeight / 100
 
     # General excluding functions
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, prewarp=False, invert=False, mode="exclude", **kwargs):
@@ -480,15 +480,15 @@ class ExclusionCalculator(object):
 
         # Indicate on the source
         areas = (s.region.indicateValues(source, value, buffer=buffer,
-                                         resolutionDiv=resolutionDiv, applyMask=False, **kwargs)*100).astype(np.uint8)
+                                         resolutionDiv=resolutionDiv, applyMask=False, **kwargs) * 100).astype(np.uint8)
 
         # exclude the indicated area from the total availability
         if mode == "exclude":
             s._availability = np.min(
-                [s._availability, areas if invert else 100-areas], axis=0)
+                [s._availability, areas if invert else 100 - areas], axis=0)
         elif mode == "include":
             s._availability = np.max(
-                [s._availability, 100-areas if invert else areas], axis=0)
+                [s._availability, 100 - areas if invert else areas], axis=0)
             s._availability[~s.region.mask] = 0
         else:
             raise GlaesError("mode must be 'exclude' or 'include'")
@@ -557,15 +557,15 @@ class ExclusionCalculator(object):
 
         # Indicate on the source
         areas = (s.region.indicateFeatures(source, where=where, buffer=buffer, resolutionDiv=resolutionDiv,
-                                           bufferMethod=bufferMethod, applyMask=False, **kwargs)*100).astype(np.uint8)
+                                           bufferMethod=bufferMethod, applyMask=False, **kwargs) * 100).astype(np.uint8)
 
         # exclude the indicated area from the total availability
         if mode == "exclude":
             s._availability = np.min(
-                [s._availability, areas if invert else 100-areas], axis=0)
+                [s._availability, areas if invert else 100 - areas], axis=0)
         elif mode == "include":
             s._availability = np.max(
-                [s._availability, 100-areas if invert else areas], axis=0)
+                [s._availability, 100 - areas if invert else areas], axis=0)
             s._availability[~s.region.mask] = 0
         else:
             raise GlaesError("mode must be 'exclude' or 'include'")
@@ -686,12 +686,157 @@ class ExclusionCalculator(object):
         """
         s.excludeVectorType(s.region.vector, buffer=-buffer, invert=True)
 
+    def excludeSet(s, exclusion_set, verbose=True, **paths):
+        """
+        Iteratively exclude a set of exclusion constraints
+
+        Parameters:
+        -----------
+            exclusion_set : pandas.DataFrame
+                The rows of this dataframe dictate the exclusions which are performed
+                in the given order
+
+                * The following columns names are used:
+                    - 'name'  -> The name of the contraint
+                    - 'type'  -> The type of the contraint ['prior', 'raster', or 'vector']
+                    - 'value' -> The vale/where-statement to use
+                    - 'buffer'-> The buffer value (if not given, 0 is assumed)
+                    - 'mode'  -> The mode (if not given, 'exclude' is assumed)
+                    - 'invert'-> The inversion state (if not given, False is assumed)
+
+                * For raster or prior types, 'value' can be given in several ways:
+                    - "XXX"      -> translates to value=XXX. i.e. "exclude exactly XXX"
+                    - "XXX-YYY"  -> translates to value=(XXX,YYY). i.e. "exclude between XXX and YYY"
+                    - "None-XXX" -> translates to value=(None,XXX). i.e. "everything below XXX"
+                    - "-XXX"     -> also translates to value=(None,XXX)
+                    - "XXX-None" -> translates to value=(XXX, None). i.e. "everything above XXX"
+                    - "XXX-"     -> also translates to value=(XXX, None)
+
+                * For vector types, the 'value' is just the SQL-like where statement
+
+            verbose : bool
+                If True, progress statements are given
+
+            **paths
+                All extra arguments should correspond to the paths on disk for each of the
+                'name's specified in the exclusion_set input
+        """
+        exclusion_set = exclusion_set.copy()
+
+        # Make sure inputs are okay
+        assert isinstance(exclusion_set, pd.DataFrame)
+        assert "name" in exclusion_set.columns
+        assert "type" in exclusion_set.columns
+        assert "value" in exclusion_set.columns
+
+        if not "buffer" in exclusion_set.columns:
+            exclusion_set['buffer'] = 0
+        if not "exclusion_mode" in exclusion_set.columns:
+            exclusion_set['exclusion_mode'] = 'exclude'
+        if not "invert" in exclusion_set.columns:
+            exclusion_set['invert'] = False
+        if not "resolutionDiv" in exclusion_set.columns:
+            exclusion_set['resolutionDiv'] = 1
+
+        for p in paths:
+            assert isinstance(p, str)
+
+        # Exclude rows one by one
+        for i, row in exclusion_set.iterrows():
+            if np.isnan(row.buffer) or row.buffer == 0:
+                buffer = None
+            else:
+                buffer = float(row.buffer)
+
+            if row.type == "prior":
+                if verbose:
+                    print("Excluding Prior {} with value {}, buffer {}, mode {}, and invert {} ".format(
+                        row['name'],
+                        row.value,
+                        buffer,
+                        row.exclusion_mode,
+                        row.invert,
+                    ))
+
+                if isinstance(row.value, str):
+                    try:
+                        value_low, value_high = row.value.split("-")
+                        value_low = None if value_low == "None" else float(value_low)
+                        value_high = None if value_high == "None" else float(value_high)
+
+                        value = value_low, value_high
+                    except:
+                        value = float(value)
+
+                s.excludePrior(
+                    prior=row['name'],
+                    value=value,
+                    buffer=buffer,
+                    invert=row.invert,
+                    mode=row.exclusion_mode)
+
+            elif row.type == "raster":
+                if verbose:
+                    print("Excluding Raster {} with value {}, buffer {}, mode {}, and invert {} ".format(
+                        row['name'],
+                        row.value,
+                        buffer,
+                        row.exclusion_mode,
+                        row.invert
+                    ))
+
+                if isinstance(row.value, str):
+                    try:
+                        value_low, value_high = row.value.split("-")
+                        value_low = None if (value_low == "None" or value_low == "") else float(value_low)
+                        value_high = None if (value_high == "None" or value_high == "") else float(value_high)
+
+                        value = value_low, value_high
+                    except:
+                        value = float(row.value)
+
+                s.excludeRasterType(
+                    source=paths[row['name']],
+                    value=value,
+                    buffer=buffer,
+                    resolutionDiv=row.resolutionDiv,
+                    prewarp=False,
+                    invert=row.invert,
+                    mode=row.exclusion_mode,)
+
+            elif row.type == "vector":
+                if verbose:
+                    print("Excluding Vector {} with where-statement \"{}\", buffer {}, mode {}, and invert {} ".format(
+                        row['name'],
+                        row.value,
+                        buffer,
+                        row.exclusion_mode,
+                        row.invert
+                    ))
+
+                if row.value == "":
+                    value = None
+                else:
+                    value = row.value
+
+                s.excludeVectorType(
+                    source=paths[row['name']],
+                    where=row.value,
+                    buffer=buffer,
+                    resolutionDiv=row.resolutionDiv,
+                    prewarp=False,
+                    invert=row.invert,
+                    mode=row.exclusion_mode,)
+
+        if verbose:
+            print("Done!")
+
     def shrinkAvailability(s, dist, threshold=50):
         """Shrinks the current availability by a given distance in the given SRS"""
         geom = gk.geom.polygonizeMask(
             s._availability >= threshold, bounds=s.region.extent.xyXY, srs=s.region.srs, flat=False)
         geom = [g.Buffer(-dist) for g in geom]
-        newAvail = (s.region.indicateGeoms(geom)*100).astype(np.uint8)
+        newAvail = (s.region.indicateGeoms(geom) * 100).astype(np.uint8)
         s._availability = newAvail
 
     def pruneIsolatedAreas(s, minSize, threshold=50):
@@ -707,7 +852,7 @@ class ExclusionCalculator(object):
 
         # Replace current availability matrix
         s._availability = s.region.indicateFeatures(
-            vec, applyMask=False).astype(np.uint8)*100
+            vec, applyMask=False).astype(np.uint8) * 100
 
     def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5, _stamping=True):
         """Distribute the maximal number of minimally separated items within the available areas
@@ -790,7 +935,7 @@ class ExclusionCalculator(object):
         if not s.region.pixelWidth == s.region.pixelHeight:
             warn(
                 "Pixel width does not equal pixel height. Therefore, the average will be used to estimate distances")
-            pixelRes = (s.region.pixelWidth + s.region.pixelHeight)/2
+            pixelRes = (s.region.pixelWidth + s.region.pixelHeight) / 2
         else:
             pixelRes = s.region.pixelWidth
 
@@ -801,14 +946,14 @@ class ExclusionCalculator(object):
                 raise GlaesError(
                     "When giving gradient data, a separation tuple is expected")
 
-            sepA = sepA*sepScaling / pixelRes
-            sepT = sepT*sepScaling / pixelRes
+            sepA = sepA * sepScaling / pixelRes
+            sepT = sepT * sepScaling / pixelRes
 
             sepA2 = sepA**2
             sepT2 = sepT**2
 
-            sepFloorA = sepA-1
-            sepFloorT = sepT-1
+            sepFloorA = sepA - 1
+            sepFloorT = sepT - 1
             if not matrixScaling and (sepFloorA < 1 or sepFloorT < 1):
                 raise GlaesError(
                     "Seperations are too small compared to pixel size")
@@ -816,27 +961,27 @@ class ExclusionCalculator(object):
             sepFloorA2 = np.power(sepFloorA, 2)
             sepFloorT2 = np.power(sepFloorT, 2)
 
-            sepCeil = np.maximum(sepA, sepT)+1
+            sepCeil = np.maximum(sepA, sepT) + 1
 
             stampWidth = int(np.floor(min(sepFloorA, sepFloorT)))
             stampFloor = min(sepFloorA2, sepFloorT2)
         else:
-            separation = separation*sepScaling / pixelRes
+            separation = separation * sepScaling / pixelRes
             sep2 = np.power(separation, 2)
-            sepFloor = np.maximum(separation-1, 0)
+            sepFloor = np.maximum(separation - 1, 0)
             sepFloor2 = sepFloor**2
-            sepCeil = separation+1
+            sepCeil = separation + 1
 
             stampWidth = int(np.ceil(sepCeil))
             stampFloor = sepFloor2
 
         if _stamping:
-            _xy = np.linspace(-stampWidth, stampWidth, stampWidth*2+1)
+            _xy = np.linspace(-stampWidth, stampWidth, stampWidth * 2 + 1)
             _xs, _ys = np.meshgrid(_xy, _xy)
 
             print("STAMP FLOOR:", stampFloor)
             stamp = (np.power(_xs, 2) + np.power(_ys, 2)
-                     ) >= (stampFloor - np.sqrt(stampFloor)*2)
+                     ) >= (stampFloor - np.sqrt(stampFloor) * 2)
 
         if isinstance(sepCeil, np.ndarray) and sepCeil.size > 1:
             sepCeil = sepCeil.max()
@@ -859,7 +1004,7 @@ class ExclusionCalculator(object):
         for yi in range(yN):
             # update the "bottom" value
             # find only those values which have a y-component greater than the separation distance
-            tooFarBehind = yi-y[bot:cnt] > sepCeil
+            tooFarBehind = yi - y[bot:cnt] > sepCeil
             if tooFarBehind.size > 0:
                 # since tooFarBehind is boolean, argmin should get the first index where it is false
                 bot += np.argmin(tooFarBehind)
@@ -902,8 +1047,8 @@ class ExclusionCalculator(object):
                         _sep2 = sep2
 
                 # calculate distances
-                xDist = xClip-xi
-                yDist = yClip-yi
+                xDist = xClip - xi
+                yDist = yClip - yi
 
                 # Get the indicies in the possible range
                 # pir => Possibly In Range,
@@ -920,9 +1065,9 @@ class ExclusionCalculator(object):
                     cG = np.cos(grad)
                     sG = np.sin(grad)
 
-                    dist = np.power((xDist[pir]*cG - yDist[pir]*sG), 2)/_sepFloorA2 +\
+                    dist = np.power((xDist[pir] * cG - yDist[pir] * sG), 2) / _sepFloorA2 +\
                         np.power(
-                            (xDist[pir]*sG + yDist[pir]*cG), 2)/_sepFloorT2
+                            (xDist[pir] * sG + yDist[pir] * cG), 2) / _sepFloorT2
 
                     immidiatelyInRange = dist <= 1
 
@@ -941,15 +1086,15 @@ class ExclusionCalculator(object):
                 else:
                     # Start searching in the 'sub pixel'
                     found = False
-                    for xsp in substeps+xi:
-                        xSubDist = xClip[pir]-xsp
-                        for ysp in substeps+yi:
-                            ySubDist = yClip[pir]-ysp
+                    for xsp in substeps + xi:
+                        xSubDist = xClip[pir] - xsp
+                        for ysp in substeps + yi:
+                            ySubDist = yClip[pir] - ysp
 
                             # Test if any points in the range are overlapping
                             if useGradient:  # Test if in rotated ellipse
-                                dist = (np.power((xSubDist*cG - ySubDist*sG), 2)/_sepA2) +\
-                                    (np.power((xSubDist*sG + ySubDist*cG), 2)/_sepT2)
+                                dist = (np.power((xSubDist * cG - ySubDist * sG), 2) / _sepA2) +\
+                                    (np.power((xSubDist * sG + ySubDist * cG), 2) / _sepT2)
                                 overlapping = dist <= 1
 
                             else:  # test if in circle
@@ -974,47 +1119,47 @@ class ExclusionCalculator(object):
                         yspi = int(np.round(ysp))
 
                         stamp_center = stampWidth
-                        if xspi-stampWidth < 0:
+                        if xspi - stampWidth < 0:
                             _x_low = 0
                             _x_low_stamp = stamp_center - xspi
                         else:
                             _x_low = xspi - stampWidth
                             _x_low_stamp = 0
 
-                        if yspi-stampWidth < 0:
+                        if yspi - stampWidth < 0:
                             _y_low = 0
                             _y_low_stamp = stamp_center - yspi
                         else:
                             _y_low = yspi - stampWidth
                             _y_low_stamp = 0
 
-                        if xspi+stampWidth > (xN-1):
-                            _x_high = xN-1
+                        if xspi + stampWidth > (xN - 1):
+                            _x_high = xN - 1
                             _x_high_stamp = stamp_center + (xN - xspi - 1)
                         else:
                             _x_high = xspi + stampWidth
                             _x_high_stamp = stamp_center + stampWidth
 
-                        if yspi+stampWidth > (yN-1):
-                            _y_high = yN-1
+                        if yspi + stampWidth > (yN - 1):
+                            _y_high = yN - 1
                             _y_high_stamp = stamp_center + (yN - yspi - 1)
                         else:
                             _y_high = yspi + stampWidth
                             _y_high_stamp = stamp_center + stampWidth
 
-                        _stamp = stamp[_y_low_stamp:_y_high_stamp+1,
-                                       _x_low_stamp:_x_high_stamp+1]
+                        _stamp = stamp[_y_low_stamp:_y_high_stamp + 1,
+                                       _x_low_stamp:_x_high_stamp + 1]
 
-                        workingAvailability[_y_low:_y_high+1,
-                                            _x_low:_x_high+1] *= _stamp
+                        workingAvailability[_y_low:_y_high + 1,
+                                            _x_low:_x_high + 1] *= _stamp
 
         # Convert identified points back into the region's coordinates
         coords = np.zeros((cnt, 2))
         # shifted by 0.5 so that index corresponds to the center of the pixel
-        coords[:, 0] = s.region.extent.xMin + (x[:cnt]+0.5)*s.region.pixelWidth
+        coords[:, 0] = s.region.extent.xMin + (x[:cnt] + 0.5) * s.region.pixelWidth
         # shifted by 0.5 so that index corresponds to the center of the pixel
         coords[:, 1] = s.region.extent.yMax - \
-            (y[:cnt]+0.5)*s.region.pixelHeight
+            (y[:cnt] + 0.5) * s.region.pixelHeight
 
         s._itemCoords = coords
 
@@ -1064,7 +1209,7 @@ class ExclusionCalculator(object):
 
             # Create a list of geometry from each region WITH availability
             vec = gk.vector.createVector(
-                geoms, fieldVals={"pid": range(1, len(geoms)+1)})
+                geoms, fieldVals={"pid": range(1, len(geoms) + 1)})
             areaMap = s.region.rasterize(
                 vec, value="pid", dtype=int) * (s._availability > threshold)
 
@@ -1151,7 +1296,7 @@ class ExclusionCalculator(object):
 
         # Create a list of geometry from each region WITH availability
         vec = gk.vector.createVector(
-            geoms, fieldVals={"pid": range(1, len(geoms)+1)})
+            geoms, fieldVals={"pid": range(1, len(geoms) + 1)})
         areaMap = s.region.rasterize(
             vec, value="pid", dtype=int) * (s._availability > threshold)
 
