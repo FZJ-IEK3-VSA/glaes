@@ -5,6 +5,7 @@ from osgeo import gdal
 import numpy as np
 import geokit as gk
 import glaes as gl
+import pandas as pd
 
 
 TESTDIR = dirname(__file__)
@@ -60,7 +61,7 @@ def test_ExclusionCalculator_save():
 
     ec.save(join(RESULTDIR, "save1.tif"))
     mat = gk.raster.extractMatrix(join(RESULTDIR, "save1.tif"))
-    assert np.nansum(mat-ec.availability) == 0
+    assert np.nansum(mat - ec.availability) == 0
     assert np.isclose(np.nansum(mat), 28461360)
     assert np.isclose(np.nanstd(mat), 77.2323849648)
 
@@ -168,6 +169,20 @@ def test_ExclusionCalculator_excludePrior():
     assert np.isclose(np.nanstd(ec.availability), 41.84893036)
 
 
+def test_ExclusionCalculator_excludeSet():
+    ec = gl.ExclusionCalculator(aachenShape)
+    exclusion_set = pd.read_csv(gl._test_data_["sample_exclusion_set.csv"])
+    ec.excludeSet(
+        exclusion_set=exclusion_set,
+        clc=gl._test_data_['clc-aachen_clipped.tif'],
+        osm_roads=gl._test_data_["aachenRoads.shp"],
+        verbose=False,
+    )
+
+    assert np.isclose(np.nanmean(ec.availability), 15.231732)
+    assert np.isclose(np.nanstd(ec.availability), 35.93282)
+
+
 def test_ExclusionCalculator_excludeRegionEdge():
     # make a prior source
     pr = gl.core.priors.PriorSource(priorSample)
@@ -217,8 +232,8 @@ def test_ExclusionCalculator_distributeItems():
     assert geoms.shape[0] == 287
 
     minDist = 1000000
-    for gi in range(geoms.shape[0]-1):
-        for gj in range(gi+1, geoms.shape[0]):
+    for gi in range(geoms.shape[0] - 1):
+        for gj in range(gi + 1, geoms.shape[0]):
             d = geoms.geom[gi].Distance(geoms.geom[gj])
             if d < minDist:
                 minDist = d
@@ -236,8 +251,8 @@ def test_ExclusionCalculator_distributeItems():
     x = np.array([g.GetX() for g in geoms.geom])
     y = np.array([g.GetY() for g in geoms.geom])
 
-    for gi in range(geoms.shape[0]-1):
-        d = (x[gi]-x[gi+1:])**2/1000**2 + (y[gi]-y[gi+1:])**2/300**2
+    for gi in range(geoms.shape[0] - 1):
+        d = (x[gi] - x[gi + 1:])**2 / 1000**2 + (y[gi] - y[gi + 1:])**2 / 300**2
         assert (d >= 1).all()  # Axial objects too close
 
     # Do make areas
