@@ -20,4 +20,3 @@ testing/results/*.cpg
 testing/results/*.csv
 testing/results/eligibility_plots
 .vscode/settings.json
-Examples/*.tif

@@ -1,5 +1,6 @@
 from .util import *
 from .priors import *
+from os.path import isfile
 
 Areas = namedtuple('Areas', "coordinates geoms")
 
@@ -114,7 +115,7 @@ class ExclusionCalculator(object):
         "woodland_deciduous_proximity": (None, 300),
         "woodland_mixed_proximity": (None, 300)}
 
-    def __init__(s, region, srs=3035, pixelRes=100, where=None, padExtent=0, **kwargs):
+    def __init__(s, region, srs=3035, pixelRes=100, where=None, padExtent=0, initialValue=True, **kwargs):
         """Initialize the ExclusionCalculator
 
         Parameters:
@@ -165,6 +166,15 @@ class ExclusionCalculator(object):
             An amount by which to pad the extent before generating the RegionMask
             * Only effective if 'region' is a path to a vector
 
+
+        initialValue : bool or str; optional
+            Used to control the initial state of the ExclusionCalculator
+            * If "True", the region is assumed to begin as fully available
+            * If "False", the region is assumed to begin as completely unavailable
+            * If a path to a ".tif" file is given, then the ExclusionCalculator is initialized
+                by warping (using the 'near' algorithm) from the given raster, and excluding 
+                pixels with a value of 0 
+
         kwargs:
             * Keyword arguments are passed on to a call to geokit.RegionMask.load
             * Only take effect when the 'region' argument is a string
@@ -212,7 +222,17 @@ class ExclusionCalculator(object):
 
         # Make the total availability matrix
         s._availability = np.array(s.region.mask, dtype=np.uint8) * 100
-        # s._availability[~s.region.mask] = 255
+
+        if initialValue == True:
+            pass
+        elif initialValue == False:
+            s._availability *= 0
+        elif isinstance(initialValue, str):
+            assert isfile(initialValue)
+            s._availability = np.array(s.region.mask, dtype=np.uint8) * 100
+            s.excludeRasterType(initialValue, value=0)
+        else:
+            raise ValueError('initialValue "{}" is not known'.format(initialValue))
 
         # Make a list of item coords
         s.itemCoords = None
