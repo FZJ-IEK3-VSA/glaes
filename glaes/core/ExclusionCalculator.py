@@ -453,7 +453,7 @@ class ExclusionCalculator(object):
         # Done!!
         return axh1.ax
 
-    def drawWithSmopyBasemap(s, zoom=4, excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), ax=None, figsize=None, smopy_kwargs={}, attribution="© OpenStreetMap contributors", attribution_size=12, **kwargs):
+    def drawWithSmopyBasemap(s, zoom=4, excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), ax=None, figsize=None, smopy_kwargs=dict(attribution="© OpenStreetMap contributors", attribution_size=12), **kwargs):
         """
         This wrapper around the original ExclusionCalculator.draw function adds a basemap bethind the drawn eligibility map
 
@@ -521,9 +521,6 @@ class ExclusionCalculator(object):
 
         ax, srs, bounds = s.region.extent.drawSmopyMap(zoom, ax=ax, **smopy_kwargs)
         s.draw(ax=ax, srs=srs, goodColor=[0, 0, 0, 0], excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), **kwargs)
-
-        if attribution is not None:
-            ax.text(1, 0, attribution, transform=ax.transAxes, ha="right", va="bottom", fontsize=attribution_size)
 
         return ax
 
