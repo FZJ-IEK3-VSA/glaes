@@ -278,8 +278,8 @@ class ExclusionCalculator(object):
             data = (data >= threshold).astype(np.uint8) * 100
 
         data[~s.region.mask] = 255
-        s.region.createRaster(output=output, data=data,
-                              noData=255, meta=meta, **kwargs)
+        return s.region.createRaster(output=output, data=data,
+                                     noData=255, meta=meta, **kwargs)
 
     def draw(s, ax=None, goodColor="#9bbb59", excludedColor="#a6161a", legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, **kwargs):
         """Draw the current availability matrix on a matplotlib figure
