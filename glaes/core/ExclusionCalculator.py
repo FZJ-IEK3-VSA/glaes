@@ -971,7 +971,6 @@ class ExclusionCalculator(object):
                         print("  No suitable sources in extent! ")
 
                 for source in sources:
-                    print(source)
                     s.excludeVectorType(
                         source=source,
                         where=row.value,
