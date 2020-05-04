@@ -813,7 +813,7 @@ class ExclusionCalculator(object):
         """
         s.excludeVectorType(s.region.vector, buffer=-buffer, invert=True)
 
-    def excludeSet(s, exclusion_set, verbose=True, **paths):
+    def excludeSet(s, exclusion_set, filterSourceLists=True, verbose=True, **paths):
         """
         Iteratively exclude a set of exclusion constraints
 
@@ -841,6 +841,10 @@ class ExclusionCalculator(object):
 
                 * For vector types, the 'value' is just the SQL-like where statement
 
+            filterSourceLists : bool
+                If True, then paths to lists of vector files or raster files will be filtered
+                using self.region.Extent.filterSources(...)
+                
             verbose : bool
                 If True, progress statements are given
 
@@ -922,14 +926,24 @@ class ExclusionCalculator(object):
                     except:
                         value = float(row.value)
 
-                s.excludeRasterType(
-                    source=paths[row['name']],
-                    value=value,
-                    buffer=buffer,
-                    resolutionDiv=row.resolutionDiv,
-                    prewarp=False,
-                    invert=row.invert,
-                    mode=row.exclusion_mode,)
+                sources = paths[row['name']]
+                if isinstance(sources,str): 
+                    sources = [sources, ]
+                
+                if filterSourceLists:
+                    sources = list(s.region.extent.filterSources(sources))
+                    if verbose and len(sources) == 0:
+                        print("  No suitable sources in extent! ")
+
+                for source in sources:
+                    s.excludeRasterType(
+                        source=source,
+                        value=value,
+                        buffer=buffer,
+                        resolutionDiv=row.resolutionDiv,
+                        prewarp=False,
+                        invert=row.invert,
+                        mode=row.exclusion_mode,)
 
             elif row.type == "vector":
                 if verbose:
@@ -946,14 +960,26 @@ class ExclusionCalculator(object):
                 else:
                     value = row.value
 
-                s.excludeVectorType(
-                    source=paths[row['name']],
-                    where=row.value,
-                    buffer=buffer,
-                    resolutionDiv=row.resolutionDiv,
-                    prewarp=False,
-                    invert=row.invert,
-                    mode=row.exclusion_mode,)
+                
+                sources = paths[row['name']]
+                if isinstance(sources,str): 
+                    sources = [sources, ]
+                
+                if filterSourceLists:
+                    sources = list(s.region.extent.filterSources(sources))
+                    if verbose and len(sources) == 0:
+                        print("  No suitable sources in extent! ")
+
+                for source in sources:
+                    print(source)
+                    s.excludeVectorType(
+                        source=source,
+                        where=row.value,
+                        buffer=buffer,
+                        resolutionDiv=row.resolutionDiv,
+                        prewarp=False,
+                        invert=row.invert,
+                        mode=row.exclusion_mode,)
 
         if verbose:
             print("Done!")
