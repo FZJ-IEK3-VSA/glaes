@@ -1,6 +1,7 @@
 from .util import *
 from .priors import *
 from os.path import isfile
+from osgeo import gdal
 
 Areas = namedtuple('Areas', "coordinates geoms")
 
@@ -278,8 +279,8 @@ class ExclusionCalculator(object):
             data = (data >= threshold).astype(np.uint8) * 100
 
         data[~s.region.mask] = 255
-        s.region.createRaster(output=output, data=data,
-                              noData=255, meta=meta, **kwargs)
+        return s.region.createRaster(output=output, data=data,
+                                     noData=255, meta=meta, **kwargs)
 
     def draw(s, ax=None, goodColor="#9bbb59", excludedColor="#a6161a", legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, **kwargs):
         """Draw the current availability matrix on a matplotlib figure
@@ -818,7 +819,7 @@ class ExclusionCalculator(object):
         """
         s.excludeVectorType(s.region.vector, buffer=-buffer, invert=True)
 
-    def excludeSet(s, exclusion_set, verbose=True, **paths):
+    def excludeSet(s, exclusion_set, filterSourceLists=True, filterMissingError=True, verbose=True, **paths):
         """
         Iteratively exclude a set of exclusion constraints
 
@@ -846,6 +847,15 @@ class ExclusionCalculator(object):
 
                 * For vector types, the 'value' is just the SQL-like where statement
 
+            filterSourceLists : bool
+                If True, then paths to lists of vector files or raster files will be filtered
+                using self.region.Extent.filterSources(...)
+
+            filterMissingError : bool
+                If True, then if a path is given which does not exist, a RuntimError is raised. Otherwise
+                    a user warning is given.
+                Only effective when `filterSourceLists` is True
+                
             verbose : bool
                 If True, progress statements are given
 
@@ -926,15 +936,24 @@ class ExclusionCalculator(object):
                         value = value_low, value_high
                     except:
                         value = float(row.value)
+                sources = paths[row['name']]
+                if gk.util.isRaster(sources): 
+                    sources = [sources, ]
+                
+                if filterSourceLists:
+                    sources = list(s.region.extent.filterSources(sources, error_on_missing=filterMissingError))
+                    if verbose and len(sources) == 0:
+                        print("  No suitable sources in extent! ")
 
-                s.excludeRasterType(
-                    source=paths[row['name']],
-                    value=value,
-                    buffer=buffer,
-                    resolutionDiv=row.resolutionDiv,
-                    prewarp=False,
-                    invert=row.invert,
-                    mode=row.exclusion_mode,)
+                for source in sources:
+                    s.excludeRasterType(
+                        source=source,
+                        value=value,
+                        buffer=buffer,
+                        resolutionDiv=row.resolutionDiv,
+                        prewarp=False,
+                        invert=row.invert,
+                        mode=row.exclusion_mode,)
 
             elif row.type == "vector":
                 if verbose:
@@ -946,19 +965,31 @@ class ExclusionCalculator(object):
                         row.invert
                     ))
 
-                if row.value == "":
+                if row.value == "" or row.value == "None":
                     value = None
                 else:
                     value = row.value
 
-                s.excludeVectorType(
-                    source=paths[row['name']],
-                    where=row.value,
-                    buffer=buffer,
-                    resolutionDiv=row.resolutionDiv,
-                    prewarp=False,
-                    invert=row.invert,
-                    mode=row.exclusion_mode,)
+                
+                sources = paths[row['name']]
+                if gk.util.isVector(sources): 
+                    sources = [sources, ]
+        
+                if filterSourceLists:
+                    sources = list(s.region.extent.filterSources(sources, error_on_missing=filterMissingError))
+                    if verbose and len(sources) == 0:
+                        print("  No suitable sources in extent! ")
+
+                # print(sources)
+                for source in sources:
+                    print("SOURCE: ", source)
+                    s.excludeVectorType(
+                        source=source,
+                        where=value,
+                        buffer=buffer,
+                        resolutionDiv=row.resolutionDiv,
+                        invert=row.invert,
+                        mode=row.exclusion_mode)
 
         if verbose:
             print("Done!")

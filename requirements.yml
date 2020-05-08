@@ -1,0 +1,23 @@
+name: glaes
+channels:
+  - conda-forge
+dependencies:
+  # - python
+  # - pytest
+  # - pytest-cov
+  # - pylint
+  # - autopep8
+  # - jupyter
+  # - notebook
+  # - jupyterlab
+  - pip
+  - matplotlib
+  - descartes
+  - pandas
+  - numpy
+  - scipy
+  - scikit-learn
+  - gdal>2.2.0,<3.0.0
+  - pip:
+      - https://github.com/FZJ-IEK3-VSA/geokit/archive/v1.2.7.zip
+      - .
