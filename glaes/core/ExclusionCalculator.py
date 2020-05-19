@@ -1,7 +1,15 @@
-from .util import *
-from .priors import *
+import geokit as gk
+import re
+import numpy as np
 from os.path import isfile
+from collections import namedtuple
+from warnings import warn
+import pandas as pd
 from osgeo import gdal
+
+
+from .util import GlaesError
+from .priors import Priors, PriorSource
 
 Areas = namedtuple('Areas', "coordinates geoms")
 
