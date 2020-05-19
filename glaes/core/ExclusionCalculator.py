@@ -555,7 +555,7 @@ class ExclusionCalculator(object):
         source : str or gdal.Dataset
             The raster datasource defining the criteria values for each location
 
-        value : tuple, or numeric
+        value : numeric, tuple, iterable, or str
             The exact value, or value range to exclude
             * If Numeric, should be The exact value to exclude
                 * Generally this should only be done when the raster datasource
@@ -565,6 +565,31 @@ class ExclusionCalculator(object):
               range of values to exclude
                 * If either boundary is given as None, then it is interpreted as
                   unlimited
+            * If any other iterable : The list of exact values to accept 
+            * If str : The formatted set of elements to accept 
+              - Each element in the set is seperated by a "," 
+              - Each element must be either a singular numeric value, or a range
+              - A range element begins with either "[" or "(", and ends with either "]" or ")"
+                and should have an '-' in between
+                - "[" and "]" imply inclusivity
+                - "(" and ")" imply exclusivity
+                - Numbers on either side can be omitted, implying no limit on that side
+                - Examples:
+                  - "[1-5]" -> Indicate values from 1 up to 5, inclusively
+                  - "[1-5)" -> Indicate values from 1 up to 5, but not including 5
+                  - "(1-]"  -> Indicate values above 1 (but not including 1) up to infinity
+                  - "[-5]"  -> Indicate values from negative infinity up to and including 5
+                  - "[-]"   -> Indicate values from negative infinity to positive infinity (dont do this..)
+              - All whitespaces will be ignored (so feel free to use them as you wish)
+              - Example:
+                - "[-2),[5-7),12,(22-26],29,33,[40-]" will indicate all of the following:
+                  - Everything below 2, but not including 2
+                  - Values between 5 up to 7, but not including 7
+                  - 12
+                  - Values above 22 up to and including 26
+                  - 29
+                  - 33
+                  - Everything above 40, including 40
 
         buffer : float; optional
             A buffer region to add around the indicated pixels
@@ -845,6 +870,17 @@ class ExclusionCalculator(object):
                     - "XXX-None" -> translates to value=(XXX, None). i.e. "everything above XXX"
                     - "XXX-"     -> also translates to value=(XXX, None)
 
+                * For raster types, see the note in ExclusionCalculator.excludeRasterType regarding 
+                    passing string-type value inputs
+                    - For example, "[-2),[5-7),12,(22-26],29,33,[40-]" will indicate pixels with values:
+                        - Below 2, but not including 2
+                        - Between 5 up to 7, but not including 7
+                        - Equal to 12
+                        - Above 22 up to and including 26
+                        - Equal to 29
+                        - Equal to 33
+                        - Above 40, including 40
+
                 * For vector types, the 'value' is just the SQL-like where statement
 
             filterSourceLists : bool
@@ -855,7 +891,7 @@ class ExclusionCalculator(object):
                 If True, then if a path is given which does not exist, a RuntimError is raised. Otherwise
                     a user warning is given.
                 Only effective when `filterSourceLists` is True
-                
+
             verbose : bool
                 If True, progress statements are given
 
@@ -918,28 +954,20 @@ class ExclusionCalculator(object):
                     mode=row.exclusion_mode)
 
             elif row.type == "raster":
+                value = str(row.value)
                 if verbose:
                     print("Excluding Raster {} with value {}, buffer {}, mode {}, and invert {} ".format(
                         row['name'],
-                        row.value,
+                        value,
                         buffer,
                         row.exclusion_mode,
                         row.invert
                     ))
 
-                if isinstance(row.value, str):
-                    try:
-                        value_low, value_high = row.value.split("-")
-                        value_low = None if (value_low == "None" or value_low == "") else float(value_low)
-                        value_high = None if (value_high == "None" or value_high == "") else float(value_high)
-
-                        value = value_low, value_high
-                    except:
-                        value = float(row.value)
                 sources = paths[row['name']]
-                if gk.util.isRaster(sources): 
+                if gk.util.isRaster(sources):
                     sources = [sources, ]
-                
+
                 if filterSourceLists:
                     sources = list(s.region.extent.filterSources(sources, error_on_missing=filterMissingError))
                     if verbose and len(sources) == 0:
@@ -970,11 +998,10 @@ class ExclusionCalculator(object):
                 else:
                     value = row.value
 
-                
                 sources = paths[row['name']]
-                if gk.util.isVector(sources): 
+                if gk.util.isVector(sources):
                     sources = [sources, ]
-        
+
                 if filterSourceLists:
                     sources = list(s.region.extent.filterSources(sources, error_on_missing=filterMissingError))
                     if verbose and len(sources) == 0:

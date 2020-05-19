@@ -92,6 +92,15 @@ def test_ExclusionCalculator_excludeRasterType():
     assert np.isclose(np.nanmean(ec.availability), 81.16260529)
     assert np.isclose(np.nanstd(ec.availability), 39.10104752)
 
+    # Exclude iterable (should have the same result as the test above)
+    ec = gl.ExclusionCalculator(gl._test_data_["aachenShapefile.shp"], srs=gk.srs.EPSG3035, pixelRes=100)
+    ec.excludeRasterType(
+        gl._test_data_['clc-aachen_clipped.tif'],
+        value=[5, 6, 7, 8, 9, 10, 11, 12])
+
+    assert np.isclose(np.nanmean(ec.availability), 81.16260529)
+    assert np.isclose(np.nanstd(ec.availability), 39.10104752)
+
     # exclude value maximum
     ecMax12 = gl.ExclusionCalculator(aachenShape)
     ecMax12.excludeRasterType(clcRaster, (None, 12))
@@ -118,6 +127,15 @@ def test_ExclusionCalculator_excludeRasterType():
 
     assert np.isclose(np.nanmean(ec.availability), 82.95262909)
     assert np.isclose(np.nanstd(ec.availability), 32.26681137)
+
+    # Test with complex value input
+    ec = gl.ExclusionCalculator(gl._test_data_["aachenShapefile.shp"], srs='latlon', pixelRes=0.005)
+    ec.excludeRasterType(
+        gl._test_data_['clc-aachen_clipped.tif'],
+        value="[-2),[5-7),12,(22-26],29,33,[40-]")
+
+    assert np.isclose(np.nanmean(ec.availability), 49.5872573853)
+    assert np.isclose(np.nanstd(ec.availability), 41.2754364014)
 
 
 def test_ExclusionCalculator_excludeVectorType():
