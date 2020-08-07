@@ -5,6 +5,7 @@ from os.path import isfile
 from collections import namedtuple
 from warnings import warn
 import pandas as pd
+import hashlib
 from osgeo import gdal
 
 
@@ -124,7 +125,7 @@ class ExclusionCalculator(object):
         "woodland_deciduous_proximity": (None, 300),
         "woodland_mixed_proximity": (None, 300)}
 
-    def __init__(s, region, srs=3035, pixelRes=100, where=None, padExtent=0, initialValue=True, **kwargs):
+    def __init__(s, region, srs=3035, pixelRes=100, where=None, padExtent=0, initialValue=True, verbose=True, **kwargs):
         """Initialize the ExclusionCalculator
 
         Parameters:
@@ -189,6 +190,9 @@ class ExclusionCalculator(object):
             * Only take effect when the 'region' argument is a string
 
         """
+        # Set simple flags
+        s.verbose = verbose
+
         # Create spatial reference system (but only if a RegionMask isnt already given)
         if not isinstance(region, gk.RegionMask) and isinstance(srs, str) and srs[0:4] == "LAEA":
             import osr
@@ -554,6 +558,35 @@ class ExclusionCalculator(object):
             * Units are defined by the srs used to initialize the ExclusionCalculator"""
         return s._availability[s.region.mask].sum(dtype=np.int64) * s.region.pixelWidth * s.region.pixelHeight / 100
 
+    def _hasEqualContext(self, source):
+        """
+        Internal function which checks if a given raster source has the same context as 
+        the ExclusionCalculator. This checks SRS, extent, and pixel resolution
+        """
+        if not isfile(source) or not gk.util.isRaster(source):
+            # print("Is not a raster!")
+            return False
+
+        ri_extent = gk.Extent.fromRaster(source)
+        if not ri_extent == self.region.extent:
+            # print("Extent mismatch!")
+            return False
+
+        if not ri_extent.srs.IsSame(self.srs):
+            # print("SRS mismatch!")
+            return False
+
+        ri = gk.raster.rasterInfo(source)
+        if not np.isclose(ri.pixelWidth, self.region.pixelWidth):
+            # print("pixelWidth mismatch!")
+            return False
+
+        if not np.isclose(ri.pixelHeight, self.region.pixelHeight):
+            # print("pixelHeight mismatch!")
+            return False
+
+        return True
+
     # General excluding functions
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, intermediate=None, prewarp=False, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in a raster datasource
@@ -611,11 +644,11 @@ class ExclusionCalculator(object):
             The factor by which to divide the RegionMask's native resolution
             * This is useful if you need to represent very fine details
 
-                
+
         intermediate : path, optional
-            Path to the intermediate results tif file for this set of function arguments.
-            When not None, the exclusioncalculator will check if data from intermediate
-            input files can be used to save calculation of this particular exclusion criterion.            
+            Path to an intermediate result raster file for this set of function arguments.
+            When not None, the ExclusionCalculator will check if data from the intermediate
+            input file can be used to cache the exclusion calculation result of this criterion.            
             * If path to intermediate file exists, metadata (buffer, resolution,
               prewarp, invert, mode, kwargs will be compared to current arguments) 
             * If metadata matches, intermediate file will be excluded instead of new
@@ -647,54 +680,76 @@ class ExclusionCalculator(object):
               geokit.RegionMask.indicateValues
 
         """
-        # create dictionary of function arguments to compare against metadata
-        metadata={
-                'AREA_OR_POINT': 'Area',
-                'value':str(value),
-                'buffer':str(buffer),
-                'resolutionDiv':str(resolutionDiv), 
-                'prewarp':str(prewarp), 
-                'invert':str(invert), 
-                'mode':str(mode)
-                }
-                        
-        for k, v in kwargs.items():
-            metadata[k] = v
-                
-          
-        # check if intermediate file usage is selected and if path=file exists
-        if intermediate is not None and os.path.isfile(intermediate):
-                
-            # check the meta-data
-            if gk.raster.rasterInfo(intermediate).meta==metadata:
-                s.excludeRasterType(intermediate, value=0)
-                return
-        
-        # Do prewarp, if needed
-        if prewarp:
-            prewarpArgs = dict(resampleAlg="bilinear")
-            if isinstance(prewarp, str):
-                prewarpArgs["resampleAlg"] = prewarp
-            elif isinstance(prewarp, dict):
-                prewarpArgs.update(prewarp)
-
-            source = s.region.warp(source, returnMatrix=False, **prewarpArgs)
-
-        # Indicate on the source
-        areas = (s.region.indicateValues(source, value, buffer=buffer,
-                                         resolutionDiv=resolutionDiv, applyMask=False, **kwargs) * 100).astype(np.uint8)
-
-        # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
+        # Perform check for intermediate file
         if intermediate is not None:
-            s.region.createRaster(output=intermediate, data=areas, meta=metadata)
-        
+            if isinstance(source, gdal.Dataset):
+                h = hashlib.sha256(source.ReadAsArray().tobytes())
+                source_id = "Memory:" + h.hexdigest()
+            else:
+                source_id = str(source)
+
+            # create dictionary of function arguments to compare against metadata
+            metadata = {
+                'AREA_OR_POINT': 'Area',
+                'exclusion_type': "Raster",
+                'source': source_id,
+                'value': str(value),
+                'buffer': str(buffer),
+                'resolutionDiv': str(resolutionDiv),
+                'prewarp': str(prewarp),
+                'invert': str(invert),
+                'mode': str(mode)
+            }
+
+            for k, v in kwargs.items():
+                metadata[k] = v
+
+        # check if we can apply the intermediate file
+        if intermediate is not None and \
+                isfile(intermediate) and \
+                gk.raster.rasterInfo(intermediate).meta == metadata and \
+                s._hasEqualContext(intermediate):
+
+            if s.verbose and intermediate is not None:
+                print("Applying intermediate exclusion file:", intermediate)
+
+            indications = gk.raster.extractMatrix(intermediate)
+
+        else:  # We need to compute the exclusion
+            if s.verbose and intermediate is not None:
+                print("Computing intermediate exclusion file:", intermediate)
+            # Do prewarp, if needed
+            if prewarp:
+                prewarpArgs = dict(resampleAlg="bilinear")
+                if isinstance(prewarp, str):
+                    prewarpArgs["resampleAlg"] = prewarp
+                elif isinstance(prewarp, dict):
+                    prewarpArgs.update(prewarp)
+
+                source = s.region.warp(source, returnMatrix=False, **prewarpArgs)
+
+            # Indicate on the source
+            indications = (
+                s.region.indicateValues(
+                    source,
+                    value,
+                    buffer=buffer,
+                    resolutionDiv=resolutionDiv,
+                    applyMask=False,
+                    **kwargs) * 100
+            ).astype(np.uint8)
+
+            # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
+            if intermediate is not None:
+                s.region.createRaster(output=intermediate, data=indications, meta=metadata)
+
         # exclude the indicated area from the total availability
         if mode == "exclude":
             s._availability = np.min(
-                [s._availability, areas if invert else 100 - areas], axis=0)
+                [s._availability, indications if invert else 100 - indications], axis=0)
         elif mode == "include":
             s._availability = np.max(
-                [s._availability, 100 - areas if invert else areas], axis=0)
+                [s._availability, 100 - indications if invert else indications], axis=0)
             s._availability[~s.region.mask] = 0
         else:
             raise GlaesError("mode must be 'exclude' or 'include'")
@@ -740,8 +795,8 @@ class ExclusionCalculator(object):
         resolutionDiv : int; optional
             The factor by which to divide the RegionMask's native resolution
             * This is useful if you need to represent very fine details
-            
-                        
+
+
         intermediate : path, optional
             Path to the intermediate results tif file for this set of function arguments.
             When not None, the exclusioncalculator will check if data from intermediate
@@ -768,51 +823,76 @@ class ExclusionCalculator(object):
               geokit.RegionMask.indicateFeatures
 
         """
-        # create dictionary of function arguments to compare against metadata
-        metadata={
-                'AREA_OR_POINT': 'Area',
-                'where':str(where),
-                'buffer':str(buffer),
-                'bufferMethod':str(bufferMethod),
-                'invert':str(invert), 
-                'resolutionDiv':str(resolutionDiv), 
-                'mode':str(mode)
-                }
-                        
-        for k, v in kwargs.items():
-            metadata[k] = v
-                
-          
-        # check if intermediate file usage is selected and if path=file exists
-        if intermediate is not None and os.path.isfile(intermediate):
-                
-            # check the meta-data
-            if gk.raster.rasterInfo(intermediate).meta==metadata:
-                s.excludeRasterType(intermediate, value=0)
-                return
-        
-        
-        if isinstance(source, PriorSource):
-            edgeI = kwargs.pop("edgeIndex", np.argwhere(
-                source.edges == source.typicalExclusion))
-            source = source.generateVectorFromEdge(
-                s.region.extent, edgeIndex=edgeI)
-
-        # Indicate on the source
-        areas = (s.region.indicateFeatures(source, where=where, buffer=buffer, resolutionDiv=resolutionDiv,
-                                           bufferMethod=bufferMethod, applyMask=False, **kwargs) * 100).astype(np.uint8)
-        
-        # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
+        # Perform check for intermediate file
         if intermediate is not None:
-            s.region.createRaster(output=intermediate, data=areas, meta=metadata)
-        
+            # TODO: Find a way to get a hash signiture of an in-memory vector file
+            # if isinstance(source, gdal.Dataset):
+            #     h = hashlib.sha256(source.ReadAsArray().tobytes())
+            #     source_id = "Memory:" + h.hexdigest()
+            # else:
+            #     source_id = str(source)
+            source_id = str(source)
+
+            # create dictionary of function arguments to compare against metadata
+            metadata = {
+                'AREA_OR_POINT': 'Area',
+                'exclusion_type': "Vector",
+                'source': source_id,
+                'where': str(where),
+                'buffer': str(buffer),
+                'bufferMethod': str(bufferMethod),
+                'invert': str(invert),
+                'resolutionDiv': str(resolutionDiv),
+                'mode': str(mode)
+            }
+
+            for k, v in kwargs.items():
+                metadata[k] = v
+
+        # check if we can apply the intermediate file
+        if intermediate is not None and \
+                isfile(intermediate) and \
+                gk.raster.rasterInfo(intermediate).meta == metadata and \
+                s._hasEqualContext(intermediate):
+
+            if s.verbose and intermediate is not None:
+                print("Applying intermediate exclusion file:", intermediate)
+
+            indications = gk.raster.extractMatrix(intermediate)
+
+        else:  # We need to compute the exclusion
+            if s.verbose and intermediate is not None:
+                print("Computing intermediate exclusion file:", intermediate)
+
+            if isinstance(source, PriorSource):
+                edgeI = kwargs.pop("edgeIndex", np.argwhere(
+                    source.edges == source.typicalExclusion))
+                source = source.generateVectorFromEdge(
+                    s.region.extent, edgeIndex=edgeI)
+
+            # Indicate on the source
+            indications = (
+                s.region.indicateFeatures(
+                    source,
+                    where=where,
+                    buffer=buffer,
+                    resolutionDiv=resolutionDiv,
+                    bufferMethod=bufferMethod,
+                    applyMask=False,
+                    **kwargs) * 100
+            ).astype(np.uint8)
+
+            # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
+            if intermediate is not None:
+                s.region.createRaster(output=intermediate, data=indications, meta=metadata)
+
         # exclude the indicated area from the total availability
         if mode == "exclude":
             s._availability = np.min(
-                [s._availability, areas if invert else 100 - areas], axis=0)
+                [s._availability, indications if invert else 100 - indications], axis=0)
         elif mode == "include":
             s._availability = np.max(
-                [s._availability, 100 - areas if invert else areas], axis=0)
+                [s._availability, 100 - indications if invert else indications], axis=0)
             s._availability[~s.region.mask] = 0
         else:
             raise GlaesError("mode must be 'exclude' or 'include'")
@@ -922,7 +1002,7 @@ class ExclusionCalculator(object):
         s.excludeRasterType(prior.path, value=value,
                             invert=invert, mode=mode, **kwargs)
 
-    def excludeRegionEdge(s, buffer):
+    def excludeRegionEdge(s, buffer, **kwargs):
         """Exclude some distance from the region's edge
 
         Parameters:
@@ -931,9 +1011,9 @@ class ExclusionCalculator(object):
                 A buffer region to add around the indicated pixels
                 * Units are in the RegionMask's srs
         """
-        s.excludeVectorType(s.region.vector, buffer=-buffer, invert=True)
+        s.excludeVectorType(s.region.vector, buffer=-buffer, invert=True, **kwargs)
 
-    def excludeSet(s, exclusion_set, filterSourceLists=True, filterMissingError=True, verbose=True, **paths):
+    def excludeSet(s, exclusion_set, filterSourceLists=True, filterMissingError=True, **paths):
         """
         Iteratively exclude a set of exclusion constraints
 
@@ -988,6 +1068,7 @@ class ExclusionCalculator(object):
                 All extra arguments should correspond to the paths on disk for each of the
                 'name's specified in the exclusion_set input
         """
+        verbose = s.verbose
         exclusion_set = exclusion_set.copy()
 
         # Make sure inputs are okay
