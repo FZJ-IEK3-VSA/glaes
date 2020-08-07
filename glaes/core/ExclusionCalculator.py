@@ -146,8 +146,9 @@ class ExclusionCalculator(object):
               * Only effective if 'region' is a path to a vector
             * If a string is specified, then a new srs can be automatically
               generated using the Lambert Azimuthal Equal Area projection type
-              - Must follow the form "LAEA" or "LAEA:Y,X" where X and Y are the
-                latitute and longitude of the center point of the new projection
+              - Must follow the form "LAEA" or "LAEA:<lat>,<lon>" where <lat> 
+                and <lon> are the latitute and of the center point of the new 
+                projection
               - Specifying "LAEA" instructs the constructor to determine X and Y
                 automatically from the given 'region' input
                 - NOTE: Only works when the 'region' input is an ogr.Geometry or
