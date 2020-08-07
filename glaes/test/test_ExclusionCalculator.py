@@ -1,6 +1,6 @@
 import warnings
 import matplotlib.pyplot as plt
-from os.path import join, dirname
+from os.path import join, dirname, isfile
 from osgeo import gdal
 import numpy as np
 import geokit as gk
@@ -124,6 +124,7 @@ def test_ExclusionCalculator_excludeRasterType():
     # exclude single value
     ec = gl.ExclusionCalculator(aachenShape, srs='latlon', pixelRes=0.005)
     ec.excludeRasterType(clcRaster, 12)
+    print("AVAIL MEAN:", np.nanmean(ec.availability))
 
     assert np.isclose(np.nanmean(ec.availability), 82.95262909)
     assert np.isclose(np.nanstd(ec.availability), 32.26681137)
@@ -136,6 +137,21 @@ def test_ExclusionCalculator_excludeRasterType():
 
     assert np.isclose(np.nanmean(ec.availability), 49.5872573853)
     assert np.isclose(np.nanstd(ec.availability), 41.2754364014)
+
+    # Test with intermediate functionaliy (creation and re-use)
+    for i in range(2):
+        ec = gl.ExclusionCalculator(
+            gl._test_data_["aachenShapefile.shp"],
+            srs='latlon',
+            pixelRes=0.005,)
+        ec.excludeRasterType(
+            gl._test_data_['clc-aachen_clipped.tif'],
+            value="[-2),[5-7),12,(22-26],29,33,[40-]",
+            intermediate=join(RESULTDIR, "exclude_raster_intermediate.tif"))
+
+        assert isfile(join(RESULTDIR, "exclude_raster_intermediate.tif"))
+        assert np.isclose(np.nanmean(ec.availability), 49.5872573853)
+        assert np.isclose(np.nanstd(ec.availability), 41.2754364014)
 
 
 def test_ExclusionCalculator_excludeVectorType():
@@ -166,6 +182,19 @@ def test_ExclusionCalculator_excludeVectorType():
 
     assert np.isclose(np.nanmean(ec.availability), 77.95021057)
     assert np.isclose(np.nanstd(ec.availability), 41.45823669)
+
+    # test with intermediate functionality
+    for i in range(2):
+        ec = gl.ExclusionCalculator(aachenShape)
+        ec.excludeVectorType(
+            cddaVector,
+            where="YEAR>2000",
+            buffer=400,
+            intermediate=join(RESULTDIR, "exclude_vector_intermediate.tif"))
+
+        assert isfile(join(RESULTDIR, "exclude_vector_intermediate.tif"))
+        assert np.isclose(np.nanmean(ec.availability), 77.95021057)
+        assert np.isclose(np.nanstd(ec.availability), 41.45823669)
 
 
 def test_ExclusionCalculator_excludePrior():
