@@ -740,6 +740,7 @@ class ExclusionCalculator(object):
                     value,
                     buffer=buffer,
                     resolutionDiv=resolutionDiv,
+                    forceMaskShape=True,
                     applyMask=False,
                     **kwargs) * 100
             ).astype(np.uint8)
@@ -886,6 +887,7 @@ class ExclusionCalculator(object):
                     resolutionDiv=resolutionDiv,
                     bufferMethod=bufferMethod,
                     applyMask=False,
+                    forceMaskShape=True,
                     **kwargs) * 100
             ).astype(np.uint8)
 
