@@ -1284,10 +1284,10 @@ class ExclusionCalculator(object):
 
         # Read separation scaling file, if given
         if not sepScaling is None:
-            if isinstance(sepScaling, str):  # Assume a path to a raster file is given
-                sepScaling = s.region.warp(sepScaling, resampleAlg='near')
+            if isinstance(sepScaling, str) or isinstance(sepScaling, gdal.Dataset):  # Assume a path to a raster file is given
+                sepScaling = s.region.warp(sepScaling, resampleAlg='near', applyMask=False,)
                 matrixScaling = True
-            # Assume a path to a raster file is given
+            # Assume a numpy array is given
             elif isinstance(sepScaling, np.ndarray):
                 if not sepScaling.shape == s.region.mask.shape:
                     raise GlaesError(
@@ -1321,8 +1321,8 @@ class ExclusionCalculator(object):
             sepA2 = sepA**2
             sepT2 = sepT**2
 
-            sepFloorA = sepA - 1
-            sepFloorT = sepT - 1
+            sepFloorA = np.maximum(sepA - np.sqrt(2), 0)
+            sepFloorT = np.maximum(sepT - np.sqrt(2), 0)
             if not matrixScaling and (sepFloorA < 1 or sepFloorT < 1):
                 raise GlaesError(
                     "Seperations are too small compared to pixel size")
@@ -1332,25 +1332,25 @@ class ExclusionCalculator(object):
 
             sepCeil = np.maximum(sepA, sepT) + 1
 
-            stampWidth = int(np.floor(min(sepFloorA, sepFloorT)))
-            stampFloor = min(sepFloorA2, sepFloorT2)
+            stampFloor = min(sepFloorA2.min(), sepFloorT2.min()) if matrixScaling else min(sepFloorA2, sepFloorT2)
+            stampWidth = int(np.ceil(np.sqrt(stampFloor)) + 1)
         else:
             separation = separation * sepScaling / pixelRes
             sep2 = np.power(separation, 2)
-            sepFloor = np.maximum(separation - 1, 0)
+            sepFloor = np.maximum(separation - np.sqrt(2), 0)
             sepFloor2 = sepFloor**2
             sepCeil = separation + 1
 
-            stampWidth = int(np.ceil(sepCeil))
-            stampFloor = sepFloor2
+            stampFloor = sepFloor2.min() if matrixScaling else sepFloor2
+            stampWidth = int(np.ceil(np.sqrt(stampFloor)) + 1)
 
         if _stamping:
             _xy = np.linspace(-stampWidth, stampWidth, stampWidth * 2 + 1)
             _xs, _ys = np.meshgrid(_xy, _xy)
 
-            # print("STAMP FLOOR:", stampFloor)
+            # print("STAMP FLOOR:", stampFloor, stampWidth)
             stamp = (np.power(_xs, 2) + np.power(_ys, 2)
-                     ) >= (stampFloor - np.sqrt(stampFloor) * 2)
+                     ) >= (stampFloor)  # (stampFloor - np.sqrt(stampFloor) * 2)
 
         if isinstance(sepCeil, np.ndarray) and sepCeil.size > 1:
             sepCeil = sepCeil.max()
