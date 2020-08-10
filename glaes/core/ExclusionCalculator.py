@@ -4,6 +4,7 @@ import numpy as np
 from os.path import isfile
 from collections import namedtuple
 from warnings import warn
+import logging
 import pandas as pd
 import hashlib
 from osgeo import gdal
@@ -712,13 +713,16 @@ class ExclusionCalculator(object):
                 s._hasEqualContext(intermediate):
 
             if s.verbose and intermediate is not None:
-                print("Applying intermediate exclusion file:", intermediate)
+                logging.info("Applying intermediate exclusion file: " + intermediate)
 
             indications = gk.raster.extractMatrix(intermediate)
 
         else:  # We need to compute the exclusion
             if s.verbose and intermediate is not None:
-                print("Computing intermediate exclusion file:", intermediate)
+                logging.info("Computing intermediate exclusion file: " + intermediate)
+                if isfile(intermediate):
+                    logging.warning("Overwriting previous intermediate exclusion file: " + intermediate)
+
             # Do prewarp, if needed
             if prewarp:
                 prewarpArgs = dict(resampleAlg="bilinear")
@@ -857,13 +861,15 @@ class ExclusionCalculator(object):
                 s._hasEqualContext(intermediate):
 
             if s.verbose and intermediate is not None:
-                print("Applying intermediate exclusion file:", intermediate)
+                logging.info("Applying intermediate exclusion file: " + intermediate)
 
             indications = gk.raster.extractMatrix(intermediate)
 
         else:  # We need to compute the exclusion
             if s.verbose and intermediate is not None:
-                print("Computing intermediate exclusion file:", intermediate)
+                logging.info("Computing intermediate exclusion file: " + intermediate)
+                if isfile(intermediate):
+                    logging.warning("Overwriting previous intermediate exclusion file: " + intermediate, UserWarning)
 
             if isinstance(source, PriorSource):
                 edgeI = kwargs.pop("edgeIndex", np.argwhere(
@@ -1099,7 +1105,7 @@ class ExclusionCalculator(object):
 
             if row.type == "prior":
                 if verbose:
-                    print("Excluding Prior {} with value {}, buffer {}, mode {}, and invert {} ".format(
+                    logging.info("Excluding Prior {} with value {}, buffer {}, mode {}, and invert {} ".format(
                         row['name'],
                         row.value,
                         buffer,
@@ -1127,7 +1133,7 @@ class ExclusionCalculator(object):
             elif row.type == "raster":
                 value = str(row.value)
                 if verbose:
-                    print("Excluding Raster {} with value {}, buffer {}, mode {}, and invert {} ".format(
+                    logging.info("Excluding Raster {} with value {}, buffer {}, mode {}, and invert {} ".format(
                         row['name'],
                         value,
                         buffer,
@@ -1142,7 +1148,7 @@ class ExclusionCalculator(object):
                 if filterSourceLists:
                     sources = list(s.region.extent.filterSources(sources, error_on_missing=filterMissingError))
                     if verbose and len(sources) == 0:
-                        print("  No suitable sources in extent! ")
+                        logging.info("  No suitable sources in extent! ")
 
                 for source in sources:
                     s.excludeRasterType(
@@ -1156,7 +1162,7 @@ class ExclusionCalculator(object):
 
             elif row.type == "vector":
                 if verbose:
-                    print("Excluding Vector {} with where-statement \"{}\", buffer {}, mode {}, and invert {} ".format(
+                    logging.info("Excluding Vector {} with where-statement \"{}\", buffer {}, mode {}, and invert {} ".format(
                         row['name'],
                         row.value,
                         buffer,
@@ -1176,11 +1182,11 @@ class ExclusionCalculator(object):
                 if filterSourceLists:
                     sources = list(s.region.extent.filterSources(sources, error_on_missing=filterMissingError))
                     if verbose and len(sources) == 0:
-                        print("  No suitable sources in extent! ")
+                        logging.info("  No suitable sources in extent! ")
 
                 # print(sources)
                 for source in sources:
-                    print("SOURCE: ", source)
+                    # print("SOURCE: ", source)
                     s.excludeVectorType(
                         source=source,
                         where=value,
@@ -1190,7 +1196,7 @@ class ExclusionCalculator(object):
                         mode=row.exclusion_mode)
 
         if verbose:
-            print("Done!")
+            logging.info("Done!")
 
     def shrinkAvailability(s, dist, threshold=50):
         """Shrinks the current availability by a given distance in the given SRS"""
@@ -1340,7 +1346,7 @@ class ExclusionCalculator(object):
             _xy = np.linspace(-stampWidth, stampWidth, stampWidth * 2 + 1)
             _xs, _ys = np.meshgrid(_xy, _xy)
 
-            print("STAMP FLOOR:", stampFloor)
+            # print("STAMP FLOOR:", stampFloor)
             stamp = (np.power(_xs, 2) + np.power(_ys, 2)
                      ) >= (stampFloor - np.sqrt(stampFloor) * 2)
 
