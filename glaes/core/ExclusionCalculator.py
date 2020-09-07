@@ -1223,7 +1223,7 @@ class ExclusionCalculator(object):
         s._availability = s.region.indicateFeatures(
             vec, applyMask=False).astype(np.uint8) * 100
 
-    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5, _stamping=True):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, maxAcceptableDistance=None, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5, _stamping=True):
         """Distribute the maximal number of minimally separated items within the available areas
 
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -1249,6 +1249,17 @@ class ExclusionCalculator(object):
                 - float : The direction to apply to all points
                 - np.ndarray : The directions at each pixel (must match availability matrix shape)
                 - str : A path to a raster file containing axial directions
+
+            maxAcceptableDistance : A maximum distance to allow between items
+                - Computes a post-placement distance matrix for the located placements
+                - If the placement's nearest neighbor is greater than `maxAcceptableDistance`, then it is removed
+                - Input can be given as:
+                    - Y[float] - Meaning that the nearest neighbor must be within the given distance, Y
+                    - (Y1[int], Y2[float], ...) - Meaning that the first neighbor must be within a distance of Y1,
+                      the second nearest neighbor should be within a distance of Y2, and so forth.
+                - Ex.
+                    - "maxAcceptableDistance=(1000, 2000, 3000)" means that if the nearest 3 neighbors are not within a 
+                      distance of 1000, 2000, and 3000 meters, respectively, then the placement in question will be deleted
 
             sepScaling : An additional scaling factor which can be applied to each pixel
                 - float : The scaling to apply to all points
@@ -1542,6 +1553,41 @@ class ExclusionCalculator(object):
             coords = newCoords
         s.itemCoords = coords
 
+        # Filter by max acceptable distance, maybe
+        if maxAcceptableDistance is not None:
+            try:
+                maxAcceptableDistance = [float(x) for x in maxAcceptableDistance]
+            except:
+                maxAcceptableDistance = [float(maxAcceptableDistance)]
+
+            maxAcceptableDistance2 = np.power(maxAcceptableDistance, 2)
+
+            sel = []
+            for i in range(s._itemCoords.shape[0]):
+                x = s._itemCoords[i, 0]
+                y = s._itemCoords[i, 1]
+
+                X = np.concatenate((s._itemCoords[:i, 0], s._itemCoords[(i + 1):, 0]))
+                Y = np.concatenate((s._itemCoords[:i, 1], s._itemCoords[(i + 1):, 1]))
+                subsel = np.abs(X - x) <= max(maxAcceptableDistance)
+                subsel *= np.abs(Y - y) <= max(maxAcceptableDistance)
+
+                subX = X[subsel]
+                subY = Y[subsel]
+                dist2 = np.power(subX - x, 2) + np.power(subY - y, 2)
+
+                if dist2.shape[0] < len(maxAcceptableDistance2):
+                    sel.append(False)
+                else:
+                    isokay = True
+                    dist2 = np.sort(dist2)
+                    for j, md2 in enumerate(maxAcceptableDistance2):
+                        isokay = isokay and dist2[j] <= md2
+                    sel.append(isokay)
+
+            s._itemCoords = s._itemCoords[sel, :]
+            s.itemCoords = s.itemCoords[sel, :]
+
         # Make areas
         if asArea:
             warn("Area distribution will soon be removed from 'distributeItems'. Use 'distributeArea' instead", DeprecationWarning)
@@ -1594,8 +1640,7 @@ class ExclusionCalculator(object):
         # Make shapefile
         if not output is None:
             warn("Shapefile output will soon be removed from 'distributeItems'. Use 'saveItems' or 'saveAreas' instead", DeprecationWarning)
-            srs = gk.srs.loadSRS(
-                outputSRS) if not outputSRS is None else s.region.srs
+            srs = gk.srs.loadSRS(outputSRS) if not outputSRS is None else s.region.srs
             # Should the locations be converted to areas?
             if asArea:
                 if not srs.IsSame(s.region.srs):
@@ -1607,7 +1652,10 @@ class ExclusionCalculator(object):
                 geoms = pd.DataFrame({"geom": geoms, "area": areas})
 
             else:  # Just write the points
-                geoms = [gk.geom.point(loc, srs=srs) for loc in coords]
+                geoms = gk.LocationSet(
+                    s._itemCoords,
+                    srs=s.srs
+                ).asGeom(srs=srs if outputSRS is None else outputSRS)
 
             gk.vector.createVector(geoms, output=output)
         else:
