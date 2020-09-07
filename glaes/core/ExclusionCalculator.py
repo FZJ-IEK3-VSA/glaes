@@ -147,8 +147,8 @@ class ExclusionCalculator(object):
               * Only effective if 'region' is a path to a vector
             * If a string is specified, then a new srs can be automatically
               generated using the Lambert Azimuthal Equal Area projection type
-              - Must follow the form "LAEA" or "LAEA:<lat>,<lon>" where <lat> 
-                and <lon> are the latitute and of the center point of the new 
+              - Must follow the form "LAEA" or "LAEA:<lat>,<lon>" where <lat>
+                and <lon> are the latitute and of the center point of the new
                 projection
               - Specifying "LAEA" instructs the constructor to determine X and Y
                 automatically from the given 'region' input
@@ -183,8 +183,8 @@ class ExclusionCalculator(object):
             * If "True", the region is assumed to begin as fully available
             * If "False", the region is assumed to begin as completely unavailable
             * If a path to a ".tif" file is given, then the ExclusionCalculator is initialized
-                by warping (using the 'near' algorithm) from the given raster, and excluding 
-                pixels with a value of 0 
+                by warping (using the 'near' algorithm) from the given raster, and excluding
+                pixels with a value of 0
 
         kwargs:
             * Keyword arguments are passed on to a call to geokit.RegionMask.load
@@ -214,12 +214,13 @@ class ExclusionCalculator(object):
                     center_x = centroid.GetX()
                     center_y = centroid.GetY()
                 elif isinstance(region, str):
-                    vi = gk.vector.vectorInfo(region)
-                    center_x = (vi.xMin + vi.xMax) / 2
-                    center_y = (vi.yMin + vi.yMax) / 2
-                    if not vi.srs.IsSame(gk.srs.EPSG4326):
+                    _ext = gk.Extent.fromVector(region, where=where)
+
+                    center_x = (_ext.xMin + _ext.xMax) / 2
+                    center_y = (_ext.yMin + _ext.yMax) / 2
+                    if not _ext.srs.IsSame(gk.srs.EPSG4326):
                         center_x, center_y, _ = gk.srs.xyTransform(
-                            (center_x, center_y), fromSRS=vi.srs, toSRS=gk.srs.EPSG4326)
+                            (center_x, center_y), fromSRS=_ext.srs, toSRS=gk.srs.EPSG4326)
                 else:
                     raise RuntimeError(
                         "Automatic center determination is only possible when the 'region' input is an ogr.Geometry Object or a path to a vector file")
@@ -490,13 +491,13 @@ class ExclusionCalculator(object):
                 The desired zoom level of the basemap
                 * Should be between 1 - 20
                 * The higher the number, the more you're zooming in
-                * Note that, for each increase in the zoom level, the numer of tiles 
+                * Note that, for each increase in the zoom level, the numer of tiles
                     fetched increases by a factor of 4
 
             excludeColor : (r, g, b, a)
                 The color to give to excluded points
 
-            ax : matplotlib axes 
+            ax : matplotlib axes
                 The axes to draw on
                 * If not given, one will be generated
 
@@ -561,7 +562,7 @@ class ExclusionCalculator(object):
 
     def _hasEqualContext(self, source):
         """
-        Internal function which checks if a given raster source has the same context as 
+        Internal function which checks if a given raster source has the same context as
         the ExclusionCalculator. This checks SRS, extent, and pixel resolution
         """
         if not isfile(source) or not gk.util.isRaster(source):
@@ -607,9 +608,9 @@ class ExclusionCalculator(object):
               range of values to exclude
                 * If either boundary is given as None, then it is interpreted as
                   unlimited
-            * If any other iterable : The list of exact values to accept 
-            * If str : The formatted set of elements to accept 
-              - Each element in the set is seperated by a "," 
+            * If any other iterable : The list of exact values to accept
+            * If str : The formatted set of elements to accept
+              - Each element in the set is seperated by a ","
               - Each element must be either a singular numeric value, or a range
               - A range element begins with either "[" or "(", and ends with either "]" or ")"
                 and should have an '-' in between
@@ -649,9 +650,9 @@ class ExclusionCalculator(object):
         intermediate : path, optional
             Path to an intermediate result raster file for this set of function arguments.
             When not None, the ExclusionCalculator will check if data from the intermediate
-            input file can be used to cache the exclusion calculation result of this criterion.            
+            input file can be used to cache the exclusion calculation result of this criterion.
             * If path to intermediate file exists, metadata (buffer, resolution,
-              prewarp, invert, mode, kwargs will be compared to current arguments) 
+              prewarp, invert, mode, kwargs will be compared to current arguments)
             * If metadata matches, intermediate file will be excluded instead of new
               calculation
             * If metadata does not match, exclusion will be calculated anew from source file
@@ -805,9 +806,9 @@ class ExclusionCalculator(object):
         intermediate : path, optional
             Path to the intermediate results tif file for this set of function arguments.
             When not None, the exclusioncalculator will check if data from intermediate
-            input files can be used to save calculation of this particular exclusion criterion.            
+            input files can be used to save calculation of this particular exclusion criterion.
             * If path to intermediate file exists, metadata (buffer, resolution,
-              prewarp, invert, mode, kwargs will be compared to current arguments) 
+              prewarp, invert, mode, kwargs will be compared to current arguments)
             * If metadata matches, intermediate file will be excluded instead of new
               calculation
             * If metadata does not match, exclusion will be calculated anew from source file
@@ -1047,7 +1048,7 @@ class ExclusionCalculator(object):
                     - "XXX-None" -> translates to value=(XXX, None). i.e. "everything above XXX"
                     - "XXX-"     -> also translates to value=(XXX, None)
 
-                * For raster types, see the note in ExclusionCalculator.excludeRasterType regarding 
+                * For raster types, see the note in ExclusionCalculator.excludeRasterType regarding
                     passing string-type value inputs
                     - For example, "[-2),[5-7),12,(22-26],29,33,[40-]" will indicate pixels with values:
                         - Below 2, but not including 2
@@ -1312,8 +1313,9 @@ class ExclusionCalculator(object):
                 sepA, sepT = separation
             except:
                 raise GlaesError(
-                    "When giving gradient data, a separation tuple is expected")
+                    "When giving axial direction data, a separation tuple is expected")
 
+            sepA, sepT = float(sepA), float(sepT)  # Cast as float to avoid integer overflow errors
             sepA = sepA * sepScaling / pixelRes
             sepT = sepT * sepScaling / pixelRes
 
@@ -1334,6 +1336,7 @@ class ExclusionCalculator(object):
             stampFloor = min(sepFloorA2.min(), sepFloorT2.min()) if matrixScaling else min(sepFloorA2, sepFloorT2)
             stampWidth = int(np.ceil(np.sqrt(stampFloor)) + 1)
         else:
+            separation = float(separation)  # Cast as float to avoid integer overflow errors
             separation = separation * sepScaling / pixelRes
             sep2 = np.power(separation, 2)
             sepFloor = np.maximum(separation - np.sqrt(2), 0)
