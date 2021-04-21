@@ -535,7 +535,7 @@ class ExclusionCalculator(object):
             ax.spines['right'].set_visible(False)
 
         ax, srs, bounds = s.region.extent.drawSmopyMap(zoom, ax=ax, **smopy_kwargs)
-        s.draw(ax=ax, srs=srs, goodColor=[0, 0, 0, 0], excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), **kwargs)
+        s.draw(ax=ax, srs=srs, goodColor=[0, 0, 0, 0], excludedColor=excludedColor, **kwargs)
 
         return ax
 
