@@ -1,0 +1,18 @@
+image: continuumio/miniconda3:latest
+
+stages:
+  - test
+
+test:
+  stage: test
+  tags: 
+    - linux
+
+  script: 
+    - conda install mamba -c conda-forge
+    - mamba env update -n glaes --file=requirements.yml
+    - mamba env update -n glaes --file=requirements-dev.yml
+    - mamba info --envs
+    - source activate glaes
+    - python -m pip install -e .
+    - python -m pytest --cov=glaes glaes/test/
