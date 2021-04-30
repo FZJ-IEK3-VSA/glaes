@@ -251,7 +251,11 @@ class ExclusionCalculator(object):
 
         # Make a list of item coords
         s.itemCoords = None
+        s.existingItemCoords = None
+        s.existingPVItemCoords = None
         s._itemCoords = None
+        s._existingItemCoords = None
+        s._existingPVItemCoords = None
         s._areas = None
 
     def save(s, output, threshold=None, **kwargs):
