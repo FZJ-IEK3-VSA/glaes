@@ -296,7 +296,7 @@ class ExclusionCalculator(object):
         return s.region.createRaster(output=output, data=data,
                                      noData=255, meta=meta, **kwargs)
 
-    def draw(s, ax=None, goodColor="#9bbb59", excludedColor="#a6161a", legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, **kwargs):
+    def draw(s, ax=None, goodColor=(220/255, 220/255, 220/255), excludedColor=(2/255, 61/255, 107/255), itemsColor="black", legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, german=False, **kwargs):
         """Draw the current availability matrix on a matplotlib figure
 
         Note:
@@ -409,13 +409,12 @@ class ExclusionCalculator(object):
                     points,
                     fromSRS=s.region.srs,
                     toSRS=srs,
-                    outputFormet="xy"
+                    outputFormat="xy"
                 )
 
                 points = np.column_stack([points.x, points.y])
-
-            axh1.ax.plot(points[:, 0], points[:, 1], 'ok')
-
+            axh1.ax.plot(points[:, 0], points[:, 1], color=itemsColor, marker='o', linestyle='None')
+        
         # Draw Areas, maybe?
         if not s._areas is None:
             gk.drawGeoms(
@@ -453,12 +452,12 @@ class ExclusionCalculator(object):
 
             patches = [
                 Patch(ec="k", fc="None", linewidth=3, label=regionLabel),
-                Patch(color=excludedColor, label="Excluded: %.2f%%" % (100 - p)),
-                Patch(color=goodColor, label="Eligible: %.2f%%" % (p)),
+                Patch(color=excludedColor, label=f"{'Ausgeschlossen' if german else 'Excluded'}: %.2f%%" % (100 - p)),
+                Patch(color=goodColor, label=f"{'Verfügbar' if german else 'Eligible'}: %.2f%%" % (p)),
             ]
             if not s._itemCoords is None:
-                h = axh1.ax.plot([], [], 'ok', label="Items: {:,d}".format(
-                    s._itemCoords.shape[0]))
+                h = axh1.ax.plot([], [], color=itemsColor, marker='o', linestyle='None', label="{}: {:,d}".format(
+                    'Elemente' if german else 'Items', s._itemCoords.shape[0]))
                 patches.append(h[0])
 
             _legendargs = dict(loc="lower right", fontsize=14)
@@ -468,7 +467,7 @@ class ExclusionCalculator(object):
         # Done!!
         return axh1.ax
 
-    def drawWithSmopyBasemap(s, zoom=4, excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), ax=None, figsize=None, smopy_kwargs=dict(attribution="© OpenStreetMap contributors", attribution_size=12), **kwargs):
+    def drawWithSmopyBasemap(s, zoom=4, excludedColor=(2/255, 61/255, 107/255, 128/255), ax=None, figsize=None, smopy_kwargs=dict(attribution="© OpenStreetMap contributors", attribution_size=12), **kwargs):
         """
         This wrapper around the original ExclusionCalculator.draw function adds a basemap bethind the drawn eligibility map
 
@@ -535,7 +534,7 @@ class ExclusionCalculator(object):
             ax.spines['right'].set_visible(False)
 
         ax, srs, bounds = s.region.extent.drawSmopyMap(zoom, ax=ax, **smopy_kwargs)
-        s.draw(ax=ax, srs=srs, goodColor=[0, 0, 0, 0], excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), **kwargs)
+        s.draw(ax=ax, srs=srs, goodColor=[0, 0, 0, 0], excludedColor=excludedColor, **kwargs)
 
         return ax
 
