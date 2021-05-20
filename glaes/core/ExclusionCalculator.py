@@ -296,7 +296,7 @@ class ExclusionCalculator(object):
         return s.region.createRaster(output=output, data=data,
                                      noData=255, meta=meta, **kwargs)
 
-    def draw(s, ax=None, goodColor=(220/255, 220/255, 220/255), excludedColor=(2/255, 61/255, 107/255), itemsColor="black", legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, german=False, **kwargs):
+    def draw(s, ax=None, goodColor=(255/255, 255/255, 255/255), excludedColor=(2/255, 61/255, 107/255), itemsColor="black", legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, german=False, **kwargs):
         """Draw the current availability matrix on a matplotlib figure
 
         Note:
@@ -317,6 +317,9 @@ class ExclusionCalculator(object):
         excludedColor: A matplotlib color
             The color to apply to 'excluded' locations (having a value of 0)
 
+        itemsColor: A matplotlib color
+            The color to apply to predicted items. Default is black.
+
         legend: bool; optional
             If True, a legend will be drawn
 
@@ -334,6 +337,9 @@ class ExclusionCalculator(object):
             * Use this when the region's geometry is extremely detailed compared
               to the scale over which it is drawn
             * Setting this to None will apply no simplification
+
+        german: bool
+            If true legend will be in German
 
         **kwargs:
             All keyword arguments are passed on to a call to geokit.drawImage
