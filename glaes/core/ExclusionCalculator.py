@@ -416,7 +416,7 @@ class ExclusionCalculator(object):
                 )
 
                 points = np.column_stack([points.x, points.y])
-axh1.ax.plot(points[:, 0], points[:, 1], color=itemsColor, marker='o', linestyle='None')
+            axh1.ax.plot(points[:, 0], points[:, 1], color=itemsColor, marker='o', linestyle='None')
 
         # Draw Areas, maybe?
         if not s._areas is None:
