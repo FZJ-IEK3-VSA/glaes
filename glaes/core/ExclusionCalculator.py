@@ -296,7 +296,7 @@ class ExclusionCalculator(object):
         return s.region.createRaster(output=output, data=data,
                                      noData=255, meta=meta, **kwargs)
 
-    def draw(s, ax=None, goodColor=(255/255, 255/255, 255/255), excludedColor=(2/255, 61/255, 107/255), itemsColor="black", legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, german=False, **kwargs):
+    def draw(s, ax=None, goodColor=(255/255, 255/255, 255/255), excludedColor=(2/255, 61/255, 107/255), itemsColor=(51/255, 153/255, 255/255), legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, german=False, **kwargs):
         """Draw the current availability matrix on a matplotlib figure
 
         Note:
@@ -420,7 +420,7 @@ class ExclusionCalculator(object):
 
                 points = np.column_stack([points.x, points.y])
             axh1.ax.plot(points[:, 0], points[:, 1], color=itemsColor, marker='o', linestyle='None')
-        
+
         # Draw Areas, maybe?
         if not s._areas is None:
             gk.drawGeoms(
