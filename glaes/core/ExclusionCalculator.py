@@ -736,16 +736,16 @@ class ExclusionCalculator(object):
                   gk.raster.rasterInfo(intermediate).meta == {k:metadata[k] for k in metadata if k!='invertIntermediate'})):
 
             if s.verbose and intermediate is not None:
-                 glaes_logger.info("Applying intermediate exclusion file: " + intermediate)
+                 glaes_logger.info("Applying intermediate exclusion file: {interm}".format(interm=intermediate))
 
             # load indications matrix (always inverted) from intermediate; set to 100 - intermediate matrix to invert from non-inverted intermediates
             indications = gk.raster.extractMatrix(intermediate) if invertIntermediate else (100 - gk.raster.extractMatrix(intermediate))
 
         else:  # We need to compute the exclusion
             if s.verbose and intermediate is not None:
-                glaes_logger.info("Computing intermediate exclusion file: " + intermediate)
+                glaes_logger.info("Computing intermediate exclusion file: {interm}".format(interm=intermediate))
                 if isfile(intermediate):
-                    glaes_logger.warning("Overwriting previous intermediate exclusion file: " + intermediate)
+                    glaes_logger.warning("Overwriting previous intermediate exclusion file: {interm}".format(interm=intermediate))
 
             # Do prewarp, if needed
             if prewarp:
@@ -884,28 +884,32 @@ class ExclusionCalculator(object):
                 'bufferMethod': str(bufferMethod),
                 'invert': str(invert),
                 'resolutionDiv': str(resolutionDiv),
-                'mode': str(mode)
+                'mode': str(mode),
+                'invertIntermediate' : str(invertIntermediate),
             }
 
             for k, v in kwargs.items():
                 metadata[k] = v
 
         # check if we can apply the intermediate file
-        if intermediate is not None and \
-                isfile(intermediate) and \
-                gk.raster.rasterInfo(intermediate).meta == metadata and \
-                s._hasEqualContext(intermediate):
+        # second 'or' condition block does not consider invertIntermediate in metadata when invertIntermediate = True to allow for existing
+        # old intermediates (always inverted) before introduction of invertIntermediate parameter (if using set invertIntermediate to False)
+        if intermediate is not None and isfile(intermediate) and s._hasEqualContext(intermediate) and \
+                ((gk.raster.rasterInfo(intermediate).meta == metadata)  or \
+                 (not gk.raster.rasterInfo(intermediate).meta == metadata and invertIntermediate==True and \
+                  gk.raster.rasterInfo(intermediate).meta == {k:metadata[k] for k in metadata if k!='invertIntermediate'})):
 
             if s.verbose and intermediate is not None:
-                glaes_logger.info("Applying intermediate exclusion file: " + intermediate)
+                glaes_logger.info("Applying intermediate exclusion file: {interm}".format(interm=intermediate))
 
-            indications = gk.raster.extractMatrix(intermediate)
+            # load indications matrix (always inverted) from intermediate; set to 100 - intermediate matrix to invert from non-inverted intermediates
+            indications = gk.raster.extractMatrix(intermediate) if invertIntermediate else (100 - gk.raster.extractMatrix(intermediate))
 
         else:  # We need to compute the exclusion
             if s.verbose and intermediate is not None:
-                glaes_logger.info("Computing intermediate exclusion file: " + intermediate)
+                glaes_logger.info("Computing intermediate exclusion file: {interm}".format(interm=intermediate))
                 if isfile(intermediate):
-                    glaes_logger.warning("Overwriting previous intermediate exclusion file: " + intermediate, UserWarning)
+                    glaes_logger.warning("Overwriting previous intermediate exclusion file: {interm}".format(interm=intermediate), UserWarning)
 
             if isinstance(source, PriorSource):
                 edgeI = kwargs.pop("edgeIndex", np.argwhere(
