@@ -610,7 +610,7 @@ class ExclusionCalculator(object):
 
     # General excluding functions
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, intermediate=None, prewarp=False,
-                          invert=False, mode="exclude", **kwargs):
+                          invert=False, mode="exclude", invertIntermediate=False, **kwargs):
         """Exclude areas based off the values in a raster datasource
 
         Parameters:
@@ -720,22 +720,26 @@ class ExclusionCalculator(object):
                 'resolutionDiv': str(resolutionDiv),
                 'prewarp': str(prewarp),
                 'invert': str(invert),
-                'mode': str(mode)
+                'mode': str(mode),
+                'invertIntermediate' : str(invertIntermediate),
             }
 
             for k, v in kwargs.items():
                 metadata[k] = v
 
         # check if we can apply the intermediate file
-        if intermediate is not None and \
-                isfile(intermediate) and \
-                gk.raster.rasterInfo(intermediate).meta == metadata and \
-                s._hasEqualContext(intermediate):
+        # second 'or' condition block does not consider invertIntermediate in metadata when invertIntermediate = True to allow for existing
+        # old intermediates (always inverted) before introduction of invertIntermediate parameter (if using set invertIntermediate to False)
+        if intermediate is not None and isfile(intermediate) and s._hasEqualContext(intermediate) and \
+                ((gk.raster.rasterInfo(intermediate).meta == metadata)  or \
+                 (not gk.raster.rasterInfo(intermediate).meta == metadata and invertIntermediate==True and \
+                  gk.raster.rasterInfo(intermediate).meta == {k:metadata[k] for k in metadata if k!='invertIntermediate'})):
 
             if s.verbose and intermediate is not None:
                  glaes_logger.info("Applying intermediate exclusion file: " + intermediate)
 
-            indications = gk.raster.extractMatrix(intermediate)
+            # load indications matrix (always inverted) from intermediate; set to 100 - intermediate matrix to invert from non-inverted intermediates
+            indications = gk.raster.extractMatrix(intermediate) if invertIntermediate else (100 - gk.raster.extractMatrix(intermediate))
 
         else:  # We need to compute the exclusion
             if s.verbose and intermediate is not None:
@@ -767,7 +771,10 @@ class ExclusionCalculator(object):
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
             if intermediate is not None:
-                s.region.createRaster(output=intermediate, data=indications, meta=metadata)
+                # use unchanged indications matrix for intermediate if invertIntermediate = True (indications matrix is inverted per se)
+                # un-invert (inverted) indications matrix for intermediate if invertIntermediate = False
+                data= s.region.applyMask(indications, 255.0) if invertIntermediate else s.region.applyMask(100-indications, 255.0)
+                s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
 
         # exclude the indicated area from the total availability
         if mode == "exclude":
@@ -788,7 +795,7 @@ class ExclusionCalculator(object):
             raise GlaesError("mode must be 'exclude' or 'include'")
 
     def excludeVectorType(s, source, where=None, buffer=None, bufferMethod='geom', invert=False, mode="exclude",
-                          resolutionDiv=1, intermediate=None, **kwargs):
+                          resolutionDiv=1, intermediate=None, invertIntermediate=False, **kwargs):
         """Exclude areas based off the features in a vector datasource
 
         Parameters:
@@ -921,7 +928,10 @@ class ExclusionCalculator(object):
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
             if intermediate is not None:
-                s.region.createRaster(output=intermediate, data=indications, meta=metadata)
+                # use unchanged indications matrix for intermediate if invertIntermediate = True (indications matrix is inverted per se)
+                # un-invert (inverted) indications matrix for intermediate if invertIntermediate = False
+                data= s.region.applyMask(indications, 255.0) if invertIntermediate else s.region.applyMask(100-indications, 255.0)
+                s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
 
         # exclude the indicated area from the total availability
         if mode == "exclude":
