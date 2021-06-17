@@ -562,7 +562,6 @@ class ExclusionCalculator(object):
         """The percent of the region which remains available"""
         return s._availability.sum(dtype=np.int64) / s.region.mask.sum()
 
-    # TODO: Push Git
     @property
     def percentAvailablePerCriterion(s):
         """The percent of the region which remains available"""
@@ -1198,7 +1197,8 @@ class ExclusionCalculator(object):
                         resolutionDiv=row.resolutionDiv,
                         prewarp=False,
                         invert=row.invert,
-                        mode=row.exclusion_mode, )
+                        mode=row.exclusion_mode,
+                        )
 
             elif row.type == "vector":
                 if verbose:
@@ -1806,7 +1806,6 @@ class ExclusionCalculator(object):
         areas = [g.Area() for g in geoms]
         if data is None:
             data = pd.DataFrame({"geom": geoms, "area": areas})
-            # data = pd.DataFrame(dict(geom=geoms))
         else:
             data = pd.DataFrame(data)
             data['geom'] = geoms
