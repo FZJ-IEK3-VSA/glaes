@@ -725,7 +725,7 @@ class ExclusionCalculator(object):
             }
 
             for k, v in kwargs.items():
-                metadata[k] = v
+                metadata[k] = str(v)
 
         # check if we can apply the intermediate file
         # second 'or' condition block does not consider invertIntermediate in metadata when invertIntermediate = True to allow for existing
@@ -889,7 +889,7 @@ class ExclusionCalculator(object):
             }
 
             for k, v in kwargs.items():
-                metadata[k] = v
+                metadata[k] = str(v)
 
         # check if we can apply the intermediate file
         # second 'or' condition block does not consider invertIntermediate in metadata when invertIntermediate = True to allow for existing
