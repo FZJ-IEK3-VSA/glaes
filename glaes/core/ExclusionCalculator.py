@@ -1805,7 +1805,18 @@ class ExclusionCalculator(object):
 
         return gk.vector.createVector(data, output=output)
 
-    def saveAreas(s, output, srs=None, data=None):
+    def saveAreas(s, output:str, srs=None, data=None, savePolygons=True):
+        """Saves distributed areas into output shp file.
+
+        Args:
+            output (str): output file path
+            srs (anything acceptable by gk.geom.transform(), optional): The spatial reference system of the output file geometries. Defaults to None, meaning that the SRS of the exclusion calculator (usually metric LAEA) is adapted.
+            data (list/pd.Series/np.array, optional): additional description data of your choice, e.g. enumeration etc. Defaults to None.
+            savePolygons (bool, optional): If set to False, area polygons will not be saved to reduce disk space. Defaults to True.
+
+        Returns:
+            [type]: [description]
+        """
         # Get srs
         srs = gk.srs.loadSRS(srs) if not srs is None else s.region.srs
 
@@ -1816,13 +1827,26 @@ class ExclusionCalculator(object):
         else:
             geoms = s._areas
 
-        # make shapefile
+        # prepare geometry attributes - extract areas
         areas = [g.Area() for g in geoms]
+        # extract centroids and save in srs of geoms
+        centroids = [gk.geom.point(g.Centroid().GetX(), 
+                                   g.Centroid().GetY(), 
+                                   srs=g.GetSpatialReference(),
+                                   ) for g in geoms]
+        # make shapefile
         if data is None:
-            data = pd.DataFrame({"geom": geoms, "area": areas})
+            data = pd.DataFrame({"area": areas,
+                                 "centroid" : centroids
+                                 })
+        
         else:
             data = pd.DataFrame(data)
-            data['geom'] = geoms
             data['area'] = areas
+            data['centroid'] = centroids
+        
+        if savePolygons:
+            data['geom'] = geoms
+
 
         return gk.vector.createVector(data, output=output)
