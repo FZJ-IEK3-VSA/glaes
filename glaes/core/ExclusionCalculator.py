@@ -610,7 +610,8 @@ class ExclusionCalculator(object):
 
     # General excluding functions
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, intermediate=None, prewarp=False,
-                          invert=False, mode="exclude", invertIntermediate=False, **kwargs):
+                          invert=False, mode="exclude", invertIntermediate=False, minSize:int=None, threshold=50, 
+                          **kwargs):
         """Exclude areas based off the values in a raster datasource
 
         Parameters:
@@ -696,6 +697,17 @@ class ExclusionCalculator(object):
               current availability matrix
             * If 'include', then the indicated pixel are added back into the
               availability matrix
+        
+        minSize: int>0; optional
+            Must be given in the unit of the exclusion calculator object.
+            When given, all isolated eligible areas with an area less 
+            than minSize will be removed for the current exclusion step
+            (similar to pruneIsolatedAreas() for overall eligibility matrix).
+            Note: Takes very long for large regions with low exclusion.
+
+        threshold: int (>0, <100); optional
+            Cells with an eligibility percentage below this threshold 
+            will be considered as ineligible. Defaults to 50.
 
         kwargs
             * All other keyword arguments are passed on to a call to
@@ -722,6 +734,8 @@ class ExclusionCalculator(object):
                 'invert': str(invert),
                 'mode': str(mode),
                 'invertIntermediate' : str(invertIntermediate),
+                'threshold' : str(threshold),
+                'minSize' : str(minSize),
             }
 
             for k, v in kwargs.items():
@@ -768,6 +782,42 @@ class ExclusionCalculator(object):
                         applyMask=False,
                         **kwargs) * 100
             ).astype(np.uint8)
+
+            # drop all isolated areas below minSize if given
+            if not minSize == None:
+ 
+                # Create a vector file of geometries larger than 'minSize'
+                #TODO speed up the process: Either possibly invert the process 
+                # and remove holes/inner rings to save time or use gdal sieve
+                #TODO agree on solution for int 0-100 values for cell exclusion
+                # what value should be excluded? Overlay isolated areas with 0-100
+                # indications matrix to preserve exclusions <50% and possibly also
+                # keep exclusion values 50-100% (instead of setting them to 0 i.e. 
+                # 100% exclusion) - if so what value to assign to additionally excluded
+                # isolated (former eligible) areas? 0 or rather 49 to reduce impact 
+                # on ec.üercentAvailable?
+                if invert:
+                    geoms = gk.geom.polygonizeMask((indications) >= threshold, 
+                                        bounds=s.region.extent.xyXY, 
+                                        srs=s.region.srs, 
+                                        flat=False)
+                else:
+                    # un-invert indications before polygonizing since indications is always inverted per se
+                    geoms = gk.geom.polygonizeMask((100-indications) >= threshold, 
+                                        bounds=s.region.extent.xyXY, 
+                                        srs=s.region.srs, 
+                                        flat=False)
+                # filter geom list for areas greater than minSize
+                geoms = list(filter(lambda x: x.Area() >= minSize, geoms))
+                # create vector, indicate features and overwrite indications
+                vec = gk.core.util.quickVector(geoms)
+                if invert:
+                    indications = (s.region.indicateFeatures(vec, 
+                        applyMask=False).astype(np.uint8) * 100)
+                else:
+                    indications = 100 - (s.region.indicateFeatures(vec, 
+                        applyMask=False).astype(np.uint8) * 100)
+
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
             if intermediate is not None:
