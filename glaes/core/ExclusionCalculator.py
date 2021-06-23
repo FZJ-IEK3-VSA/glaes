@@ -610,7 +610,7 @@ class ExclusionCalculator(object):
 
     # General excluding functions
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, intermediate=None, prewarp=False,
-                          invert=False, mode="exclude", invertIntermediate=False, minSize:int=None, threshold=50, 
+                          invert=False, mode="exclude", invertIntermediate=False, minSize=None, threshold=50, 
                           **kwargs):
         """Exclude areas based off the values in a raster datasource
 
@@ -1834,7 +1834,7 @@ class ExclusionCalculator(object):
         s._areas = geoms
         return geoms
 
-    def saveItems(s, output, srs=None, data=None):
+    def saveItems(s, output=None, srs=None, data=None):
         # Get srs
         srs = gk.srs.loadSRS(srs) if not srs is None else s.region.srs
 
@@ -1853,13 +1853,17 @@ class ExclusionCalculator(object):
             data = pd.DataFrame(data)
             data['geom'] = points
 
-        return gk.vector.createVector(data, output=output)
+        if output==None:
+            return df
+        else:
+            return gk.vector.createVector(data, output=output)
 
-    def saveAreas(s, output:str, srs=None, data=None, savePolygons=True):
+    def saveAreas(s, output=None, srs=None, data=None, savePolygons=True):
         """Saves distributed areas into output shp file.
 
         Args:
-            output (str): output file path
+            output (str): output file path. If None, dataframe will be returned 
+            instead of saving. Defaults to None.
 
             srs (anything acceptable by gk.geom.transform(), optional):
             The spatial reference system of the output file geometries. 
@@ -1913,4 +1917,7 @@ class ExclusionCalculator(object):
         if not data is None:
             df['data'] = data
 
-        return gk.vector.createVector(df, output=output)
+        if output==None:
+            return df
+        else:
+            return gk.vector.createVector(df, output=output)
