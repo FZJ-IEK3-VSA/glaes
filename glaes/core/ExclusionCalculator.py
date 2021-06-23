@@ -759,7 +759,7 @@ class ExclusionCalculator(object):
             if s.verbose and intermediate is not None:
                 glaes_logger.info(f"Computing intermediate exclusion file: {intermediate}")
                 if isfile(intermediate):
-                    glaes_logger.warning(f"Overwriting previous intermediate exclusion file: {intermediate}", UserWarning)
+                    glaes_logger.warning(f"Overwriting previous intermediate exclusion file: {intermediate}")
 
             # Do prewarp, if needed
             if prewarp:
@@ -959,7 +959,7 @@ class ExclusionCalculator(object):
             if s.verbose and intermediate is not None:
                 glaes_logger.info(f"Computing intermediate exclusion file: {intermediate}")
                 if isfile(intermediate):
-                    glaes_logger.warning(f"Overwriting previous intermediate exclusion file: {intermediate}", UserWarning)
+                    glaes_logger.warning(f"Overwriting previous intermediate exclusion file: {intermediate}")
 
             if isinstance(source, PriorSource):
                 edgeI = kwargs.pop("edgeIndex", np.argwhere(
