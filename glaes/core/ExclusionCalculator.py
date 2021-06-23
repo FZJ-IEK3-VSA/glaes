@@ -750,16 +750,16 @@ class ExclusionCalculator(object):
                   gk.raster.rasterInfo(intermediate).meta == {k:metadata[k] for k in metadata if k!='invertIntermediate'})):
 
             if s.verbose and intermediate is not None:
-                 glaes_logger.info("Applying intermediate exclusion file: {interm}".format(interm=intermediate))
+                 glaes_logger.info(f"Applying intermediate exclusion file: {intermediate}")
 
             # load indications matrix (always inverted) from intermediate; set to 100 - intermediate matrix to invert from non-inverted intermediates
             indications = gk.raster.extractMatrix(intermediate) if invertIntermediate else (100 - gk.raster.extractMatrix(intermediate))
 
         else:  # We need to compute the exclusion
             if s.verbose and intermediate is not None:
-                glaes_logger.info("Computing intermediate exclusion file: {interm}".format(interm=intermediate))
+                glaes_logger.info(f"Computing intermediate exclusion file: {intermediate}")
                 if isfile(intermediate):
-                    glaes_logger.warning("Overwriting previous intermediate exclusion file: {interm}".format(interm=intermediate))
+                    glaes_logger.warning(f"Overwriting previous intermediate exclusion file: {intermediate}", UserWarning)
 
             # Do prewarp, if needed
             if prewarp:
@@ -950,16 +950,16 @@ class ExclusionCalculator(object):
                   gk.raster.rasterInfo(intermediate).meta == {k:metadata[k] for k in metadata if k!='invertIntermediate'})):
 
             if s.verbose and intermediate is not None:
-                glaes_logger.info("Applying intermediate exclusion file: {interm}".format(interm=intermediate))
+                glaes_logger.info(f"Applying intermediate exclusion file: {intermediate}")
 
             # load indications matrix (always inverted) from intermediate; set to 100 - intermediate matrix to invert from non-inverted intermediates
             indications = gk.raster.extractMatrix(intermediate) if invertIntermediate else (100 - gk.raster.extractMatrix(intermediate))
 
         else:  # We need to compute the exclusion
             if s.verbose and intermediate is not None:
-                glaes_logger.info("Computing intermediate exclusion file: {interm}".format(interm=intermediate))
+                glaes_logger.info(f"Computing intermediate exclusion file: {intermediate}")
                 if isfile(intermediate):
-                    glaes_logger.warning("Overwriting previous intermediate exclusion file: {interm}".format(interm=intermediate), UserWarning)
+                    glaes_logger.warning(f"Overwriting previous intermediate exclusion file: {intermediate}", UserWarning)
 
             if isinstance(source, PriorSource):
                 edgeI = kwargs.pop("edgeIndex", np.argwhere(
@@ -1208,13 +1208,7 @@ class ExclusionCalculator(object):
 
             if row.type == "prior":
                 if verbose:
-                    glaes_logger.info("Excluding Prior {} with value {}, buffer {}, mode {}, and invert {} ".format(
-                        row['name'],
-                        row.value,
-                        buffer,
-                        row.exclusion_mode,
-                        row.invert,
-                    ))
+                    glaes_logger.info(f"Excluding Prior {row['name']} with value {row.value}, buffer {buffer}, mode {row.exclusion_mode}, and invert {row.invert}")
 
                 if isinstance(row.value, str):
                     try:
@@ -1236,13 +1230,7 @@ class ExclusionCalculator(object):
             elif row.type == "raster":
                 value = str(row.value)
                 if verbose:
-                    glaes_logger.info("Excluding Raster {} with value {}, buffer {}, mode {}, and invert {} ".format(
-                        row['name'],
-                        value,
-                        buffer,
-                        row.exclusion_mode,
-                        row.invert
-                    ))
+                    glaes_logger.info(f"Excluding Raster {row['name']} with value {value}, buffer {buffer}, mode {row.exclusion_mode}, and invert {row.invert}")
 
                 sources = paths[row['name']]
                 if gk.util.isRaster(sources):
@@ -1251,7 +1239,7 @@ class ExclusionCalculator(object):
                 if filterSourceLists:
                     sources = list(s.region.extent.filterSources(sources, error_on_missing=filterMissingError))
                     if verbose and len(sources) == 0:
-                        glaes_logger.info("  No suitable sources in extent! ")
+                        glaes_logger.info(f"  No suitable sources in extent! ")
 
                 for source in sources:
                     s.excludeRasterType(
@@ -1266,13 +1254,7 @@ class ExclusionCalculator(object):
 
             elif row.type == "vector":
                 if verbose:
-                    glaes_logger.info("Excluding Vector {} with where-statement \"{}\", buffer {}, mode {}, and invert {} ".format(
-                            row['name'],
-                            row.value,
-                            buffer,
-                            row.exclusion_mode,
-                            row.invert
-                        ))
+                    glaes_logger.info(f"Excluding Vector {row['name']} with where-statement \"{row.value}\", buffer {buffer}, mode {row.exclusion_mode}, and invert {row.invert} ")
 
                 if row.value == "" or row.value == "None":
                     value = None
@@ -1286,7 +1268,7 @@ class ExclusionCalculator(object):
                 if filterSourceLists:
                     sources = list(s.region.extent.filterSources(sources, error_on_missing=filterMissingError))
                     if verbose and len(sources) == 0:
-                        glaes_logger.info("  No suitable sources in extent! ")
+                        glaes_logger.info(f"  No suitable sources in extent! ")
 
                 # print(sources)
                 for source in sources:
@@ -1300,7 +1282,7 @@ class ExclusionCalculator(object):
                         mode=row.exclusion_mode)
 
         if verbose:
-            glaes_logger.info("Done!")
+            glaes_logger.info(f"Done!")
 
     def shrinkAvailability(s, dist, threshold=50):
         """Shrinks the current availability by a given distance in the given SRS"""
