@@ -1885,10 +1885,11 @@ class ExclusionCalculator(object):
         # make shapefile
         df = pd.DataFrame()
         
-        # savePolygons, write area polygon list into geom column, else centroids
+        # savePolygons, write area polygon list into geom column, else centroids as geom
         if savePolygons:
             df['geom'] = geoms
-            df['centroid'] = centroids
+            # extract lat/lon from centroids as an additional column (geom column already taken by polygons)
+            df['centroid'] = [(c.GetX(), c.GetY()) for c in centroids]
         else:
             df['geom'] = centroids
         
