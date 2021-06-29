@@ -1863,20 +1863,24 @@ class ExclusionCalculator(object):
             column in the dataset. Defaults to True.
 
         Returns:
-            pd.DataFrame(): Dataframe with geom column 
+            pd.DataFrame(): Dataframe with geom column, area column (area 
+            always in m² independent of geom srs), possibly centroid column 
+            if polygons saved as geom
         """
         # Get srs
         srs = gk.srs.loadSRS(srs) if not srs is None else s.region.srs
 
-        # transform?
+        # extract geoms from _areas attribute in the (metric) srs of the EC object
+        geoms = s._areas
+
+        # prepare list with area values for geoms in m² from metric srs geoms
+        areas = [g.Area() for g in geoms]
+
+        # if required transform geoms to specified SRS
         if not srs.IsSame(s.region.srs):
             geoms = gk.geom.transform(
                 s._areas, fromSRS=s.region.srs, toSRS=srs)
-        else:
-            geoms = s._areas
 
-        # prepare geometry attributes - extract areas
-        areas = [g.Area() for g in geoms]
         # extract centroids and save in srs of geoms
         centroids = [gk.geom.point(g.Centroid().GetX(), 
                                    g.Centroid().GetY(), 
@@ -1894,7 +1898,7 @@ class ExclusionCalculator(object):
             df['geom'] = centroids
         
         # add polygon areas
-        df['area'] = areas
+        df['area_m2'] = areas
         
         # add data list if given
         if not data is None:

@@ -379,8 +379,8 @@ def test_ExclusionCalculator_saveAreas():
                       )                
     df_saveAreas=gk.vector.extractFeatures(join(RESULTDIR, "saveAreas.shp"))
 
-    assert np.isclose(df_saveAreas.area.sum(), 0.022388145075648)
-    assert np.isclose(df_saveAreas.area.mean(), 7.80074741311777e-05)
-    assert np.isclose(df_saveAreas.area.std(), 2.78127609254332e-05)
+    assert np.isclose(df_saveAreas.area_m2.sum(), 175768748.40184686)
+    assert np.isclose(df_saveAreas.area_m2.mean(), 612434.6634210692)
+    assert np.isclose(df_saveAreas.area_m2.std(), 218376.01981464328)
     assert (len(df_saveAreas) == 287)
     
