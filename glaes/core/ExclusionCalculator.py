@@ -1864,8 +1864,8 @@ class ExclusionCalculator(object):
 
         Returns:
             pd.DataFrame(): Dataframe with geom column, area column (area 
-            always in m² independent of geom srs), possibly centroid column 
-            if polygons saved as geom
+            always in m² independent of geom srs), possibly lat and lon columns 
+            for centroid location if polygons saved as geom
         """
         # Get srs
         srs = gk.srs.loadSRS(srs) if not srs is None else s.region.srs
@@ -1892,8 +1892,9 @@ class ExclusionCalculator(object):
         # savePolygons, write area polygon list into geom column, else centroids as geom
         if savePolygons:
             df['geom'] = geoms
-            # extract lat/lon from centroids as an additional column (geom column already taken by polygons)
-            df['centroid'] = [(c.GetX(), c.GetY()) for c in centroids]
+            # extract lat lon from centroids as columns (geom column already taken by polygons)
+            df['lon'] = [float(c.GetX()) for c in centroids]
+            df['lat'] = [float(c.GetY()) for c in centroids] 
         else:
             df['geom'] = centroids
         
