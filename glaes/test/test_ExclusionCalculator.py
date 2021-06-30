@@ -378,9 +378,20 @@ def test_ExclusionCalculator_saveAreas():
                       data=np.arange(len(ec._areas)),
                       )                
     df_saveAreas=gk.vector.extractFeatures(join(RESULTDIR, "saveAreas.shp"))
-
+    
+    df_inRamAreas=ec.saveAreas(srs=4326, 
+                      savePolygons=True,
+                      data=np.arange(len(ec._areas)),
+                      )    
+    # assert that values retrieved from saved file match
     assert np.isclose(df_saveAreas.area_m2.sum(), 175768748.40184686)
     assert np.isclose(df_saveAreas.area_m2.mean(), 612434.6634210692)
     assert np.isclose(df_saveAreas.area_m2.std(), 218376.01981464328)
     assert (len(df_saveAreas) == 287)
+    
+    # assert that values from df stored in variable match
+    assert np.isclose(df_inRamAreas.area_m2.sum(), 175768748.40184686)
+    assert np.isclose(df_inRamAreas.area_m2.mean(), 612434.6634210692)
+    assert np.isclose(df_inRamAreas.area_m2.std(), 218376.01981464328)
+    assert (len(df_inRamAreas) == 287)
     

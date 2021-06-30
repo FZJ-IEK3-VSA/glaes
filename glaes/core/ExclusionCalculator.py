@@ -1836,7 +1836,7 @@ class ExclusionCalculator(object):
             data['geom'] = points
 
         if output==None:
-            return df
+            return data
         else:
             return gk.vector.createVector(data, output=output)
 
