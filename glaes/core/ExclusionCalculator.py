@@ -1899,15 +1899,15 @@ class ExclusionCalculator(object):
 
         # make shapefile
         if data is None:
-            data = pd.DataFrame(dict(geom=points))
+            df = pd.DataFrame(dict(geom=points))
         else:
-            data = pd.DataFrame(data)
-            data['geom'] = points
+            df = pd.DataFrame(data)
+            df['geom'] = points
 
         if output==None:
-            return data
+            return df
         else:
-            return gk.vector.createVector(data, output=output)
+            return gk.vector.createVector(df, output=output)
 
     def saveAreas(s, output=None, srs=None, data=None, savePolygons=True):
         """Saves distributed areas into output shp file.
