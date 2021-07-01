@@ -227,8 +227,8 @@ def test_ExclusionCalculator_excludeSet():
         verbose=False,
     )
 
-    assert np.isclose(np.nanmean(ec.availability), 15.231732)
-    assert np.isclose(np.nanstd(ec.availability), 35.93282)
+    assert np.isclose(np.nanmean(ec.availability), 15.230323)
+    assert np.isclose(np.nanstd(ec.availability), 35.931458)
 
 
 def test_ExclusionCalculator_excludeRegionEdge():

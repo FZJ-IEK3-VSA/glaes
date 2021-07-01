@@ -854,7 +854,8 @@ class ExclusionCalculator(object):
             raise GlaesError("mode must be 'exclude' or 'include'")
 
     def excludeVectorType(s, source, where=None, buffer=None, bufferMethod='geom', invert=False, mode="exclude",
-                          resolutionDiv=1, intermediate=None, invertIntermediate=False, **kwargs):
+                          resolutionDiv=1, intermediate=None, invertIntermediate=False, regionPad=None,
+                          use_regionmask=True, **kwargs):
         """Exclude areas based off the features in a vector datasource
 
         Parameters:
@@ -960,6 +961,7 @@ class ExclusionCalculator(object):
                 'resolutionDiv': str(resolutionDiv),
                 'mode': str(mode),
                 'invertIntermediate' : str(invertIntermediate),
+                'regionPad': str(regionPad)
             }
 
             for k, v in kwargs.items():
@@ -992,6 +994,8 @@ class ExclusionCalculator(object):
                     s.region.extent, edgeIndex=edgeI)
 
             # Indicate on the source
+            if not isinstance(source, gdal.Dataset) and use_regionmask:
+                source = s.region.mutateVector(source, regionPad=regionPad)
             indications = (
                     s.region.indicateFeatures(
                         source,
@@ -1001,6 +1005,7 @@ class ExclusionCalculator(object):
                         bufferMethod=bufferMethod,
                         applyMask=False,
                         forceMaskShape=True,
+                        regionPad=regionPad,
                         **kwargs) * 100
             ).astype(np.uint8)
 
