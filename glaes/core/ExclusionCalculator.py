@@ -2,7 +2,7 @@ import geokit as gk
 import re
 import numpy as np
 import time
-from os.path import isfile
+from os.path import isfile, basename
 from collections import namedtuple
 from warnings import warn
 import pandas as pd
@@ -242,6 +242,8 @@ class ExclusionCalculator(object):
         s._availability = np.array(s.region.mask, dtype=np.uint8) * 100
         s._availability_per_criterion = np.array(s.region.mask, dtype=np.uint8) * 100
 
+        s._exclusionStr =str()
+
         if initialValue == True:
             pass
         elif initialValue == False:
@@ -289,7 +291,8 @@ class ExclusionCalculator(object):
 
         meta = {
             "description": "The availability of each pixel",
-            "units": "percent-available"
+            "units": "percent-available",
+            "exclusions": s._exclusionStr
         }
 
         data = s.availability
@@ -715,13 +718,21 @@ class ExclusionCalculator(object):
               geokit.RegionMask.indicateValues
 
         """
+        # create sourcePath
+        if isinstance(source, str):
+            sourcePath=str(source)
+        elif isinstance(source, gdal.Dataset):
+            sourcePath="from memory"
+        else:
+            raise GlaesError("Source must be gdal.Dataset or path to raster file.")
+        
         # Perform check for intermediate file
         if intermediate is not None:
+            # hash the source to create unique identifier for metadata
             if isinstance(source, gdal.Dataset):
                 h = hashlib.sha256(source.ReadAsArray().tobytes())
                 source_id = "Memory:" + h.hexdigest()
-                sourcePath="from memory"
-            elif isinstance(source, str):
+            else:
                 h = hashlib.sha256()
                 with open(source,'rb') as file:
                     chunk = 0
@@ -729,9 +740,6 @@ class ExclusionCalculator(object):
                         chunk = file.read(1024)
                         h.update(chunk)
                 source_id = str(h.hexdigest())
-                sourcePath=str(source)
-            else:
-                raise GlaesError("Source must be gdal.Dataset or path to raster file.")
 
             # create dictionary of function arguments to compare against metadata
             metadata = {
@@ -873,6 +881,9 @@ class ExclusionCalculator(object):
         else:
             raise GlaesError("mode must be 'exclude' or 'include'")
 
+        # add exclusion to eclusion list str
+        s._exclusionStr=s._exclusionStr + f"({basename(sourcePath)}/value: {value}/buffer: {buffer}m), "
+
     def excludeVectorType(s, source, where=None, buffer=None, bufferMethod='geom', invert=False, mode="exclude",
                           resolutionDiv=1, intermediate=None, invertIntermediate=False, regionPad=None,
                           use_regionmask=True, **kwargs):
@@ -951,15 +962,24 @@ class ExclusionCalculator(object):
         # Set regionPad to buffer size if None
         if regionPad is None:
             regionPad = buffer
+        
+        # create sourcePath
+        if isinstance(source, str):
+            sourcePath=str(source)
+        elif isinstance(source, gdal.Dataset):
+            sourcePath="from memory"
+        else:
+            raise GlaesError("Source must be gdal.Dataset or path to raster file.")
+                
         # Perform check for intermediate file
         if intermediate is not None:
+            # hash the source to create unique identifier for intermediate metadata
             # TODO: Find a way to get a hash signiture of an in-memory vector file
             if isinstance(source, gdal.Dataset):
                 glaes_logger.warning("Intermediate from in-memory vector file is not implemented. " +
                                      "Intermediate will be created but cannot be reloaded.")
                 source_id = str(time.time())
-                sourcePath="from memory"
-            elif isinstance(source, str):
+            else:
                 h = hashlib.sha256()
                 with open(source,'rb') as file:
                     chunk = 0
@@ -967,9 +987,6 @@ class ExclusionCalculator(object):
                         chunk = file.read(1024)
                         h.update(chunk)
                 source_id = str(h.hexdigest())
-                sourcePath=str(source)
-            else:
-                raise GlaesError("Source must be gdal.Dataset or path to vector file.")
 
             # create dictionary of function arguments to compare against metadata
             metadata = {
@@ -1073,6 +1090,9 @@ class ExclusionCalculator(object):
             s._availability_per_criterion[~s.region.mask] = 0
         else:
             raise GlaesError("mode must be 'exclude' or 'include'")
+
+        # add exclusion to eclusion list str
+        s._exclusionStr=s._exclusionStr + f"({basename(sourcePath)}/where: {where}/buffer: {buffer}m), "
 
     def excludePrior(s, prior, value=None, buffer=None, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in one of the Prior data sources
