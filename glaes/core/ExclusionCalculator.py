@@ -1,6 +1,7 @@
 import geokit as gk
 import re
 import numpy as np
+import time
 from os.path import isfile
 from collections import namedtuple
 from warnings import warn
@@ -719,8 +720,16 @@ class ExclusionCalculator(object):
             if isinstance(source, gdal.Dataset):
                 h = hashlib.sha256(source.ReadAsArray().tobytes())
                 source_id = "Memory:" + h.hexdigest()
+            elif isinstance(source, str):
+                h = hashlib.sha256()
+                with open(source,'rb') as file:
+                    chunk = 0
+                    while chunk != b'':
+                        chunk = file.read(1024)
+                        h.update(chunk)
+                source_id = str(h.hexdigest())
             else:
-                source_id = str(source)
+                raise GlaesError("Source must be gdal.Dataset or path to raster file.")
 
             # create dictionary of function arguments to compare against metadata
             metadata = {
@@ -909,20 +918,35 @@ class ExclusionCalculator(object):
             * If 'include', then the indicated pixel are added back into the
               availability matrix
 
+        regionPad: int; optional
+            * If given feature within a buffer of regionPad will be considered for exclusion. 
+              Default (None) sets regionPad=buffer
+
         kwargs
             * All other keyword arguments are passed on to a call to
               geokit.RegionMask.indicateFeatures
 
         """
+        # Set regionPad to buffer size if None
+        if regionPad is None:
+            regionPad = buffer
         # Perform check for intermediate file
         if intermediate is not None:
             # TODO: Find a way to get a hash signiture of an in-memory vector file
-            # if isinstance(source, gdal.Dataset):
-            #     h = hashlib.sha256(source.ReadAsArray().tobytes())
-            #     source_id = "Memory:" + h.hexdigest()
-            # else:
-            #     source_id = str(source)
-            source_id = str(source)
+            if isinstance(source, gdal.Dataset):
+                glaes_logger.warning("Intermediate from in-memory vector file is not implemented. " +
+                                     "Intermediate will be created but cannot be reloaded.")
+                source_id = str(time.time())
+            elif isinstance(source, str):
+                h = hashlib.sha256()
+                with open(source,'rb') as file:
+                    chunk = 0
+                    while chunk != b'':
+                        chunk = file.read(1024)
+                        h.update(chunk)
+                source_id = str(h.hexdigest())
+            else:
+                raise GlaesError("Source must be gdal.Dataset or path to vector file.")
 
             # create dictionary of function arguments to compare against metadata
             metadata = {
