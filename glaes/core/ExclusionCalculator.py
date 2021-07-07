@@ -439,7 +439,7 @@ class ExclusionCalculator(object):
                 )
 
                 points = np.column_stack([points.x, points.y])
-            ex_item_color= (51/255, 153/255, 255/255)
+            ex_item_color= (176/255, 99/255, 214/255)
             axh1.ax.plot(points[:, 0], points[:, 1], color=ex_item_color, marker='o', markersize=2, linestyle='None')
         # Draw existing points
         if not s._existingPVItemCoords is None:
