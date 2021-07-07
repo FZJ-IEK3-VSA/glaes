@@ -427,6 +427,34 @@ class ExclusionCalculator(object):
 
                 points = np.column_stack([points.x, points.y])
             axh1.ax.plot(points[:, 0], points[:, 1], color=itemsColor, marker='o', linestyle='None')
+        # Draw existing points
+        if not s._existingItemCoords is None:
+            points = s._existingItemCoords
+            if not srs.IsSame(s.region.srs):
+                points = gk.srs.xyTransform(
+                    points,
+                    fromSRS=s.region.srs,
+                    toSRS=srs,
+                    outputFormat="xy"
+                )
+
+                points = np.column_stack([points.x, points.y])
+            ex_item_color= (51/255, 153/255, 255/255)
+            axh1.ax.plot(points[:, 0], points[:, 1], color=ex_item_color, marker='o', markersize=2, linestyle='None')
+        # Draw existing points
+        if not s._existingPVItemCoords is None:
+            points = s._existingPVItemCoords
+            if not srs.IsSame(s.region.srs):
+                points = gk.srs.xyTransform(
+                    points,
+                    fromSRS=s.region.srs,
+                    toSRS=srs,
+                    outputFormat="xy"
+                )
+
+                points = np.column_stack([points.x, points.y])
+
+            axh1.ax.plot(points[:, 0], points[:, 1], 'oy', markersize=2)
 
         # Draw Areas, maybe?
         if not s._areas is None:
@@ -471,6 +499,18 @@ class ExclusionCalculator(object):
             if not s._itemCoords is None:
                 h = axh1.ax.plot([], [], color=itemsColor, marker='o', linestyle='None', label="{}: {:,d}".format(
                     'Elemente' if german else 'Items', s._itemCoords.shape[0]))
+                patches.append(h[0])
+            if not s._existingItemCoords is None:
+                # h = axh1.ax.plot([], [], 'ob', label="Existing items: {:,d}".format(
+                #     s._existingItemCoords.shape[0]))#
+                h = axh1.ax.plot([], [], color=ex_item_color, marker='o', linestyle='None', label="Existing Turbines: {:,d}".format(
+                    s._existingItemCoords.shape[0]))
+                patches.append(h[0])
+            if not s._existingPVItemCoords is None:
+                # h = axh1.ax.plot([], [], 'oy', label="Existing OF-PV items: {:,d}".format(
+                #     s._existingPVItemCoords.shape[0]))
+                h = axh1.ax.plot([], [], 'oy', label="Existing Openfield-PV {:,d}".format(
+                    s._existingPVItemCoords.shape[0]))
                 patches.append(h[0])
 
             _legendargs = dict(loc="lower right", fontsize=14)
