@@ -611,11 +611,70 @@ class ExclusionCalculator(object):
             return False
 
         return True
+    
+    def _compareIntermediates(s, metadata, intermediate):
+        """
+        Compares metadata of intermediate file with dict of parameters 
+        passed on to exclusion function, initiates logs and outputs 
+        boolean indicating if (re)calculation is necessary if 
+        intermediates differ.
+
+        Args:
+            metadata (dict): Dictionnary containing all parameters of 
+            super function that are relevant for the exclusion.
+            
+            intermediate (str): Path to intermediate file, either 
+            existing or where to create intermediate.
+
+        Returns:
+            boolean: If 'recalculate' is True, new (re)calculation is 
+            required
+        """
+        # initiate variable indicating need for recalculation as False
+        recalculate=False
+        # create a str containing a comparison of all non-matching metadata entries of old and new intermediate
+        diff=str()
+        # extract metadata information from existing intermediate tif file and drop those arguments that shall not be compared
+        metaNotConsidered=['sourcePath']
+        if intermediate is not None and isfile(intermediate):
+            meta_intermediate_compare = {k: gk.raster.rasterInfo(intermediate).meta[k] for k in gk.raster.rasterInfo(intermediate).meta if not k in metaNotConsidered}
+
+        # check if we can apply the intermediate file (check all metadata besides sourcePath which is stored only for user information)
+        if intermediate is not None and isfile(intermediate) and s._hasEqualContext(intermediate) and \
+                meta_intermediate_compare == {k:metadata[k] for k in metadata if not k in metaNotConsidered}:
+ 
+            if s.verbose and intermediate is not None:
+                 glaes_logger.info(f"Applying intermediate exclusion file: {intermediate}")
+
+        else:  # We need to compute the exclusion
+            if intermediate is not None:
+                if s.verbose: 
+                    glaes_logger.info(f"Computing intermediate exclusion file: {intermediate}")
+                if isfile(intermediate) and s.verbose:
+                    # add all new keys
+                    for k in {k:metadata[k] for k in metadata if not k in metaNotConsidered}.keys()-meta_intermediate_compare.keys():
+                        diff=diff + f"\n(not in old metadata / {k}: {metadata[k]}); "
+                    # add all missing keys in new set
+                    for k in meta_intermediate_compare.keys()-{k:metadata[k] for k in metadata if not k in metaNotConsidered}.keys():
+                        diff=diff + f"\n({k}: {meta_intermediate_compare[k]} / not in new metadata); "
+                    # add all keys whose values differ
+                    for k in set(meta_intermediate_compare).intersection(set(metadata)):
+                        if meta_intermediate_compare[k]!=metadata[k] and not k in metaNotConsidered:
+                            diff=diff + f"\n({k}: {meta_intermediate_compare[k]} / {metadata[k]}); "
+                            # if source_id (hash) is different, show path to file to help bug fixing
+                            if k=='source':
+                                diff=diff + f"\n(SourcePath (not considered in metadata comparison, FYI only): {gk.raster.rasterInfo(intermediate).meta['sourcePath'] if 'sourcePath' in gk.raster.rasterInfo(intermediate).meta.keys() else 'not in old dataset'} / {metadata['sourcePath']}); "
+                    diff=diff+'\n(old/new intermediate)'
+                    glaes_logger.warning(f"Overwriting previous intermediate exclusion file: {intermediate}. The following difference in intermediate metadata was found: {diff})")
+                recalculate=True
+        
+        return recalculate
+
 
     # General excluding functions
-    def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, intermediate=None, prewarp=False,
-                          invert=False, mode="exclude", invertIntermediate=False, minSize=None, threshold=50, 
-                          **kwargs):
+    def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, 
+        intermediate=None, prewarp=False, invert=False, mode="exclude", 
+        minSize=None, threshold=50, **kwargs):
         """Exclude areas based off the values in a raster datasource
 
         Parameters:
@@ -753,7 +812,6 @@ class ExclusionCalculator(object):
                 'prewarp': str(prewarp),
                 'invert': str(invert),
                 'mode': str(mode),
-                'invertIntermediate' : str(invertIntermediate),
                 'threshold' : str(threshold),
                 'minSize' : str(minSize),
             }
@@ -761,43 +819,20 @@ class ExclusionCalculator(object):
             for k, v in kwargs.items():
                 metadata[k] = str(v)
 
-        # check if we can apply the intermediate file (check all metadata besides sourcePath which is stored only for user information)
-        # second 'or' condition block does not consider invertIntermediate in metadata when invertIntermediate = True to allow for existing
-        # old intermediates (always inverted) before introduction of invertIntermediate parameter (if using set invertIntermediate to False)
-        metaNotConsidered=['sourcePath']
-        if invertIntermediate:
-            metaNotConsidered.append('invertIntermediate')
-        if intermediate is not None and isfile(intermediate) and s._hasEqualContext(intermediate) and \
-                gk.raster.rasterInfo(intermediate).meta == {k:metadata[k] for k in metadata if not k in metaNotConsidered}:
+    	    # compare metadata and define if recalculation is required
+            recalculate = s._compareIntermediates(
+                metadata=metadata, 
+                intermediate=intermediate)
+        else:
+            # if no internmediate is passed, "re"calculation is always required
+            recalculate = True
 
-            if s.verbose and intermediate is not None:
-                 glaes_logger.info(f"Applying intermediate exclusion file: {intermediate}")
-
-            # load indications matrix (always inverted) from intermediate; set to 100 - intermediate matrix to invert from non-inverted intermediates
-            indications = gk.raster.extractMatrix(intermediate) if invertIntermediate else (100 - gk.raster.extractMatrix(intermediate))
-
-        else:  # We need to compute the exclusion
-            if s.verbose and intermediate is not None:
-                glaes_logger.info(f"Computing intermediate exclusion file: {intermediate}")
-                if isfile(intermediate):
-                    # create a str containing a comparison of all non-matching metadata entries of old and new intermediate
-                    diff=""
-                    # add all new keys
-                    for k in metadata.keys()-gk.raster.rasterInfo(intermediate).meta.keys():
-                        diff=diff + f"\n(not in old metadata / {k}: {metadata[k]}); "
-                    # add all missing keys in new set
-                    for k in gk.raster.rasterInfo(intermediate).meta.keys()-metadata.keys():
-                        diff=diff + f"\n({k}: {gk.raster.rasterInfo(intermediate).meta[k]} / not in new metadata); "
-                    # add all keys whose values differ
-                    for k in set(gk.raster.rasterInfo(intermediate).meta).intersection(set(metadata)):
-                        if gk.raster.rasterInfo(intermediate).meta[k]!=metadata[k] and not k in metaNotConsidered:
-                            diff=diff + f"\n({k}: {gk.raster.rasterInfo(intermediate).meta[k]} / {metadata[k]}); "
-                            # if source_id (hash) is different, show path to file to help bug fixing
-                            if k=='source_id':
-                                diff=diff + f"\n(SourcePath (not considered in metadata comparison, FYI only): {gk.raster.rasterInfo(intermediate).meta['sourcePath']} / {metadata['sourcePath']}); "
-                    diff=diff+'\n(old/new intermediate)'
-                    glaes_logger.warning(f"Overwriting previous intermediate exclusion file: {intermediate}. The following difference in intermediate metadata was found: {diff})")
-
+        if not recalculate:
+            # load indications matrix (always inverted) from intermediate; 
+            # set to 100 - intermediate matrix to invert from non-inverted 
+            # intermediates
+            indications = 100 - gk.raster.extractMatrix(intermediate)
+        else:
             # Do prewarp, if needed
             if prewarp:
                 prewarpArgs = dict(resampleAlg="bilinear")
@@ -807,7 +842,6 @@ class ExclusionCalculator(object):
                     prewarpArgs.update(prewarp)
 
                 source = s.region.warp(source, returnMatrix=False, **prewarpArgs)
-
             # Indicate on the source
             indications = (
                     s.region.indicateValues(
@@ -858,9 +892,8 @@ class ExclusionCalculator(object):
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
             if intermediate is not None:
-                # use unchanged indications matrix for intermediate if invertIntermediate = True (indications matrix is inverted per se)
-                # un-invert (inverted) indications matrix for intermediate if invertIntermediate = False
-                data= s.region.applyMask(indications, 255.0) if invertIntermediate else s.region.applyMask(100-indications, 255.0)
+                # un-invert (inverted) indications matrix for intermediate 
+                data= s.region.applyMask(100-indications, 255.0)
                 s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
 
         # exclude the indicated area from the total availability
@@ -884,9 +917,9 @@ class ExclusionCalculator(object):
         # add exclusion to eclusion list str
         s._exclusionStr=s._exclusionStr + f"({basename(sourcePath)}/value: {value}/buffer: {buffer}m), "
 
-    def excludeVectorType(s, source, where=None, buffer=None, bufferMethod='geom', invert=False, mode="exclude",
-                          resolutionDiv=1, intermediate=None, invertIntermediate=False, regionPad=None,
-                          use_regionmask=True, **kwargs):
+    def excludeVectorType(s, source, where=None, buffer=None, 
+        bufferMethod='geom', invert=False, mode="exclude", resolutionDiv=1, 
+        intermediate=None, regionPad=None, useRegionmask=True, **kwargs):
         """Exclude areas based off the features in a vector datasource
 
         Parameters:
@@ -953,6 +986,10 @@ class ExclusionCalculator(object):
         regionPad: int; optional
             * If given feature within a buffer of regionPad will be considered for exclusion. 
               Default (None) sets regionPad=buffer
+        
+        useRegionmask: bool; optional
+            * If True, vector dataset will be pre-loaded via regionmask 
+            to save time loading huge vector datasets. Defaults to True
 
         kwargs
             * All other keyword arguments are passed on to a call to
@@ -1000,60 +1037,48 @@ class ExclusionCalculator(object):
                 'invert': str(invert),
                 'resolutionDiv': str(resolutionDiv),
                 'mode': str(mode),
-                'invertIntermediate' : str(invertIntermediate),
                 'regionPad': str(regionPad)
             }
 
             for k, v in kwargs.items():
                 metadata[k] = str(v)
 
-        # check if we can apply the intermediate file (check all metadata besides sourcePath which is stored only for user information)
-        # second 'or' condition block does not consider invertIntermediate in metadata when invertIntermediate = True to allow for existing
-        # old intermediates (always inverted) before introduction of invertIntermediate parameter (if using set invertIntermediate to False)
-        metaNotConsidered=['sourcePath']
-        if invertIntermediate:
-            metaNotConsidered.append('invertIntermediate')
-        if intermediate is not None and isfile(intermediate) and s._hasEqualContext(intermediate) and \
-                gk.raster.rasterInfo(intermediate).meta == {k:metadata[k] for k in metadata if not k in metaNotConsidered}:
+            # compare metadata and define if recalculation is required
+            recalculate = s._compareIntermediates(
+                metadata=metadata, 
+                intermediate=intermediate)
+        else:
+            # if no internmediate is passed, "re"calculation is always required
+            recalculate = True
 
-            if s.verbose and intermediate is not None:
-                glaes_logger.info(f"Applying intermediate exclusion file: {intermediate}")
-
-            # load indications matrix (always inverted) from intermediate; set to 100 - intermediate matrix to invert from non-inverted intermediates
-            indications = gk.raster.extractMatrix(intermediate) if invertIntermediate else (100 - gk.raster.extractMatrix(intermediate))
-
-        else:  # We need to compute the exclusion
-            if s.verbose and intermediate is not None:
-                glaes_logger.info(f"Computing intermediate exclusion file: {intermediate}")
-                if isfile(intermediate):
-                    # create a str containing a comparison of all non-matching metadata entries of old and new intermediate
-                    diff=""
-                    # add all new keys
-                    for k in metadata.keys()-gk.raster.rasterInfo(intermediate).meta.keys():
-                        diff=diff + f"\n(not in old metadata / {k}: {metadata[k]}); "
-                    # add all missing keys in new set
-                    for k in gk.raster.rasterInfo(intermediate).meta.keys()-metadata.keys():
-                        diff=diff + f"\n({k}: {gk.raster.rasterInfo(intermediate).meta[k]} / not in new metadata); "
-                    # add all keys whose values differ
-                    for k in set(gk.raster.rasterInfo(intermediate).meta).intersection(set(metadata)):
-                        if gk.raster.rasterInfo(intermediate).meta[k]!=metadata[k] and not k in metaNotConsidered:
-                            diff=diff + f"\n({k}: {gk.raster.rasterInfo(intermediate).meta[k]} / {metadata[k]}); "
-                            # if source_id (hash) is different, show path to file to help bug fixing
-                            if k=='source_id':
-                                diff=diff + f"\n(SourcePath (not considered in metadata comparison, FYI only): {gk.raster.rasterInfo(intermediate).meta['sourcePath']} / {metadata['sourcePath']}); "
-                    diff=diff+'\n(old/new intermediate)'
-                    glaes_logger.warning(f"Overwriting previous intermediate exclusion file: {intermediate}. The following difference in intermediate metadata was found: {diff})")
-
+        if not recalculate:
+            # load indications matrix (always inverted) from intermediate; 
+            # set to 100 - intermediate matrix to invert from non-inverted 
+            # intermediates
+            indications = 100 - gk.raster.extractMatrix(intermediate)
+        else:
+            # (re)calculate the exclusions
             if isinstance(source, PriorSource):
                 edgeI = kwargs.pop("edgeIndex", np.argwhere(
                     source.edges == source.typicalExclusion))
                 source = source.generateVectorFromEdge(
                     s.region.extent, edgeIndex=edgeI)
 
-            # Indicate on the source
-            if not isinstance(source, gdal.Dataset) and use_regionmask:
+            # reduce vector dataset to padded region shape to avoid loading 
+            # huge vector datasets in next step in indicate features
+            if not isinstance(source, gdal.Dataset) and useRegionmask:
                 source = s.region.mutateVector(source, regionPad=regionPad)
-            indications = (
+            if source is None:
+                # create an empty indications matrix since no exclusions in 
+                # region shape of exclusion calculator object
+#                 indications=np.zeros(shape=s._availability.shape)
+                indications=s.region._returnBlank(resolutionDiv=resolutionDiv, 
+                        forceMaskShape=True,
+                        applyMask=False, 
+                        **kwargs)
+            else:
+                # calculate the actual exclusions
+                indications = (
                     s.region.indicateFeatures(
                         source,
                         where=where,
@@ -1064,13 +1089,12 @@ class ExclusionCalculator(object):
                         forceMaskShape=True,
                         regionPad=regionPad,
                         **kwargs) * 100
-            ).astype(np.uint8)
+                    ).astype(np.uint8)
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
             if intermediate is not None:
-                # use unchanged indications matrix for intermediate if invertIntermediate = True (indications matrix is inverted per se)
-                # un-invert (inverted) indications matrix for intermediate if invertIntermediate = False
-                data= s.region.applyMask(indications, 255.0) if invertIntermediate else s.region.applyMask(100-indications, 255.0)
+                # un-invert (inverted) indications matrix for intermediate 
+                data= s.region.applyMask(100-indications, 255.0)
                 s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
 
         # exclude the indicated area from the total availability
@@ -1998,3 +2022,4 @@ class ExclusionCalculator(object):
             return df
         else:
             return gk.vector.createVector(df, output=output)
+            
