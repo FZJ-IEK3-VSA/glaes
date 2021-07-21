@@ -1414,11 +1414,15 @@ class ExclusionCalculator(object):
         geoms = gk.geom.polygonizeMask(
             s._availability >= threshold, bounds=s.region.extent.xyXY, srs=s.region.srs, flat=False)
         geoms = list(filter(lambda x: x.Area() >= minSize, geoms))
-        vec = gk.core.util.quickVector(geoms)
+        # if geoms is empty, exclude the whole mask
+        if not geoms:
+            s._availability *= 0
+        else:
+            vec = gk.core.util.quickVector(geoms)
 
-        # Replace current availability matrix
-        s._availability = s.region.indicateFeatures(
-            vec, applyMask=False).astype(np.uint8) * 100
+            # Replace current availability matrix
+            s._availability = s.region.indicateFeatures(
+                vec, applyMask=False).astype(np.uint8) * 100
 
     def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, maxAcceptableDistance=None, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5, _stamping=True):
         """Distribute the maximal number of minimally separated items within the available areas
