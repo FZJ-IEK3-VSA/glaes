@@ -1255,6 +1255,10 @@ class ExclusionCalculator(object):
         geoms = gk.geom.polygonizeMask(
             s._availability >= threshold, bounds=s.region.extent.xyXY, srs=s.region.srs, flat=False)
         geoms = list(filter(lambda x: x.Area() >= minSize, geoms))
+        # if geoms is empty, exclude the whole mask
+        if not geoms:
+            s._availability *= 0
+            return
         vec = gk.core.util.quickVector(geoms)
 
         # Replace current availability matrix
