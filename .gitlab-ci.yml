@@ -15,7 +15,7 @@ test:
     - git clone --branch dev https://CIGlaes:${GeokitAccessToken}@jugit.fz-juelich.de/iek-3/shared-code/geokit.git
     - cd geokit
     - mamba env update -n glaes --file=requirements-dev.yml
-    - conda install python=3.8
+    - mamba install python=3.8
     - mamba install -c conda-forge gdal=2.4.4
     - cd ..
     - python -m pip show geokit
