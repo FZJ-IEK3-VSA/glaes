@@ -12,7 +12,6 @@ test:
     - conda install mamba -c conda-forge
     - mamba create -n glaes
     - source activate glaes
-    - python -m pip show gdal
     - git clone --branch dev https://CIGlaes:${GeokitAccessToken}@jugit.fz-juelich.de/iek-3/shared-code/geokit.git
     - cd geokit
     - mamba env update -n glaes --file=requirements-dev.yml
