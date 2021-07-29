@@ -8,16 +8,17 @@ test:
   tags: 
     - linux
 
-  script: 
+  script:
     - conda install mamba -c conda-forge
-    - mamba env update -n glaes --file=requirements.yml
-    - mamba env update -n glaes --file=requirements-dev.yml
-    - mamba info --envs
+    - mamba create -n glaes
     - source activate glaes
     - git clone https://CIGlaes:$GeokitAccessToken@jugit.fz-juelich.de/iek-3/shared-code/geokit.git
     - cd geokit
     - git checkout dev
+    - mamba env update --file=requirements-dev.yml
     - python -m pip install -e .
     - cd ..
+    - mamba env update --file=requirements-dev.yml
+    - mamba info --envs
     - python -m pip install -e .
     - python -m pytest --cov=glaes glaes/test/
