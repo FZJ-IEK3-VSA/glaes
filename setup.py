@@ -9,7 +9,7 @@ setup(
     include_package_data=True,
     install_requires=[
         "geokit>=1.2.8",
-        "gdal>2.0.0,<3.0.0",
+        "gdal>2.0.0,<=3.2.1",
         "numpy",
         "descartes",
         "pandas",
