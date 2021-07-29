@@ -9,6 +9,7 @@ test:
     - linux
 
   script:
+    - echo "${Test}"
     - conda install mamba -c conda-forge
     - mamba create -n glaes
     - source activate glaes
