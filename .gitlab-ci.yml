@@ -16,9 +16,8 @@ test:
     - git clone --branch dev https://CIGlaes:${GeokitAccessToken}@jugit.fz-juelich.de/iek-3/shared-code/geokit.git
     - cd geokit
     - mamba env update --file=requirements-dev.yml
-    - python -m pip install -e .
     - cd ..
+    - python -m pip show geokit
     - mamba env update --file=requirements-dev.yml
     - mamba info --envs
-    - python -m pip install -e .
     - python -m pytest --cov=glaes glaes/test/
