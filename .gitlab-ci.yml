@@ -18,5 +18,6 @@ test:
     - cd ..
     - python -m pip show geokit
     - mamba env update -n glaes --file=requirements-dev.yml
+    - python -m pip instell -e .
     - mamba info --envs
     - python -m pytest --cov=glaes glaes/test/
