@@ -14,7 +14,11 @@ test:
     - source activate glaes
     - git clone --branch dev https://CIGlaes:${GeokitAccessToken}@jugit.fz-juelich.de/iek-3/shared-code/geokit.git
     - cd geokit
-    - mamba install -c conda-forge numpy, descartes, pandas, scipy, matplotlib
+    - mamba install -c conda-forge numpy
+    - mamba install -c conda-forge descartes
+    - mamba install -c conda-forge pandas
+    - mamba install -c conda-forge scipy
+    - mamba install -c conda-forge matplotlib
     - python -m pip install smopy
     - mamba install -c conda-forge gdal=2.4.4
     - python -m pip install -e .
