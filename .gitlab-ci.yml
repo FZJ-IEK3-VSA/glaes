@@ -10,13 +10,14 @@ test:
 
   script:
     - conda install mamba -c conda-forge
-    - mamba create -n glaes
+    - mamba create -n glaes python=3.8
     - source activate glaes
     - git clone --branch dev https://CIGlaes:${GeokitAccessToken}@jugit.fz-juelich.de/iek-3/shared-code/geokit.git
     - cd geokit
-    - mamba env update -n glaes --file=requirements-dev.yml
-    - mamba install python=3.8
+    - mamba install -c conda-forge numpy, descartes, pandas, scipy, matplotlib
+    - python -m pip install smopy
     - mamba install -c conda-forge gdal=2.4.4
+    - python -m pip install -e .
     - cd ..
     - python -m pip show geokit
     - mamba env update -n glaes --file=requirements-dev.yml
