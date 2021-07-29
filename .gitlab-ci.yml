@@ -12,10 +12,11 @@ test:
     - conda install mamba -c conda-forge
     - mamba create -n glaes
     - source activate glaes
+    - mamba install -c conda-forge gdal<3.0.0
+    - python -m pip show gdal
     - git clone --branch dev https://CIGlaes:${GeokitAccessToken}@jugit.fz-juelich.de/iek-3/shared-code/geokit.git
     - cd geokit
     - mamba env update -n glaes --file=requirements-dev.yml
-    - python -m pip install "gdal>2.2.0,<3.0.0"
     - cd ..
     - python -m pip show geokit
     - mamba env update -n glaes --file=requirements-dev.yml
