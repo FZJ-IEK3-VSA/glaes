@@ -19,5 +19,4 @@ dependencies:
   - scikit-learn
   - gdal>2.2.0,<3.0.0
   - pip:
-      - https://github.com/FZJ-IEK3-VSA/geokit/archive/v1.2.8.zip
       - -e .
