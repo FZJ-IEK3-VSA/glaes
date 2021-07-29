@@ -2,7 +2,7 @@ name: glaes
 channels:
   - conda-forge
 dependencies:
-  - python<3.9
+  - python
   - pytest
   - pytest-cov
   - pylint
