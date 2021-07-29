@@ -16,7 +16,7 @@ test:
     - python -m pip show gdal
     - git clone --branch dev https://CIGlaes:${GeokitAccessToken}@jugit.fz-juelich.de/iek-3/shared-code/geokit.git
     - cd geokit
-    - mamba env update -n glaes --file=requirements-dev.yml
+    - mamba env update -n glaes --file=requirements-dev.yml --freeze-installed
     - cd ..
     - python -m pip show geokit
     - mamba env update -n glaes --file=requirements-dev.yml
