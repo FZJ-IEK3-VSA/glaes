@@ -14,8 +14,8 @@ test:
     - source activate glaes
     - git clone --branch dev https://CIGlaes:${GeokitAccessToken}@jugit.fz-juelich.de/iek-3/shared-code/geokit.git
     - cd geokit
-    - python -m pip install "gdal>2.2.0,<3.0.0"
     - mamba env update -n glaes --file=requirements-dev.yml
+    - python -m pip install "gdal>2.2.0,<3.0.0"
     - cd ..
     - python -m pip show geokit
     - mamba env update -n glaes --file=requirements-dev.yml
