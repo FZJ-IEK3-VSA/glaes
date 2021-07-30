@@ -254,11 +254,7 @@ class ExclusionCalculator(object):
 
         # Make a list of item coords
         s.itemCoords = None
-        s.existingItemCoords = None
-        s.existingPVItemCoords = None
         s._itemCoords = None
-        s._existingItemCoords = None
-        s._existingPVItemCoords = None
         s._areas = None
 
     def save(s, output, threshold=None, **kwargs):
@@ -303,7 +299,12 @@ class ExclusionCalculator(object):
         return s.region.createRaster(output=output, data=data,
                                      noData=255, meta=meta, **kwargs)
 
-    def draw(s, ax=None, goodColor=(255/255, 255/255, 255/255), excludedColor=(2/255, 61/255, 107/255), itemsColor=(51/255, 153/255, 255/255), legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, german=False, **kwargs):
+    def draw(s, ax=None, goodColor=(255/255, 255/255, 255/255),
+             excludedColor=(2/255, 61/255, 107/255),
+             itemsColor=(51/255, 153/255, 255/255), legend=True,
+             legendargs={"loc": "lower left"},
+             srs=None, dataScalingFactor=1, geomSimplificationFactor=None,
+             german=False, additional_items={}, **kwargs):
         """Draw the current availability matrix on a matplotlib figure
 
         Note:
@@ -428,8 +429,14 @@ class ExclusionCalculator(object):
                 points = np.column_stack([points.x, points.y])
             axh1.ax.plot(points[:, 0], points[:, 1], color=itemsColor, marker='o', linestyle='None')
         # Draw existing points
-        if not s._existingItemCoords is None:
-            points = s._existingItemCoords
+        for i, point_items in enumerate(additional_items.keys()):
+            if isinstance(additional_items[point_items]["points"], str):
+                points = gk.vector.extractFeatures()
+            elif isinstance(additional_items[point_items]["points"], pd.DataFrame):
+                points = additional_items[point_items]["points"]
+            else:
+                raise GlaesError("Blabla")
+            # TODO: convert to numpy array with locations
             if not srs.IsSame(s.region.srs):
                 points = gk.srs.xyTransform(
                     points,
@@ -439,8 +446,12 @@ class ExclusionCalculator(object):
                 )
 
                 points = np.column_stack([points.x, points.y])
-            ex_item_color= (176/255, 99/255, 214/255)
-            axh1.ax.plot(points[:, 0], points[:, 1], color=ex_item_color, marker='o', markersize=2, linestyle='None')
+            if additional_items[point_items].get("color") is not None:
+                _ex_item_color = additional_items[point_items].get("color")
+            else:
+                _ex_item_colors= [(176/255, 99/255, 214/255), ()]
+                _ex_item_color = _ex_item_colors[i]
+            axh1.ax.plot(points[:, 0], points[:, 1], color=_ex_item_color, marker='o', markersize=2, linestyle='None')
         # Draw existing points
         if not s._existingPVItemCoords is None:
             points = s._existingPVItemCoords
@@ -985,6 +996,94 @@ class ExclusionCalculator(object):
             s._availability_per_criterion[~s.region.mask] = 0
         else:
             raise GlaesError("mode must be 'exclude' or 'include'")
+
+    def excludePoints(s, source, geometry_shape, scale=None, where=None,
+                      direction=None):
+        # pd.DataFrame(columns=["geom", "scale", "direction"])
+        if isinstance(source, str):
+            points = gk.vector.extractFeatures(source, where=where)
+        elif isinstance(source, pd.DataFrame):
+            # TODO: filtering with where statement (see excludeVectorType)
+            # TODO: think about loading the points like in vectorType 
+            # (with buffer and regionmask)
+            points = source
+            arr_existing = []
+            vec_exclusion = pd.DataFrame(columns=["geom"])
+            if "scale" in points.columns:
+                pass
+            elif scale is not None:
+                points["scale"] = scale
+            else:
+                raise GlaesError("Scale has to be defined blblbla")
+            # TODO: Scale has a factor /2 in it. Has to be changed below and
+            # double checked
+            # TODO: maybe use itertuples for performance reasons or just use geoms
+            for idx, row in points.iterrows():
+                # TODO: check if scale is either a list with length of the points
+                # or length is one
+                coor = row["geom"].Center # TODO: extract point as coordinate
+                if geometry_shape == "rectangle":
+                    # Make polygon turned by main wind direction.
+                    # Valid from 0-90
+                    x1 = np.sqrt((row["scale"][0])**2+(row["scale"][1])**2) / \
+                        2*np.sin(np.radians(90-direction) -
+                                 np.arctan(row["scale"][1]/row["scale"][0]))
+                    y1 = np.sqrt((row["scale"][0])**2+(row["scale"][1])**2) / \
+                        2*np.cos(np.radians(90-direction) -
+                                 np.arctan(row["scale"][1]/row["scale"][0]))
+                    x2 = np.sqrt((row["scale"][0])**2+(row["scale"][1])**2) / \
+                        2*np.cos(np.radians(direction) -
+                                 np.arctan(row["scale"][1]/row["scale"][0]))
+                    y2 = np.sqrt((row["scale"][0])**2+(row["scale"][1])**2) / \
+                        2*np.sin(np.radians(direction) -
+                                 np.arctan(row["scale"][1]/row["scale"][0]))
+                    outerRing = [(coor[0]+x1, coor[1]+y1),
+                                 (coor[0]+x2, coor[1]+y2),
+                                 (coor[0]-x1, coor[1]-y1),
+                                 (coor[0]-x2, coor[1]-y2)]
+                elif geometry_shape == "ellipse":
+                    outerRing = []
+                    # Function to rotate the points.
+                    def rotate(pts, center, angle):
+                        def _rotate(pt, angle):
+                            angle = np.radians(angle)
+                            sin = np.sin(angle)
+                            cos = np.cos(angle)
+                            x = pt[0]
+                            y = pt[1]
+                            pt[0] = x * cos - y * sin
+                            pt[1] = x * sin + y * cos
+                            return pt
+
+                        for point in pts:
+                            point[0] -= center[0]
+                            point[1] -= center[1]
+                            point = _rotate(point, angle)
+                            point[0] += center[0]
+                            point[1] += center[1]
+
+                        return pts
+                    # Create the outerRing of an ellipse around the coor
+                    # with 30 points.
+                    for i in range(0, 30):
+                        ang = i/30*2*np.pi
+                        outerRing.append(
+                            [coor[0] + row["scale"][0] / 2 * np.cos(ang),
+                             coor[1] + row["scale"][1] / 2 * np.sin(ang)])
+                    # Rotate the created ellipse
+                    # (outerRing, with center coor in wind_dir)
+                    if "direction" in points.columns and row["direction"] is not None:
+                        outerRing = rotate(outerRing, coor, row["direction"])
+                    elif direction is not None:
+                        outerRing = rotate(outerRing, coor, direction)
+
+                existing = gk.geom.polygon(outerRing, srs=s.region.srs)
+                arr_existing.append(existing)
+            # create dataframe with geom in style of gk.vector and
+            # exclude the total vector for better performance
+            vec_exclusion["geom"] = arr_existing
+            s.excludeVectorType(gk.vector.createVector(vec_exclusion))
+
 
     def excludePrior(s, prior, value=None, buffer=None, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in one of the Prior data sources
