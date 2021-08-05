@@ -5,6 +5,7 @@ import time
 from os.path import isfile, basename
 from collections import namedtuple
 from warnings import warn
+from numpy.core.numeric import outer
 import pandas as pd
 import hashlib
 from osgeo import gdal
@@ -257,12 +258,9 @@ class ExclusionCalculator(object):
 
         # Make a list of item coords
         s.itemCoords = None
-        s.existingItemCoords = None
-        s.existingPVItemCoords = None
         s._itemCoords = None
-        s._existingItemCoords = None
-        s._existingPVItemCoords = None
         s._areas = None
+        s._additional_points = None
 
     def save(s, output, threshold=None, **kwargs):
         """Save the current availability matrix to a raster file
@@ -307,7 +305,12 @@ class ExclusionCalculator(object):
         return s.region.createRaster(output=output, data=data,
                                      noData=255, meta=meta, **kwargs)
 
-    def draw(s, ax=None, goodColor=(255/255, 255/255, 255/255), excludedColor=(2/255, 61/255, 107/255), itemsColor=(51/255, 153/255, 255/255), legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, german=False, **kwargs):
+    def draw(s, ax=None, goodColor=(255/255, 255/255, 255/255),
+             excludedColor=(2/255, 61/255, 107/255),
+             itemsColor=(51/255, 153/255, 255/255), legend=True,
+             legendargs={"loc": "lower left"},
+             srs=None, dataScalingFactor=1, geomSimplificationFactor=None,
+             german=False, additional_items=None, **kwargs):
         """Draw the current availability matrix on a matplotlib figure
 
         Note:
@@ -431,34 +434,6 @@ class ExclusionCalculator(object):
 
                 points = np.column_stack([points.x, points.y])
             axh1.ax.plot(points[:, 0], points[:, 1], color=itemsColor, marker='o', linestyle='None')
-        # Draw existing points
-        if not s._existingItemCoords is None:
-            points = s._existingItemCoords
-            if not srs.IsSame(s.region.srs):
-                points = gk.srs.xyTransform(
-                    points,
-                    fromSRS=s.region.srs,
-                    toSRS=srs,
-                    outputFormat="xy"
-                )
-
-                points = np.column_stack([points.x, points.y])
-            ex_item_color= (176/255, 99/255, 214/255)
-            axh1.ax.plot(points[:, 0], points[:, 1], color=ex_item_color, marker='o', markersize=2, linestyle='None')
-        # Draw existing points
-        if not s._existingPVItemCoords is None:
-            points = s._existingPVItemCoords
-            if not srs.IsSame(s.region.srs):
-                points = gk.srs.xyTransform(
-                    points,
-                    fromSRS=s.region.srs,
-                    toSRS=srs,
-                    outputFormat="xy"
-                )
-
-                points = np.column_stack([points.x, points.y])
-
-            axh1.ax.plot(points[:, 0], points[:, 1], 'oy', markersize=2)
 
         # Draw Areas, maybe?
         if not s._areas is None:
@@ -504,19 +479,51 @@ class ExclusionCalculator(object):
                 h = axh1.ax.plot([], [], color=itemsColor, marker='o', linestyle='None', label="{}: {:,d}".format(
                     'Elemente' if german else 'Items', s._itemCoords.shape[0]))
                 patches.append(h[0])
-            if not s._existingItemCoords is None:
-                # h = axh1.ax.plot([], [], 'ob', label="Existing items: {:,d}".format(
-                #     s._existingItemCoords.shape[0]))#
-                h = axh1.ax.plot([], [], color=ex_item_color, marker='o', linestyle='None', label="Existing Turbines: {:,d}".format(
-                    s._existingItemCoords.shape[0]))
-                patches.append(h[0])
-            if not s._existingPVItemCoords is None:
-                # h = axh1.ax.plot([], [], 'oy', label="Existing OF-PV items: {:,d}".format(
-                #     s._existingPVItemCoords.shape[0]))
-                h = axh1.ax.plot([], [], 'oy', label="Existing Openfield-PV {:,d}".format(
-                    s._existingPVItemCoords.shape[0]))
-                patches.append(h[0])
+            # if not s._existingItemCoords is None:
+            #     # h = axh1.ax.plot([], [], 'ob', label="Existing items: {:,d}".format(
+            #     #     s._existingItemCoords.shape[0]))#
+            #     h = axh1.ax.plot([], [], color=ex_item_color, marker='o', linestyle='None', label="Existing Turbines: {:,d}".format(
+            #         s._existingItemCoords.shape[0]))
+            #     patches.append(h[0])
+            # if not s._existingPVItemCoords is None:
+            #     # h = axh1.ax.plot([], [], 'oy', label="Existing OF-PV items: {:,d}".format(
+            #     #     s._existingPVItemCoords.shape[0]))
+            #     h = axh1.ax.plot([], [], 'oy', label="Existing Openfield-PV {:,d}".format(
+            #         s._existingPVItemCoords.shape[0]))
+            #     patches.append(h[0])
+        # Draw existing points
+        if s._additional_points is not None and additional_items is None:
+            additional_items = s._additional_points
+        if additional_items is not None:
+            for i, point_items in enumerate(additional_items.keys()):
+                if isinstance(additional_items[point_items]["points"], str):
+                    points = gk.vector.extractFeatures() # TODO
+                elif isinstance(additional_items[point_items]["points"], np.ndarray):
+                    points = additional_items[point_items]["points"]
+                else:
+                    raise GlaesError("Blabla") # TODO
+                # TODO: convert to numpy array with locations
+                if not srs.IsSame(s.region.srs):
+                    points = gk.srs.xyTransform(
+                        points,
+                        fromSRS=s.region.srs,
+                        toSRS=srs,
+                        outputFormat="xy"
+                    )
 
+                    points = np.column_stack([points.x, points.y])
+                if additional_items[point_items].get("color") is not None:
+                    _ex_item_color = additional_items[point_items].get("color")
+                else:
+                    _ex_item_colors= [(176/255, 99/255, 214/255), "orange"]
+                    _ex_item_color = _ex_item_colors[i]
+                axh1.ax.plot(points[:, 0], points[:, 1], color=_ex_item_color, marker='o', markersize=2, linestyle='None')
+                if legend:
+                    h = axh1.ax.plot([], [], color=_ex_item_color, marker='o', linestyle='None', label="{}: {:,d}".format(
+                                    point_items,
+                                    s._existingItemCoords.shape[0]))
+                    patches.append(h[0])
+        if legend:
             _legendargs = dict(loc="lower right", fontsize=14)
             _legendargs.update(legendargs)
             axh1.ax.legend(handles=patches, **_legendargs)
@@ -1161,6 +1168,95 @@ class ExclusionCalculator(object):
 
         # add exclusion to eclusion list str
         s._exclusionStr=s._exclusionStr + f"({basename(sourcePath)}/where: {where}/buffer: {buffer}m), "
+
+
+    def excludePoints(s, source, geometry_shape, scale=None, where=None,
+                      direction=None, save_to_ec=None):
+        # pd.DataFrame(columns=["geom", "scale", "direction"])
+        if isinstance(source, str):
+            points = gk.vector.extractFeatures(source, where=where)
+        elif isinstance(source, pd.DataFrame):
+            # TODO: filtering with where statement (see excludeVectorType)
+            # TODO: think about loading the points like in vectorType 
+            # (with buffer and regionmask)
+            points = source
+            arr_existing = []
+            vec_exclusion = pd.DataFrame(columns=["geom"])
+            if "scale" in points.columns:
+                pass
+            elif scale is not None:
+                points["scale"] = scale
+            else:
+                raise GlaesError("Scale has to be defined blblbla")
+            def rotate(pts, center, angle):
+                def _rotate(pt, angle):
+                    angle = np.radians(angle)
+                    sin = np.sin(angle)
+                    cos = np.cos(angle)
+                    x = pt[0]
+                    y = pt[1]
+                    pt[0] = x * cos - y * sin
+                    pt[1] = x * sin + y * cos
+                    return pt
+
+                for point in pts:
+                    point[0] -= center[0]
+                    point[1] -= center[1]
+                    point = _rotate(point, angle)
+                    point[0] += center[0]
+                    point[1] += center[1]
+
+                return pts
+            # Transform maybe
+            # TODO: Scale has a factor /2 in it. Has to be changed below and
+            # double checked
+            # TODO: maybe use itertuples for performance reasons or just use geoms
+            for idx, row in points.iterrows():
+                if "direction" in points.columns and row["direction"] is not None:
+                    _direction = row["direction"]
+                elif direction is not None:
+                    _direction = direction
+                else:
+                    raise GlaesError("blabla")
+                # TODO: check if scale is either a list with length of the points
+                # or length is one
+                coor = gk.srs.xyTransform(np.array([[row["geom"].GetX(), row["geom"].GetY()]]),
+                    fromSRS=row["geom"].GetSpatialReference(), toSRS=s.region.srs)[0] # TODO: apply for each srs
+                if geometry_shape == "rectangle":
+                    outerRing = [[coor[0]+row["scale"][0], coor[1]+row["scale"][1]],
+                                 [coor[0]+row["scale"][0], coor[1]-row["scale"][1]],
+                                 [coor[0]-row["scale"][0], coor[1]-row["scale"][1]],
+                                 [coor[0]-row["scale"][0], coor[1]+row["scale"][1]]]
+                    outerRing = rotate(outerRing, coor, _direction)
+                elif geometry_shape == "ellipse":
+                    outerRing = []
+                    # Function to rotate the points.
+                    # Create the outerRing of an ellipse around the coor
+                    # with 30 points.
+                    for i in range(0, 30):
+                        ang = i/30*2*np.pi
+                        outerRing.append(
+                            [coor[0] + row["scale"][0] * np.cos(ang),
+                             coor[1] + row["scale"][1] * np.sin(ang)])
+                    # Rotate the created ellipse
+                    # (outerRing, with center coor in wind_dir)
+                    outerRing = rotate(outerRing, coor, _direction)
+
+                existing = gk.geom.polygon(outerRing, srs=s.region.srs)
+                arr_existing.append(existing)
+            # create dataframe with geom in style of gk.vector and
+            # exclude the total vector for better performance
+            vec_exclusion["geom"] = arr_existing
+            s.excludeVectorType(gk.vector.createVector(vec_exclusion))
+            if save_to_ec is not None:
+                if s._additional_points is None:
+                    s._additional_points = {}
+                s._additional_points.update({save_to_ec: {}})
+                s._additional_points[save_to_ec]["points"] = np.array([i[0] for i in points.apply(
+                    lambda x: np.array(gk.srs.xyTransform(np.array([
+                        [x["geom"].GetX(), x["geom"].GetY()]]),
+                        fromSRS=x["geom"].GetSpatialReference(), toSRS=s.region.srs)), axis=1).values]) #TODO: ceck that SRS is always correct
+                    # TODO: nicer implementation
 
     def excludePrior(s, prior, value=None, buffer=None, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in one of the Prior data sources
