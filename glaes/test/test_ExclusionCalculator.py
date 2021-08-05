@@ -6,6 +6,7 @@ import numpy as np
 import geokit as gk
 import glaes as gl
 import pandas as pd
+import statistics
 
 
 TESTDIR = dirname(__file__)
@@ -226,8 +227,8 @@ def test_ExclusionCalculator_excludeSet():
         verbose=False,
     )
 
-    assert np.isclose(np.nanmean(ec.availability), 15.231732)
-    assert np.isclose(np.nanstd(ec.availability), 35.93282)
+    assert np.isclose(np.nanmean(ec.availability), 15.230323)
+    assert np.isclose(np.nanstd(ec.availability), 35.931458)
 
 
 def test_ExclusionCalculator_excludeRegionEdge():
@@ -341,3 +342,56 @@ def test_ExclusionCalculator_distributeItems():
         sepScaling=ras,
         axialDirection=0)
     assert points.shape[0] == 389
+
+
+def test_ExclusionCalculator_distributeAreas():
+    # make a prior source
+    pr = gl.core.priors.PriorSource(priorSample)
+    ec = gl.ExclusionCalculator(aachenShape)
+    ec.excludePrior(pr, value=(400, None))
+
+    # Do a regular distribution and subsequent area assignment
+    ec.distributeItems(1000, outputSRS=3035)
+    ec.distributeAreas(minArea=20000)
+
+    areas = [g.Area() for g in ec._areas]
+
+    assert np.isclose(sum(areas), 175768748.40184686)
+    assert np.isclose(statistics.stdev(areas), 218376.01981464328)
+    assert np.isclose(statistics.mean(areas), 612434.6634210692)
+
+
+def test_ExclusionCalculator_saveAreas():
+    # make a prior source
+    pr = gl.core.priors.PriorSource(priorSample)
+    ec = gl.ExclusionCalculator(aachenShape)
+    ec.excludePrior(pr, value=(400, None))
+
+    # Do a regular distribution and subsequent area assignment
+    ec.distributeItems(1000, outputSRS=3035)
+    ec.distributeAreas(minArea=20000)
+
+    # save df via saveAreas() and reload for comparison
+    ec.saveAreas(join(RESULTDIR, "saveAreas.shp"), 
+                      srs=4326, 
+                      savePolygons=True,
+                      data=np.arange(len(ec._areas)),
+                      )                
+    df_saveAreas=gk.vector.extractFeatures(join(RESULTDIR, "saveAreas.shp"))
+    
+    df_inRamAreas=ec.saveAreas(srs=4326, 
+                      savePolygons=True,
+                      data=np.arange(len(ec._areas)),
+                      )    
+    # assert that values retrieved from saved file match
+    assert np.isclose(df_saveAreas.area_m2.sum(), 175768748.40184686)
+    assert np.isclose(df_saveAreas.area_m2.mean(), 612434.6634210692)
+    assert np.isclose(df_saveAreas.area_m2.std(), 218376.01981464328)
+    assert (len(df_saveAreas) == 287)
+    
+    # assert that values from df stored in variable match
+    assert np.isclose(df_inRamAreas.area_m2.sum(), 175768748.40184686)
+    assert np.isclose(df_inRamAreas.area_m2.mean(), 612434.6634210692)
+    assert np.isclose(df_inRamAreas.area_m2.std(), 218376.01981464328)
+    assert (len(df_inRamAreas) == 287)
+    
