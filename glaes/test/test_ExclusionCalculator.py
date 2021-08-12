@@ -311,3 +311,33 @@ def test_ExclusionCalculator_distributeItems():
     assert np.isclose(geoms.shape[0], 97)
     assert np.isclose(geoms.area.mean(), 0.000230714164474)
     assert np.isclose(geoms.area.std(), 8.2766693979e-05)
+
+    # Do a variable separation distance placement
+    ec = gl.ExclusionCalculator(
+        gl._test_data_['aachenShapefile.shp'],
+        pixelRes=25,
+        srs="LAEA")
+
+    ec.excludeRasterType(
+        gl._test_data_['clc-aachen_clipped.tif'],
+        value=(1, 2),
+        invert=True)
+
+    mat = np.zeros_like(ec.region.mask, dtype=np.uint16)
+    for i in range(mat.shape[0]):
+        mat[i, :] = (300 - 50) * i / mat.shape[0] + 100
+
+    ras = ec.region.createRaster(data=mat)
+
+    points = ec.distributeItems(
+        separation=5,
+        sepScaling=ras,
+        _stamping=False)
+
+    assert points.shape[0] == 335
+
+    points = ec.distributeItems(
+        separation=(8, 3),
+        sepScaling=ras,
+        axialDirection=0)
+    assert points.shape[0] == 389

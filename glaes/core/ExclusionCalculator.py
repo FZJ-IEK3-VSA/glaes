@@ -4,13 +4,12 @@ import numpy as np
 from os.path import isfile
 from collections import namedtuple
 from warnings import warn
-import logging
 import pandas as pd
 import hashlib
 from osgeo import gdal
 
 
-from .util import GlaesError
+from .util import GlaesError, glaes_logger
 from .priors import Priors, PriorSource
 
 Areas = namedtuple('Areas', "coordinates geoms")
@@ -126,7 +125,8 @@ class ExclusionCalculator(object):
         "woodland_deciduous_proximity": (None, 300),
         "woodland_mixed_proximity": (None, 300)}
 
-    def __init__(s, region, srs=3035, pixelRes=100, where=None, padExtent=0, initialValue=True, verbose=True, **kwargs):
+    def __init__(s, region, start_raster=None, srs=3035, pixelRes=100, where=None, padExtent=0, initialValue=True,
+                 verbose=True, **kwargs):
         """Initialize the ExclusionCalculator
 
         Parameters:
@@ -215,28 +215,31 @@ class ExclusionCalculator(object):
                     center_x = centroid.GetX()
                     center_y = centroid.GetY()
                 elif isinstance(region, str):
-                    vi = gk.vector.vectorInfo(region)
-                    center_x = (vi.xMin + vi.xMax) / 2
-                    center_y = (vi.yMin + vi.yMax) / 2
-                    if not vi.srs.IsSame(gk.srs.EPSG4326):
+                    _ext = gk.Extent.fromVector(region, where=where)
+
+                    center_x = (_ext.xMin + _ext.xMax) / 2
+                    center_y = (_ext.yMin + _ext.yMax) / 2
+                    if not _ext.srs.IsSame(gk.srs.EPSG4326):
                         center_x, center_y, _ = gk.srs.xyTransform(
-                            (center_x, center_y), fromSRS=vi.srs, toSRS=gk.srs.EPSG4326)
+                            (center_x, center_y), fromSRS=_ext.srs, toSRS=gk.srs.EPSG4326)
                 else:
                     raise RuntimeError(
                         "Automatic center determination is only possible when the 'region' input is an ogr.Geometry Object or a path to a vector file")
 
             srs = osr.SpatialReference()
             srs.ImportFromProj4(
-                '+proj=laea +lat_0={} +lon_0={} +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'.format(center_y, center_x))
+                '+proj=laea +lat_0={} +lon_0={} +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'.format(
+                    center_y, center_x))
 
         # load the region
         s.region = gk.RegionMask.load(
-            region, srs=srs, pixelRes=pixelRes, where=where, padExtent=padExtent, **kwargs)
+            region, start_raster=start_raster, srs=srs, pixelRes=pixelRes, where=where, padExtent=padExtent, **kwargs)
         s.srs = s.region.srs
         s.maskPixels = s.region.mask.sum()
 
         # Make the total availability matrix
         s._availability = np.array(s.region.mask, dtype=np.uint8) * 100
+        s._availability_per_criterion = np.array(s.region.mask, dtype=np.uint8) * 100
 
         if initialValue == True:
             pass
@@ -296,7 +299,7 @@ class ExclusionCalculator(object):
         return s.region.createRaster(output=output, data=data,
                                      noData=255, meta=meta, **kwargs)
 
-    def draw(s, ax=None, goodColor="#9bbb59", excludedColor="#a6161a", legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, **kwargs):
+    def draw(s, ax=None, goodColor=(255/255, 255/255, 255/255), excludedColor=(2/255, 61/255, 107/255), itemsColor=(51/255, 153/255, 255/255), legend=True, legendargs={"loc": "lower left"}, srs=None, dataScalingFactor=1, geomSimplificationFactor=None, german=False, **kwargs):
         """Draw the current availability matrix on a matplotlib figure
 
         Note:
@@ -317,6 +320,9 @@ class ExclusionCalculator(object):
         excludedColor: A matplotlib color
             The color to apply to 'excluded' locations (having a value of 0)
 
+        itemsColor: A matplotlib color
+            The color to apply to predicted items. Default is black.
+
         legend: bool; optional
             If True, a legend will be drawn
 
@@ -334,6 +340,9 @@ class ExclusionCalculator(object):
             * Use this when the region's geometry is extremely detailed compared
               to the scale over which it is drawn
             * Setting this to None will apply no simplification
+
+        german: bool
+            If true legend will be in German
 
         **kwargs:
             All keyword arguments are passed on to a call to geokit.drawImage
@@ -409,12 +418,11 @@ class ExclusionCalculator(object):
                     points,
                     fromSRS=s.region.srs,
                     toSRS=srs,
-                    outputFormet="xy"
+                    outputFormat="xy"
                 )
 
                 points = np.column_stack([points.x, points.y])
-
-            axh1.ax.plot(points[:, 0], points[:, 1], 'ok')
+            axh1.ax.plot(points[:, 0], points[:, 1], color=itemsColor, marker='o', linestyle='None')
 
         # Draw Areas, maybe?
         if not s._areas is None:
@@ -453,12 +461,12 @@ class ExclusionCalculator(object):
 
             patches = [
                 Patch(ec="k", fc="None", linewidth=3, label=regionLabel),
-                Patch(color=excludedColor, label="Excluded: %.2f%%" % (100 - p)),
-                Patch(color=goodColor, label="Eligible: %.2f%%" % (p)),
+                Patch(color=excludedColor, label=f"{'Ausgeschlossen' if german else 'Excluded'}: %.2f%%" % (100 - p)),
+                Patch(color=goodColor, label=f"{'Verfügbar' if german else 'Eligible'}: %.2f%%" % (p)),
             ]
             if not s._itemCoords is None:
-                h = axh1.ax.plot([], [], 'ok', label="Items: {:,d}".format(
-                    s._itemCoords.shape[0]))
+                h = axh1.ax.plot([], [], color=itemsColor, marker='o', linestyle='None', label="{}: {:,d}".format(
+                    'Elemente' if german else 'Items', s._itemCoords.shape[0]))
                 patches.append(h[0])
 
             _legendargs = dict(loc="lower right", fontsize=14)
@@ -468,7 +476,7 @@ class ExclusionCalculator(object):
         # Done!!
         return axh1.ax
 
-    def drawWithSmopyBasemap(s, zoom=4, excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), ax=None, figsize=None, smopy_kwargs=dict(attribution="© OpenStreetMap contributors", attribution_size=12), **kwargs):
+    def drawWithSmopyBasemap(s, zoom=4, excludedColor=(2/255, 61/255, 107/255, 128/255), ax=None, figsize=None, smopy_kwargs=dict(attribution="© OpenStreetMap contributors", attribution_size=12), **kwargs):
         """
         This wrapper around the original ExclusionCalculator.draw function adds a basemap bethind the drawn eligibility map
 
@@ -535,7 +543,7 @@ class ExclusionCalculator(object):
             ax.spines['right'].set_visible(False)
 
         ax, srs, bounds = s.region.extent.drawSmopyMap(zoom, ax=ax, **smopy_kwargs)
-        s.draw(ax=ax, srs=srs, goodColor=[0, 0, 0, 0], excludedColor=(166 / 255, 22 / 255, 26 / 255, 128 / 255), **kwargs)
+        s.draw(ax=ax, srs=srs, goodColor=[0, 0, 0, 0], excludedColor=excludedColor, **kwargs)
 
         return ax
 
@@ -553,6 +561,18 @@ class ExclusionCalculator(object):
     def percentAvailable(s):
         """The percent of the region which remains available"""
         return s._availability.sum(dtype=np.int64) / s.region.mask.sum()
+
+    # TODO: Push Git
+    @property
+    def percentAvailablePerCriterion(s):
+        """The percent of the region which remains available"""
+        return s._availability_per_criterion.sum(dtype=np.int64) / s.region.mask.sum()
+
+    @property
+    def clearPercentAvailablePerCriterion(s):
+        """The percent of the region which remains available"""
+        s._availability_per_criterion = np.array(s.region.mask, dtype=np.uint8) * 100
+        return
 
     @property
     def areaAvailable(s):
@@ -590,7 +610,8 @@ class ExclusionCalculator(object):
         return True
 
     # General excluding functions
-    def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, intermediate=None, prewarp=False, invert=False, mode="exclude", **kwargs):
+    def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, intermediate=None, prewarp=False,
+                          invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in a raster datasource
 
         Parameters:
@@ -713,15 +734,15 @@ class ExclusionCalculator(object):
                 s._hasEqualContext(intermediate):
 
             if s.verbose and intermediate is not None:
-                logging.info("Applying intermediate exclusion file: " + intermediate)
+                 glaes_logger.info("Applying intermediate exclusion file: " + intermediate)
 
             indications = gk.raster.extractMatrix(intermediate)
 
         else:  # We need to compute the exclusion
             if s.verbose and intermediate is not None:
-                logging.info("Computing intermediate exclusion file: " + intermediate)
+                glaes_logger.info("Computing intermediate exclusion file: " + intermediate)
                 if isfile(intermediate):
-                    logging.warning("Overwriting previous intermediate exclusion file: " + intermediate)
+                    glaes_logger.warning("Overwriting previous intermediate exclusion file: " + intermediate)
 
             # Do prewarp, if needed
             if prewarp:
@@ -735,13 +756,14 @@ class ExclusionCalculator(object):
 
             # Indicate on the source
             indications = (
-                s.region.indicateValues(
-                    source,
-                    value,
-                    buffer=buffer,
-                    resolutionDiv=resolutionDiv,
-                    applyMask=False,
-                    **kwargs) * 100
+                    s.region.indicateValues(
+                        source,
+                        value,
+                        buffer=buffer,
+                        resolutionDiv=resolutionDiv,
+                        forceMaskShape=True,
+                        applyMask=False,
+                        **kwargs) * 100
             ).astype(np.uint8)
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
@@ -752,14 +774,22 @@ class ExclusionCalculator(object):
         if mode == "exclude":
             s._availability = np.min(
                 [s._availability, indications if invert else 100 - indications], axis=0)
+
+            s._availability_per_criterion = np.min(
+                [s._availability_per_criterion, indications if invert else 100 - indications], axis=0)
         elif mode == "include":
             s._availability = np.max(
                 [s._availability, 100 - indications if invert else indications], axis=0)
             s._availability[~s.region.mask] = 0
+
+            s._availability_per_criterion = np.max(
+                [s._availability_per_criterion, 100 - indications if invert else indications], axis=0)
+            s._availability_per_criterion[~s.region.mask] = 0
         else:
             raise GlaesError("mode must be 'exclude' or 'include'")
 
-    def excludeVectorType(s, source, where=None, buffer=None, bufferMethod='geom', invert=False, mode="exclude", resolutionDiv=1, intermediate=None, **kwargs):
+    def excludeVectorType(s, source, where=None, buffer=None, bufferMethod='geom', invert=False, mode="exclude",
+                          resolutionDiv=1, intermediate=None, **kwargs):
         """Exclude areas based off the features in a vector datasource
 
         Parameters:
@@ -861,15 +891,15 @@ class ExclusionCalculator(object):
                 s._hasEqualContext(intermediate):
 
             if s.verbose and intermediate is not None:
-                logging.info("Applying intermediate exclusion file: " + intermediate)
+                glaes_logger.info("Applying intermediate exclusion file: " + intermediate)
 
             indications = gk.raster.extractMatrix(intermediate)
 
         else:  # We need to compute the exclusion
             if s.verbose and intermediate is not None:
-                logging.info("Computing intermediate exclusion file: " + intermediate)
+                glaes_logger.info("Computing intermediate exclusion file: " + intermediate)
                 if isfile(intermediate):
-                    logging.warning("Overwriting previous intermediate exclusion file: " + intermediate, UserWarning)
+                    glaes_logger.warning("Overwriting previous intermediate exclusion file: " + intermediate, UserWarning)
 
             if isinstance(source, PriorSource):
                 edgeI = kwargs.pop("edgeIndex", np.argwhere(
@@ -879,14 +909,15 @@ class ExclusionCalculator(object):
 
             # Indicate on the source
             indications = (
-                s.region.indicateFeatures(
-                    source,
-                    where=where,
-                    buffer=buffer,
-                    resolutionDiv=resolutionDiv,
-                    bufferMethod=bufferMethod,
-                    applyMask=False,
-                    **kwargs) * 100
+                    s.region.indicateFeatures(
+                        source,
+                        where=where,
+                        buffer=buffer,
+                        resolutionDiv=resolutionDiv,
+                        bufferMethod=bufferMethod,
+                        applyMask=False,
+                        forceMaskShape=True,
+                        **kwargs) * 100
             ).astype(np.uint8)
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
@@ -897,10 +928,17 @@ class ExclusionCalculator(object):
         if mode == "exclude":
             s._availability = np.min(
                 [s._availability, indications if invert else 100 - indications], axis=0)
+
+            s._availability_per_criterion = np.min(
+                [s._availability_per_criterion, indications if invert else 100 - indications], axis=0)
         elif mode == "include":
             s._availability = np.max(
                 [s._availability, 100 - indications if invert else indications], axis=0)
             s._availability[~s.region.mask] = 0
+
+            s._availability_per_criterion = np.max(
+                [s._availability_per_criterion, 100 - indications if invert else indications], axis=0)
+            s._availability_per_criterion[~s.region.mask] = 0
         else:
             raise GlaesError("mode must be 'exclude' or 'include'")
 
@@ -986,7 +1024,9 @@ class ExclusionCalculator(object):
 
         else:
             if not value == 0:
-                warn("It is advisable to exclude by a value range instead of a singular value when using the Prior datasets", UserWarning)
+                warn(
+                    "It is advisable to exclude by a value range instead of a singular value when using the Prior datasets",
+                    UserWarning)
 
         # Project to 'index space'
         try:
@@ -1105,7 +1145,7 @@ class ExclusionCalculator(object):
 
             if row.type == "prior":
                 if verbose:
-                    logging.info("Excluding Prior {} with value {}, buffer {}, mode {}, and invert {} ".format(
+                    glaes_logger.info("Excluding Prior {} with value {}, buffer {}, mode {}, and invert {} ".format(
                         row['name'],
                         row.value,
                         buffer,
@@ -1133,7 +1173,7 @@ class ExclusionCalculator(object):
             elif row.type == "raster":
                 value = str(row.value)
                 if verbose:
-                    logging.info("Excluding Raster {} with value {}, buffer {}, mode {}, and invert {} ".format(
+                    glaes_logger.info("Excluding Raster {} with value {}, buffer {}, mode {}, and invert {} ".format(
                         row['name'],
                         value,
                         buffer,
@@ -1148,7 +1188,7 @@ class ExclusionCalculator(object):
                 if filterSourceLists:
                     sources = list(s.region.extent.filterSources(sources, error_on_missing=filterMissingError))
                     if verbose and len(sources) == 0:
-                        logging.info("  No suitable sources in extent! ")
+                        glaes_logger.info("  No suitable sources in extent! ")
 
                 for source in sources:
                     s.excludeRasterType(
@@ -1158,17 +1198,17 @@ class ExclusionCalculator(object):
                         resolutionDiv=row.resolutionDiv,
                         prewarp=False,
                         invert=row.invert,
-                        mode=row.exclusion_mode,)
+                        mode=row.exclusion_mode, )
 
             elif row.type == "vector":
                 if verbose:
-                    logging.info("Excluding Vector {} with where-statement \"{}\", buffer {}, mode {}, and invert {} ".format(
-                        row['name'],
-                        row.value,
-                        buffer,
-                        row.exclusion_mode,
-                        row.invert
-                    ))
+                    glaes_logger.info("Excluding Vector {} with where-statement \"{}\", buffer {}, mode {}, and invert {} ".format(
+                            row['name'],
+                            row.value,
+                            buffer,
+                            row.exclusion_mode,
+                            row.invert
+                        ))
 
                 if row.value == "" or row.value == "None":
                     value = None
@@ -1182,7 +1222,7 @@ class ExclusionCalculator(object):
                 if filterSourceLists:
                     sources = list(s.region.extent.filterSources(sources, error_on_missing=filterMissingError))
                     if verbose and len(sources) == 0:
-                        logging.info("  No suitable sources in extent! ")
+                        glaes_logger.info("  No suitable sources in extent! ")
 
                 # print(sources)
                 for source in sources:
@@ -1196,7 +1236,7 @@ class ExclusionCalculator(object):
                         mode=row.exclusion_mode)
 
         if verbose:
-            logging.info("Done!")
+            glaes_logger.info("Done!")
 
     def shrinkAvailability(s, dist, threshold=50):
         """Shrinks the current availability by a given distance in the given SRS"""
@@ -1215,13 +1255,17 @@ class ExclusionCalculator(object):
         geoms = gk.geom.polygonizeMask(
             s._availability >= threshold, bounds=s.region.extent.xyXY, srs=s.region.srs, flat=False)
         geoms = list(filter(lambda x: x.Area() >= minSize, geoms))
-        vec = gk.core.util.quickVector(geoms)
+        # if geoms is empty, exclude the whole mask
+        if not geoms:
+            s._availability *= 0
+        else:
+            vec = gk.core.util.quickVector(geoms)
 
-        # Replace current availability matrix
-        s._availability = s.region.indicateFeatures(
-            vec, applyMask=False).astype(np.uint8) * 100
+            # Replace current availability matrix
+            s._availability = s.region.indicateFeatures(
+                vec, applyMask=False).astype(np.uint8) * 100
 
-    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5, _stamping=True):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, maxAcceptableDistance=None, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5, _stamping=True):
         """Distribute the maximal number of minimally separated items within the available areas
 
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -1247,6 +1291,17 @@ class ExclusionCalculator(object):
                 - float : The direction to apply to all points
                 - np.ndarray : The directions at each pixel (must match availability matrix shape)
                 - str : A path to a raster file containing axial directions
+
+            maxAcceptableDistance : A maximum distance to allow between items
+                - Computes a post-placement distance matrix for the located placements
+                - If the placement's nearest neighbor is greater than `maxAcceptableDistance`, then it is removed
+                - Input can be given as:
+                    - Y[float] - Meaning that the nearest neighbor must be within the given distance, Y
+                    - (Y1[int], Y2[float], ...) - Meaning that the first neighbor must be within a distance of Y1,
+                      the second nearest neighbor should be within a distance of Y2, and so forth.
+                - Ex.
+                    - "maxAcceptableDistance=(1000, 2000, 3000)" means that if the nearest 3 neighbors are not within a 
+                      distance of 1000, 2000, and 3000 meters, respectively, then the placement in question will be deleted
 
             sepScaling : An additional scaling factor which can be applied to each pixel
                 - float : The scaling to apply to all points
@@ -1282,10 +1337,10 @@ class ExclusionCalculator(object):
 
         # Read separation scaling file, if given
         if not sepScaling is None:
-            if isinstance(sepScaling, str):  # Assume a path to a raster file is given
-                sepScaling = s.region.warp(sepScaling, resampleAlg='near')
+            if isinstance(sepScaling, str) or isinstance(sepScaling, gdal.Dataset):  # Assume a path to a raster file is given
+                sepScaling = s.region.warp(sepScaling, resampleAlg='near', applyMask=False,)
                 matrixScaling = True
-            # Assume a path to a raster file is given
+            # Assume a numpy array is given
             elif isinstance(sepScaling, np.ndarray):
                 if not sepScaling.shape == s.region.mask.shape:
                     raise GlaesError(
@@ -1311,16 +1366,17 @@ class ExclusionCalculator(object):
                 sepA, sepT = separation
             except:
                 raise GlaesError(
-                    "When giving gradient data, a separation tuple is expected")
+                    "When giving axial direction data, a separation tuple is expected")
 
+            sepA, sepT = float(sepA), float(sepT)  # Cast as float to avoid integer overflow errors
             sepA = sepA * sepScaling / pixelRes
             sepT = sepT * sepScaling / pixelRes
 
-            sepA2 = sepA**2
-            sepT2 = sepT**2
+            sepA2 = sepA ** 2
+            sepT2 = sepT ** 2
 
-            sepFloorA = sepA - 1
-            sepFloorT = sepT - 1
+            sepFloorA = np.maximum(sepA - np.sqrt(2), 0)
+            sepFloorT = np.maximum(sepT - np.sqrt(2), 0)
             if not matrixScaling and (sepFloorA < 1 or sepFloorT < 1):
                 raise GlaesError(
                     "Seperations are too small compared to pixel size")
@@ -1330,25 +1386,26 @@ class ExclusionCalculator(object):
 
             sepCeil = np.maximum(sepA, sepT) + 1
 
-            stampWidth = int(np.floor(min(sepFloorA, sepFloorT)))
-            stampFloor = min(sepFloorA2, sepFloorT2)
+            stampFloor = min(sepFloorA2.min(), sepFloorT2.min()) if matrixScaling else min(sepFloorA2, sepFloorT2)
+            stampWidth = int(np.ceil(np.sqrt(stampFloor)) + 1)
         else:
+            separation = float(separation)  # Cast as float to avoid integer overflow errors
             separation = separation * sepScaling / pixelRes
             sep2 = np.power(separation, 2)
-            sepFloor = np.maximum(separation - 1, 0)
+            sepFloor = np.maximum(separation - np.sqrt(2), 0)
             sepFloor2 = sepFloor**2
             sepCeil = separation + 1
 
-            stampWidth = int(np.ceil(sepCeil))
-            stampFloor = sepFloor2
+            stampFloor = sepFloor2.min() if matrixScaling else sepFloor2
+            stampWidth = int(np.ceil(np.sqrt(stampFloor)) + 1)
 
         if _stamping:
             _xy = np.linspace(-stampWidth, stampWidth, stampWidth * 2 + 1)
             _xs, _ys = np.meshgrid(_xy, _xy)
 
-            # print("STAMP FLOOR:", stampFloor)
+            # print("STAMP FLOOR:", stampFloor, stampWidth)
             stamp = (np.power(_xs, 2) + np.power(_ys, 2)
-                     ) >= (stampFloor - np.sqrt(stampFloor) * 2)
+                     ) >= (stampFloor)  # (stampFloor - np.sqrt(stampFloor) * 2)
 
         if isinstance(sepCeil, np.ndarray) and sepCeil.size > 1:
             sepCeil = sepCeil.max()
@@ -1433,8 +1490,8 @@ class ExclusionCalculator(object):
                     sG = np.sin(grad)
 
                     dist = np.power((xDist[pir] * cG - yDist[pir] * sG), 2) / _sepFloorA2 +\
-                        np.power(
-                            (xDist[pir] * sG + yDist[pir] * cG), 2) / _sepFloorT2
+                           np.power(
+                               (xDist[pir] * sG + yDist[pir] * cG), 2) / _sepFloorT2
 
                     immidiatelyInRange = dist <= 1
 
@@ -1461,7 +1518,7 @@ class ExclusionCalculator(object):
                             # Test if any points in the range are overlapping
                             if useGradient:  # Test if in rotated ellipse
                                 dist = (np.power((xSubDist * cG - ySubDist * sG), 2) / _sepA2) +\
-                                    (np.power((xSubDist * sG + ySubDist * cG), 2) / _sepT2)
+                                       (np.power((xSubDist * sG + ySubDist * cG), 2) / _sepT2)
                                 overlapping = dist <= 1
 
                             else:  # test if in circle
@@ -1515,10 +1572,10 @@ class ExclusionCalculator(object):
                             _y_high_stamp = stamp_center + stampWidth
 
                         _stamp = stamp[_y_low_stamp:_y_high_stamp + 1,
-                                       _x_low_stamp:_x_high_stamp + 1]
+                                 _x_low_stamp:_x_high_stamp + 1]
 
                         workingAvailability[_y_low:_y_high + 1,
-                                            _x_low:_x_high + 1] *= _stamp
+                        _x_low:_x_high + 1] *= _stamp
 
         # Convert identified points back into the region's coordinates
         coords = np.zeros((cnt, 2))
@@ -1526,7 +1583,7 @@ class ExclusionCalculator(object):
         coords[:, 0] = s.region.extent.xMin + (x[:cnt] + 0.5) * s.region.pixelWidth
         # shifted by 0.5 so that index corresponds to the center of the pixel
         coords[:, 1] = s.region.extent.yMax - \
-            (y[:cnt] + 0.5) * s.region.pixelHeight
+                       (y[:cnt] + 0.5) * s.region.pixelHeight
 
         s._itemCoords = coords
 
@@ -1538,9 +1595,45 @@ class ExclusionCalculator(object):
             coords = newCoords
         s.itemCoords = coords
 
+# Filter by max acceptable distance, maybe
+        if maxAcceptableDistance is not None:
+            try:
+                maxAcceptableDistance = [float(x) for x in maxAcceptableDistance]
+            except:
+                maxAcceptableDistance = [float(maxAcceptableDistance)]
+
+            maxAcceptableDistance2 = np.power(maxAcceptableDistance, 2)
+
+            sel = []
+            for i in range(s._itemCoords.shape[0]):
+                x = s._itemCoords[i, 0]
+                y = s._itemCoords[i, 1]
+
+                X = np.concatenate((s._itemCoords[:i, 0], s._itemCoords[(i + 1):, 0]))
+                Y = np.concatenate((s._itemCoords[:i, 1], s._itemCoords[(i + 1):, 1]))
+                subsel = np.abs(X - x) <= max(maxAcceptableDistance)
+                subsel *= np.abs(Y - y) <= max(maxAcceptableDistance)
+
+                subX = X[subsel]
+                subY = Y[subsel]
+                dist2 = np.power(subX - x, 2) + np.power(subY - y, 2)
+
+                if dist2.shape[0] < len(maxAcceptableDistance2):
+                    sel.append(False)
+                else:
+                    isokay = True
+                    dist2 = np.sort(dist2)
+                    for j, md2 in enumerate(maxAcceptableDistance2):
+                        isokay = isokay and dist2[j] <= md2
+                    sel.append(isokay)
+
+            s._itemCoords = s._itemCoords[sel, :]
+            s.itemCoords = s.itemCoords[sel, :]
+
         # Make areas
         if asArea:
-            warn("Area distribution will soon be removed from 'distributeItems'. Use 'distributeArea' instead", DeprecationWarning)
+            warn("Area distribution will soon be removed from 'distributeItems'. Use 'distributeArea' instead",
+                 DeprecationWarning)
 
             ext = s.region.extent.pad(_voronoiBoundaryPadding, percent=True)
 
@@ -1555,7 +1648,8 @@ class ExclusionCalculator(object):
                                       ext.xMin, ext.xMax, _voronoiBoundaryPoints)],
                                   [(ext.xMin, y) for y in np.linspace(
                                       ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1],
-                                  [(ext.xMax, y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][1:-1], ])
+                                  [(ext.xMax, y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)][
+                                  1:-1], ])
 
             v = Voronoi(pts)
 
@@ -1589,7 +1683,8 @@ class ExclusionCalculator(object):
 
         # Make shapefile
         if not output is None:
-            warn("Shapefile output will soon be removed from 'distributeItems'. Use 'saveItems' or 'saveAreas' instead", DeprecationWarning)
+            warn("Shapefile output will soon be removed from 'distributeItems'. Use 'saveItems' or 'saveAreas' instead",
+                 DeprecationWarning)
             srs = gk.srs.loadSRS(
                 outputSRS) if not outputSRS is None else s.region.srs
             # Should the locations be converted to areas?
@@ -1603,7 +1698,10 @@ class ExclusionCalculator(object):
                 geoms = pd.DataFrame({"geom": geoms, "area": areas})
 
             else:  # Just write the points
-                geoms = [gk.geom.point(loc, srs=srs) for loc in coords]
+                geoms = gk.LocationSet(
+                    s._itemCoords,
+                    srs=s.srs
+                ).asGeom(srs=srs if outputSRS is None else outputSRS)
 
             gk.vector.createVector(geoms, output=output)
         else:
@@ -1612,7 +1710,8 @@ class ExclusionCalculator(object):
             else:
                 return coords
 
-    def distributeAreas(s, points=None, minArea=100000, threshold=50, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5):
+    def distributeAreas(s, points=None, minArea=100000, threshold=50, _voronoiBoundaryPoints=10,
+                        _voronoiBoundaryPadding=5):
         if points is None:
             try:
                 points = s._itemCoords
@@ -1708,10 +1807,13 @@ class ExclusionCalculator(object):
             geoms = s._areas
 
         # make shapefile
+        areas = [g.Area() for g in geoms]
         if data is None:
-            data = pd.DataFrame(dict(geom=geoms))
+            data = pd.DataFrame({"geom": geoms, "area": areas})
+            # data = pd.DataFrame(dict(geom=geoms))
         else:
             data = pd.DataFrame(data)
             data['geom'] = geoms
+            data['area'] = areas
 
         return gk.vector.createVector(data, output=output)

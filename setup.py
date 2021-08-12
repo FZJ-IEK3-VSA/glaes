@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 
 setup(
     name='glaes',
-    version='1.2.0',
-    author='Severin Ryberg',
+    version='1.2.1',
+    author='GLAES Developer Team',
     url='https://github.com/FZJ-IEK3-VSA/glaes',
     packages=find_packages(),
     include_package_data=True,

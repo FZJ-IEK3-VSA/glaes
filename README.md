@@ -25,7 +25,7 @@ A number of precomputed (Prior) datasets which constitute the most commonly cons
 These datasets are formatted to be used directly with the GLAES framework and, in doing so, drastically reduce the time requirements, data management, and overall complexity of conducting these analyses.
 The Priors also have the added benefit of providing a common data source to all LE researchers, which further promotes consistency between independent LE evaluations.
 Most important, usage of these datasets is just as easy as applying exclusions from other geospatial datasources.
-Although the Prior datasets are not included when cloning this repository, they can be downloaded and installed using the process detailed in the "Installation" section.
+Although the Prior datasets are not included when cloning this repository, they can be downloaded from [Mendeley Data](https://data.mendeley.com/datasets/trvfb3nwt2) and installed by unzipping (or placing if downloaded one-by-one) the files in the repo directory `glaes/data/priors`.
 
 ---
 
