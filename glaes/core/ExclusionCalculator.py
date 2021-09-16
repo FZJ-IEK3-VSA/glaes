@@ -777,6 +777,7 @@ class ExclusionCalculator(object):
               geokit.RegionMask.indicateValues
 
         """
+        
         # create sourcePath
         if isinstance(source, str):
             sourcePath=str(source)
