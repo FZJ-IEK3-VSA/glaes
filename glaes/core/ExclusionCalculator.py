@@ -841,9 +841,10 @@ class ExclusionCalculator(object):
 
         default: bool; optional 
             If True, no source must be passed and am empty, fully eligible 
-            intermediate file will be returned. If a string is passed as source,
-            it will be written into the sourcePath as well as the _exclusionStr 
-            instead of the actual source. Defaults to False.
+            default intermediate file (or 0% if mode=include) will be returned. 
+            If a string is passed as source, it will be written into the 
+            sourcePath as well as the _exclusionStr instead of the actual 
+            source. Defaults to False.
 
         kwargs
             * All other keyword arguments are passed on to a call to
@@ -1054,6 +1055,13 @@ class ExclusionCalculator(object):
             * If True, vector dataset will be pre-loaded via regionmask 
             to save time loading huge vector datasets. Defaults to True
 
+        default: bool; optional 
+            If True, no source must be passed and am empty, fully eligible 
+            default intermediate file (or 0% if mode=include) will be returned. 
+            If a string is passed as source, it will be written into the 
+            sourcePath as well as the _exclusionStr instead of the actual 
+            source. Defaults to False.
+            
         kwargs
             * All other keyword arguments are passed on to a call to
               geokit.RegionMask.indicateFeatures
