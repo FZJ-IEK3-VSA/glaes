@@ -615,7 +615,8 @@ class ExclusionCalculator(object):
     def _createIntermediateMetadata(s, buffer, resolutionDiv, invert, mode, 
         exclusiontype, source=np.nan, value=np.nan, prewarp=np.nan, 
         threshold=np.nan, minSize=np.nan, where=np.nan, bufferMethod=np.nan, 
-        regionPad=np.nan, default=np.nan, sourcePath=np.nan, **kwargs):
+        regionPad=np.nan, default=np.nan, sourcePath=np.nan, 
+        useRegionmask=np.nan, **kwargs):
     
         # make sure that the 'type' string value is correct to avoid issues in if statements
         assert exclusiontype in ['raster','vector'], "type parameter must be either 'raster' or 'vector'" #TODO possibly add prior later on
@@ -668,6 +669,8 @@ class ExclusionCalculator(object):
                 'exclusion_type': "Vector",
                 'where': str(where),
                 'bufferMethod': str(bufferMethod),
+                #TODO discuss if useRegionmask is required - should not influence the results but would reduce flexibility to use regionmask preprocessing or not
+                #'useRegionmask':str(useRegionmask),
                 'regionPad': str(regionPad), #TODO move this to the main dict once implemented in excludeRasterType as well
                 }
             metadata={**metadata, **metadata_vector}
