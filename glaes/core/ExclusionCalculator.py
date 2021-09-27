@@ -1178,7 +1178,7 @@ class ExclusionCalculator(object):
         elif isinstance(source, pd.DataFrame):
             # TODO: filtering with where statement (see excludeVectorType)
             # TODO: think about loading the points like in vectorType 
-            # (with buffer and regionmask)
+            #   (with buffer and regionmask)
             points = source
             arr_existing = []
             vec_exclusion = pd.DataFrame(columns=["geom"])
@@ -1208,8 +1208,6 @@ class ExclusionCalculator(object):
 
                 return pts
             # Transform maybe
-            # TODO: Scale has a factor /2 in it. Has to be changed below and
-            # double checked
             # TODO: maybe use itertuples for performance reasons or just use geoms
             for idx, row in points.iterrows():
                 if "direction" in points.columns and row["direction"] is not None:
@@ -1219,7 +1217,7 @@ class ExclusionCalculator(object):
                 else:
                     raise GlaesError("blabla")
                 # TODO: check if scale is either a list with length of the points
-                # or length is one
+                #  or length is one
                 coor = gk.srs.xyTransform(np.array([[row["geom"].GetX(), row["geom"].GetY()]]),
                     fromSRS=row["geom"].GetSpatialReference(), toSRS=s.region.srs)[0] # TODO: apply for each srs
                 if geometry_shape == "rectangle":
@@ -1255,7 +1253,7 @@ class ExclusionCalculator(object):
                 s._additional_points[save_to_ec]["points"] = np.array([i[0] for i in points.apply(
                     lambda x: np.array(gk.srs.xyTransform(np.array([
                         [x["geom"].GetX(), x["geom"].GetY()]]),
-                        fromSRS=x["geom"].GetSpatialReference(), toSRS=s.region.srs)), axis=1).values]) #TODO: ceck that SRS is always correct
+                        fromSRS=x["geom"].GetSpatialReference(), toSRS=s.region.srs)), axis=1).values]) #TODO: check that SRS is always correct
                     # TODO: nicer implementation
 
     def excludePrior(s, prior, value=None, buffer=None, invert=False, mode="exclude", **kwargs):
