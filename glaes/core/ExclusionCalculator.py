@@ -583,101 +583,31 @@ class ExclusionCalculator(object):
             * Units are defined by the srs used to initialize the ExclusionCalculator"""
         return s._availability[s.region.mask].sum(dtype=np.int64) * s.region.pixelWidth * s.region.pixelHeight / 100
 
-    def _compare_srs_gdal_2_vs_3(self, srs2, verbose=False):
-        """
-        Internal function that compares two different srs, especially when srs 
-        were created by different gdal versions since gdal v3.x creates a 
-        different srs definition format compared to gdal v2.x so that 
-        srs.IsSame() will fail.
-
-        srs2: OGRSpatialReference object
-        SRS to compare against the internal SRS of this class.
-
-        verbose: bool, optional
-        If True, will print reasons if srs match fails. Defaults to False.
-        """
-        # extract srs1 from class attributes for 'internal version' of function
-        srs1=self.srs
-
-        # compare SPHEROID - structure: SPHEROID["GRS 1980",6378137,298.2572221010042,
-        # apply np.isclose to float comparison since gdal 2 and 3 rounding procedure differs
-        if srs1.GetAttrValue("SPHEROID",1)!=srs2.GetAttrValue("SPHEROID",1) or not np.isclose(float(srs1.GetAttrValue("SPHEROID",2)), float(srs2.GetAttrValue("SPHEROID",2))):
-            if verbose: print("'SPHEROID' does not match.")
-            return False
-        
-        # compare TOWGS84 - structure: TOWGS84[0,0,0,0,0,0,0]
-        for i in range(7):
-            if srs1.GetAttrValue("TOWGS84",i)!=srs2.GetAttrValue("TOWGS84",i):
-                if verbose: print("'TOWGS84' does not match.")
-                return False
-        
-        # compare PRIMEM - structure: PRIMEM["Greenwich",0]
-        for i in range(2):
-            if srs1.GetAttrValue("PRIMEM",i)!=srs2.GetAttrValue("PRIMEM",i):
-                if verbose: print("'PRIMEM' does not match.")
-                return False
-        
-        # compare GEOGCS UNIT - e.g. UNIT["degree",0.0174532925199433]
-        if srs1.GetAngularUnitsName()!=srs2.GetAngularUnitsName() or srs1.GetAngularUnits()!=srs2.GetAngularUnits():
-            if verbose: print("GEOGCS 'UNIT' does not match.")
-            return False
-        
-        # compare PROJECTION
-        if srs1.GetAttrValue("PROJECTION")!=srs2.GetAttrValue("PROJECTION"):
-            if verbose: print("'PRIMEM' does not match.")
-            return False
-        
-        # compare centroids, first longitude, then latitude, then false_easting, then false_northing
-        # apply np.isclose to lat/lon floats since gdal 2 and 3 rounding procedure differs
-        if not np.isclose(float(srs1.GetProjParm('latitude_of_center')), float(srs2.GetProjParm('latitude_of_center'))) or not np.isclose(float(srs1.GetProjParm('longitude_of_center')), float(srs2.GetProjParm('longitude_of_center'))):
-            if verbose: print("latitude and/or longitude of center does not match.")
-            return False
-        if srs1.GetProjParm('false_easting')!=srs2.GetProjParm('false_easting') or srs1.GetProjParm('false_northing')!=srs2.GetProjParm('false_northing'):
-            if verbose: print("false_easting and/or false_northing of center does not match.")
-            return False
-        
-        # compare UNIT - structure: UNIT["metre",1, ...]
-        if srs1.GetLinearUnitsName()!=srs2.GetLinearUnitsName() or srs1.GetLinearUnits()!=srs2.GetLinearUnits():
-            if verbose: print("'UNIT' does not match.")
-            return False
-        
-        # compare AUTHORITY
-        if srs1.GetAuthorityName('AUTHORITY')!=srs2.GetAuthorityName('AUTHORITY') or srs1.GetAuthorityCode('AUTHORITY')!=srs2.GetAuthorityCode('AUTHORITY'):
-            if verbose: print("'AUTHORITY' does not match.")
-            return False
-        
-        return True
-
-    
-    def _hasEqualContext(self, source):
+    def _hasEqualContext(self, source, verbose=False):
         """
         Internal function which checks if a given raster source has the same context as 
         the ExclusionCalculator. This checks SRS, extent, and pixel resolution
         """
         if not isfile(source) or not gk.util.isRaster(source):
-            # print("Is not a raster!")
+            if verbose: print("Is not a raster!")
             return False
 
         ri_extent = gk.Extent.fromRaster(source)
         if not ri_extent == self.region.extent:
-            # print("Extent mismatch!")
+            if verbose: print("Extent mismatch!")
             return False
 
-        # if not ri_extent.srs.IsSame(self.srs):
-        #     # print("SRS mismatch!")
-        #     return False
-        # compare srs manually since gdal 2.x and gdal 3.x create different srs definitions so that srs1.IsSame(srs2) does not work anymore.
-        if not _compare_srs_gdal_2_vs_3(ri_extent.srs):
-            # print("SRS mismatch!")
+        if not ri_extent.srs.IsSame(self.srs):
+            if verbose: print("SRS mismatch!")
             return False
 
         ri = gk.raster.rasterInfo(source)
         if not np.isclose(ri.pixelWidth, self.region.pixelWidth):
-            # print("pixelWidth mismatch!")
+            if verbose: print("pixelWidth mismatch!")
             return False
 
         if not np.isclose(ri.pixelHeight, self.region.pixelHeight):
-            # print("pixelHeight mismatch!")
+            if verbose: print("pixelHeight mismatch!")
             return False
 
         return True
@@ -780,7 +710,7 @@ class ExclusionCalculator(object):
             meta_intermediate_compare = {k: gk.raster.rasterInfo(intermediate).meta[k] for k in gk.raster.rasterInfo(intermediate).meta if not k in metaNotConsidered}
 
         # check if we can apply the intermediate file (check all metadata besides sourcePath which is stored only for user information)
-        if intermediate is not None and isfile(intermediate) and s._hasEqualContext(intermediate) and \
+        if intermediate is not None and isfile(intermediate) and s._hasEqualContext(intermediate, verbose=True) and \
                 meta_intermediate_compare == {k:metadata[k] for k in metadata if not k in metaNotConsidered}:
  
             if s.verbose and intermediate is not None:
