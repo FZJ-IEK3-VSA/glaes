@@ -647,7 +647,15 @@ class ExclusionCalculator(object):
         if not ri_extent == self.region.extent:
             if verbose: print("Extent mismatch!")
             return False
-
+        if (ri_extent.xMin != self.region.extent.xMin or
+            ri_extent.xMax != self.region.extent.xMax or
+            ri_extent.yMin != self.region.extent.yMin or
+            ri_extent.yMax != self.region.extent.yMax):
+                if verbose: print("Extent mismatch!")
+                return False
+        if (gk.raster.extractMatrix(source)>=255).sum() != (~self.region.mask).sum():
+            if verbose: print("Mask not equal!")
+            return False
         if not ri_extent.srs.IsSame(self.srs):
             if verbose: print("SRS mismatch!")
             return False
