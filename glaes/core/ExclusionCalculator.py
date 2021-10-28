@@ -634,31 +634,39 @@ class ExclusionCalculator(object):
             * Units are defined by the srs used to initialize the ExclusionCalculator"""
         return s._availability[s.region.mask].sum(dtype=np.int64) * s.region.pixelWidth * s.region.pixelHeight / 100
 
-    def _hasEqualContext(self, source):
+    def _hasEqualContext(self, source, verbose=False):
         """
         Internal function which checks if a given raster source has the same context as 
         the ExclusionCalculator. This checks SRS, extent, and pixel resolution
         """
         if not isfile(source) or not gk.util.isRaster(source):
-            # print("Is not a raster!")
+            if verbose: print("Is not a raster!")
             return False
 
         ri_extent = gk.Extent.fromRaster(source)
         if not ri_extent == self.region.extent:
-            # print("Extent mismatch!")
+            if verbose: print("Extent mismatch!")
             return False
-
+        if (ri_extent.xMin != self.region.extent.xMin or
+            ri_extent.xMax != self.region.extent.xMax or
+            ri_extent.yMin != self.region.extent.yMin or
+            ri_extent.yMax != self.region.extent.yMax):
+                if verbose: print("Extent mismatch!")
+                return False
+        if (gk.raster.extractMatrix(source)>=255).sum() != (~self.region.mask).sum():
+            if verbose: print("Mask not equal!")
+            return False
         if not ri_extent.srs.IsSame(self.srs):
-            # print("SRS mismatch!")
+            if verbose: print("SRS mismatch!")
             return False
 
         ri = gk.raster.rasterInfo(source)
         if not np.isclose(ri.pixelWidth, self.region.pixelWidth):
-            # print("pixelWidth mismatch!")
+            if verbose: print("pixelWidth mismatch!")
             return False
 
         if not np.isclose(ri.pixelHeight, self.region.pixelHeight):
-            # print("pixelHeight mismatch!")
+            if verbose: print("pixelHeight mismatch!")
             return False
 
         return True
@@ -761,7 +769,7 @@ class ExclusionCalculator(object):
             meta_intermediate_compare = {k: gk.raster.rasterInfo(intermediate).meta[k] for k in gk.raster.rasterInfo(intermediate).meta if not k in metaNotConsidered}
 
         # check if we can apply the intermediate file (check all metadata besides sourcePath which is stored only for user information)
-        if intermediate is not None and isfile(intermediate) and s._hasEqualContext(intermediate) and \
+        if intermediate is not None and isfile(intermediate) and s._hasEqualContext(intermediate, verbose=True) and \
                 meta_intermediate_compare == {k:metadata[k] for k in metadata if not k in metaNotConsidered}:
  
             if s.verbose and intermediate is not None:
