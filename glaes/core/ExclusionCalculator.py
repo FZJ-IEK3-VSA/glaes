@@ -643,25 +643,6 @@ class ExclusionCalculator(object):
             if verbose: print("Is not a raster!")
             return False
 
-        ri_extent = gk.Extent.fromRaster(source)
-        if not ri_extent == self.region.extent:
-            if verbose: print("Extent mismatch!")
-            return False
-        start = time.time()
-        if (ri_extent.xMin != self.region.extent.xMin or
-            ri_extent.xMax != self.region.extent.xMax or
-            ri_extent.yMin != self.region.extent.yMin or
-            ri_extent.yMax != self.region.extent.yMax):
-                if verbose: print("Extent mismatch!")
-                return False
-        if (gk.raster.extractMatrix(source)>=255).sum() != (~self.region.mask).sum():
-            if verbose: print("Mask not equal!")
-            return False
-        print(f"#47 test code block take {time.time() - start}", flush=True)
-        if not ri_extent.srs.IsSame(self.srs):
-            if verbose: print("SRS mismatch!")
-            return False
-
         ri = gk.raster.rasterInfo(source)
         if not np.isclose(ri.pixelWidth, self.region.pixelWidth):
             if verbose: print("pixelWidth mismatch!")
@@ -669,6 +650,35 @@ class ExclusionCalculator(object):
 
         if not np.isclose(ri.pixelHeight, self.region.pixelHeight):
             if verbose: print("pixelHeight mismatch!")
+            return False
+            
+        ri_extent = gk.Extent.fromRaster(source)
+#         if not ri_extent == self.region.extent: #TODO remove when block hereunder works
+#             if verbose: print("Extent mismatch!")
+#             return False
+        start = time.time() #TODO remove before merge to dev
+        if (ri_extent.xMin != self.region.extent.xMin or
+            ri_extent.xMax != self.region.extent.xMax or
+            ri_extent.yMin != self.region.extent.yMin or
+            ri_extent.yMax != self.region.extent.yMax):
+                if verbose: print("Extent mismatch!")
+                return False
+                
+#         if (gk.raster.extractMatrix(source)>=255).sum() != (~self.region.mask).sum(): #TODO remove when block hereunder works
+#             if verbose: print("Mask not equal!")
+#             return False
+        # create a mask for source raster based on noData value (set noData to False, all valid values 0-100 to True)
+        source_mask=gk.raster.extractMatrix(source)
+        source_mask[source_mask<=100]=True
+        source_mask[source_mask==ri.noData]=False
+        # compare the two masks and check if they are alike for all cells
+        if not (source_mask==self.region.mask).all():
+        	  if verbose: print("Masks not equal.")
+        	  return False
+        print(f"#47 test code block take {time.time() - start}", flush=True) #TODO remove before merge to dev
+        
+        if not ri_extent.srs.IsSame(self.srs):
+            if verbose: print("SRS mismatch!")
             return False
 
         return True
