@@ -485,18 +485,6 @@ class ExclusionCalculator(object):
                 h = axh1.ax.plot([], [], color=itemsColor, marker='o', linestyle='None', label="{}: {:,d}".format(
                     'Elemente' if german else 'Items', s._itemCoords.shape[0]))
                 patches.append(h[0])
-            # if not s._existingItemCoords is None:
-            #     # h = axh1.ax.plot([], [], 'ob', label="Existing items: {:,d}".format(
-            #     #     s._existingItemCoords.shape[0]))#
-            #     h = axh1.ax.plot([], [], color=ex_item_color, marker='o', linestyle='None', label="Existing Turbines: {:,d}".format(
-            #         s._existingItemCoords.shape[0]))
-            #     patches.append(h[0])
-            # if not s._existingPVItemCoords is None:
-            #     # h = axh1.ax.plot([], [], 'oy', label="Existing OF-PV items: {:,d}".format(
-            #     #     s._existingPVItemCoords.shape[0]))
-            #     h = axh1.ax.plot([], [], 'oy', label="Existing Openfield-PV {:,d}".format(
-            #         s._existingPVItemCoords.shape[0]))
-            #     patches.append(h[0])
         # Draw existing points
         if s._additional_points is not None and additional_items is None:
             additional_items = s._additional_points
@@ -527,13 +515,8 @@ class ExclusionCalculator(object):
                              marker='o', markersize=2, linestyle='None')
                 if legend:
                     h = axh1.ax.plot([], [], color=_ex_item_color, marker='o', linestyle='None', label="{}: {:,d}".format(
-<<<<<<< HEAD
                                     point_items,
                                     points.shape[0]))
-=======
-                        point_items,
-                        s._existingItemCoords.shape[0]))
->>>>>>> 5cc7efc0248c6d8969182dcf0eb86e2e16f26918
                     patches.append(h[0])
         if legend:
             _legendargs = dict(loc="lower right", fontsize=14)
