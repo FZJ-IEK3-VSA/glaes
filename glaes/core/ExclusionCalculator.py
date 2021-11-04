@@ -1308,14 +1308,17 @@ class ExclusionCalculator(object):
         """
         if isinstance(source, str) or isinstance(source, gdal.Dataset):
             points = gk.vector.extractFeatures(source, where=where)
+            
+        elif isinstance(source, pd.DataFrame):
+            points = source
+            if where is not None:
+                raise GlaesError("Where statement only allowed when " +
+                                 "gdal.Dataset or shape is provided.")
+        if all([isinstance(i, str) for i in points["scale"]]):
             try:
                 points["scale"] = [eval(i) for i in points["scale"]]
             except:
                 raise TypeError("Couldn't convert scale to tuple.")
-        elif isinstance(source, pd.DataFrame):
-            if where is not None:
-                raise GlaesError("Where statement only allowed when " +
-                                 "gdal.Dataset or shape is provided.")
         arr_existing = []
         vec_exclusion = pd.DataFrame(columns=["geom"])
         if "scale" in points.columns:
