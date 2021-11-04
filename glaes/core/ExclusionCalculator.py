@@ -521,7 +521,7 @@ class ExclusionCalculator(object):
                 if legend:
                     h = axh1.ax.plot([], [], color=_ex_item_color, marker='o', linestyle='None', label="{}: {:,d}".format(
                                     point_items,
-                                    s._existingItemCoords.shape[0]))
+                                    points.shape[0]))
                     patches.append(h[0])
         if legend:
             _legendargs = dict(loc="lower right", fontsize=14)
