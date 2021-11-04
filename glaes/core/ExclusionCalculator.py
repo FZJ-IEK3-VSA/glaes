@@ -634,35 +634,125 @@ class ExclusionCalculator(object):
             * Units are defined by the srs used to initialize the ExclusionCalculator"""
         return s._availability[s.region.mask].sum(dtype=np.int64) * s.region.pixelWidth * s.region.pixelHeight / 100
 
-    def _hasEqualContext(self, source):
+    def _hasEqualContext(self, source, verbose=False):
         """
         Internal function which checks if a given raster source has the same context as 
         the ExclusionCalculator. This checks SRS, extent, and pixel resolution
         """
         if not isfile(source) or not gk.util.isRaster(source):
-            # print("Is not a raster!")
-            return False
-
-        ri_extent = gk.Extent.fromRaster(source)
-        if not ri_extent == self.region.extent:
-            # print("Extent mismatch!")
-            return False
-
-        if not ri_extent.srs.IsSame(self.srs):
-            # print("SRS mismatch!")
+            if verbose: print("Is not a raster!")
             return False
 
         ri = gk.raster.rasterInfo(source)
         if not np.isclose(ri.pixelWidth, self.region.pixelWidth):
-            # print("pixelWidth mismatch!")
+            if verbose: print("pixelWidth mismatch!")
             return False
 
         if not np.isclose(ri.pixelHeight, self.region.pixelHeight):
-            # print("pixelHeight mismatch!")
+            if verbose: print("pixelHeight mismatch!")
+            return False
+            
+        ri_extent = gk.Extent.fromRaster(source)
+#         if not ri_extent == self.region.extent: #TODO remove when block hereunder works
+#             if verbose: print("Extent mismatch!")
+#             return False
+        start = time.time() #TODO remove before merge to dev
+        if (ri_extent.xMin != self.region.extent.xMin or
+            ri_extent.xMax != self.region.extent.xMax or
+            ri_extent.yMin != self.region.extent.yMin or
+            ri_extent.yMax != self.region.extent.yMax):
+                if verbose: print("Extent mismatch!")
+                return False
+                
+#         if (gk.raster.extractMatrix(source)>=255).sum() != (~self.region.mask).sum(): #TODO remove when block hereunder works
+#             if verbose: print("Mask not equal!")
+#             return False
+        # create a mask for source raster based on noData value (set noData to False, all valid values 0-100 to True)
+        source_mask=gk.raster.extractMatrix(source)
+        source_mask[source_mask<=100]=True
+        source_mask[source_mask==ri.noData]=False
+        # compare the two masks and check if they are alike for all cells
+        if not (source_mask==self.region.mask).all():
+        	  if verbose: print("Masks not equal.")
+        	  return False
+        print(f"#47 test code block take {time.time() - start}", flush=True) #TODO remove before merge to dev
+        
+        if not ri_extent.srs.IsSame(self.srs):
+            if verbose: print("SRS mismatch!")
             return False
 
         return True
+
+    def _createIntermediateMetadata(s, buffer, resolutionDiv, invert, mode, 
+        exclusiontype, source=np.nan, value=np.nan, prewarp=np.nan, 
+        threshold=np.nan, minSize=np.nan, where=np.nan, bufferMethod=np.nan, 
+        regionPad=np.nan, default=np.nan, sourcePath=np.nan, 
+        useRegionmask=np.nan, **kwargs):
     
+        # make sure that the 'type' string value is correct to avoid issues in if statements
+        assert exclusiontype in ['raster','vector'], "type parameter must be either 'raster' or 'vector'" #TODO possibly add prior later on
+
+        # hash the source to create unique identifier for metadata
+        if default and isinstance(source, str):
+            source_id = str(source)
+        elif default and pd.isnull(source):
+            source_id = "defaultIntermediate"
+        elif isinstance(source, gdal.Dataset) and exclusiontype=='raster':
+            h = hashlib.sha256(source.ReadAsArray().tobytes())
+            source_id = "Memory:" + h.hexdigest()
+        elif isinstance(source, gdal.Dataset) and exclusiontype=='vector':
+            # TODO: Find a way to get a hash signiture of an in-memory vector file
+            glaes_logger.warning("Intermediate from in-memory vector file is not implemented. " +
+                                "Intermediate will be created but cannot be reloaded.")
+            source_id = str(time.time())
+        else:
+            h = hashlib.sha256()
+            with open(source,'rb') as file:
+                chunk = 0
+                while chunk != b'':
+                    chunk = file.read(1024)
+                    h.update(chunk)
+            source_id = str(h.hexdigest())
+
+        # create dictionary of function arguments to compare against metadata
+        metadata = {
+            'AREA_OR_POINT': 'Area',
+            'source': str(source_id),
+            'sourcePath': str(sourcePath),
+            'buffer': str(buffer),
+            'resolutionDiv': str(resolutionDiv),
+            'invert': str(invert),
+            'mode': str(mode),
+            }
+
+        # add exclusion-type specific parameters to intermediate metadata
+        if exclusiontype=='raster':
+            metadata_raster = {
+                'exclusion_type': "Raster",
+                'value': str(value),
+                'prewarp': str(prewarp),
+                'threshold' : str(threshold),
+                'minSize' : str(minSize), #TODO move this to the main dict once implemented in excludeVectorType as well
+                }
+            metadata={**metadata, **metadata_raster}
+        elif exclusiontype=='vector':
+            metadata_vector = {
+                'exclusion_type': "Vector",
+                'where': str(where),
+                'bufferMethod': str(bufferMethod),
+                #TODO discuss if useRegionmask is required - should not influence the results but would reduce flexibility to use regionmask preprocessing or not
+                #'useRegionmask':str(useRegionmask),
+                'regionPad': str(regionPad), #TODO move this to the main dict once implemented in excludeRasterType as well
+                }
+            metadata={**metadata, **metadata_vector}
+        
+        # add kwargs to metadata
+        for k, v in kwargs.items():
+            metadata[k] = str(v)
+           
+        return metadata
+                
+
     def _compareIntermediates(s, metadata, intermediate):
         """
         Compares metadata of intermediate file with dict of parameters 
@@ -691,7 +781,7 @@ class ExclusionCalculator(object):
             meta_intermediate_compare = {k: gk.raster.rasterInfo(intermediate).meta[k] for k in gk.raster.rasterInfo(intermediate).meta if not k in metaNotConsidered}
 
         # check if we can apply the intermediate file (check all metadata besides sourcePath which is stored only for user information)
-        if intermediate is not None and isfile(intermediate) and s._hasEqualContext(intermediate) and \
+        if intermediate is not None and isfile(intermediate) and s._hasEqualContext(intermediate, verbose=True) and \
                 meta_intermediate_compare == {k:metadata[k] for k in metadata if not k in metaNotConsidered}:
  
             if s.verbose and intermediate is not None:
@@ -725,7 +815,7 @@ class ExclusionCalculator(object):
     # General excluding functions
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1, 
         intermediate=None, prewarp=False, invert=False, mode="exclude", 
-        minSize=None, threshold=50, **kwargs):
+        minSize=None, threshold=50, default=False, **kwargs):
         """Exclude areas based off the values in a raster datasource
 
         Parameters:
@@ -823,52 +913,38 @@ class ExclusionCalculator(object):
             Cells with an eligibility percentage below this threshold 
             will be considered as ineligible. Defaults to 50.
 
+        default: bool; optional 
+            If True, no source must be passed and am empty, fully eligible 
+            default intermediate file (or 0% if mode=include) will be returned. 
+            If a string is passed as source, it will be written into the 
+            sourcePath as well as the _exclusionStr instead of the actual 
+            source. Defaults to False.
+
         kwargs
             * All other keyword arguments are passed on to a call to
               geokit.RegionMask.indicateValues
 
         """
-        # create sourcePath
-        if isinstance(source, str):
-            sourcePath=str(source)
+        
+        # create sourcePath and assert that input source is of suitable type
+        # null can only occur for default intermediates
+        if default and pd.isnull(source):
+            sourcePath = "n/a"
+        elif isinstance(source, str):
+            sourcePath = str(source)
         elif isinstance(source, gdal.Dataset):
-            sourcePath="from memory"
+            sourcePath = "from memory"
         else:
             raise GlaesError("Source must be gdal.Dataset or path to raster file.")
         
         # Perform check for intermediate file
         if intermediate is not None:
-            # hash the source to create unique identifier for metadata
-            if isinstance(source, gdal.Dataset):
-                h = hashlib.sha256(source.ReadAsArray().tobytes())
-                source_id = "Memory:" + h.hexdigest()
-            else:
-                h = hashlib.sha256()
-                with open(source,'rb') as file:
-                    chunk = 0
-                    while chunk != b'':
-                        chunk = file.read(1024)
-                        h.update(chunk)
-                source_id = str(h.hexdigest())
-
-            # create dictionary of function arguments to compare against metadata
-            metadata = {
-                'AREA_OR_POINT': 'Area',
-                'exclusion_type': "Raster",
-                'source': str(source_id),
-                'sourcePath': str(sourcePath),
-                'value': str(value),
-                'buffer': str(buffer),
-                'resolutionDiv': str(resolutionDiv),
-                'prewarp': str(prewarp),
-                'invert': str(invert),
-                'mode': str(mode),
-                'threshold' : str(threshold),
-                'minSize' : str(minSize),
-            }
-
-            for k, v in kwargs.items():
-                metadata[k] = str(v)
+            # create metadata dictionnary from input parameters
+            metadata = s._createIntermediateMetadata(source=source, 
+                buffer=buffer, resolutionDiv=resolutionDiv, invert=invert, 
+                mode=mode, exclusiontype='raster', value=value, prewarp=prewarp, 
+                minSize=minSize, threshold=threshold, default=default,
+                sourcePath=sourcePath, **kwargs)
 
     	    # compare metadata and define if recalculation is required
             recalculate = s._compareIntermediates(
@@ -882,7 +958,16 @@ class ExclusionCalculator(object):
             # load indications matrix (always inverted) from intermediate; 
             # set to 100 - intermediate matrix to invert from non-inverted 
             # intermediates
-            indications = 100 - gk.raster.extractMatrix(intermediate)
+            data = gk.raster.extractMatrix(intermediate)
+            indications = 100 - data if mode=='exclude' else data
+        elif default and intermediate is not None:
+            # create an artificial indications matrix and save a 100% eligible 
+            # (or ineligible for mode=include) default intermediate
+            indications = np.zeros(s.region.mask.shape)
+            data = indications if mode=='include' else 100-indications
+            data = s.region.applyMask(data, 255.0)
+            s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
+            glaes_logger.info(f"NOTE: Default intermediate was created as {intermediate}.")
         else:
             # Do prewarp, if needed
             if prewarp:
@@ -943,8 +1028,9 @@ class ExclusionCalculator(object):
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
             if intermediate is not None:
-                # un-invert (inverted) indications matrix for intermediate 
-                data= s.region.applyMask(100-indications, 255.0)
+                # invert indications matrix for intermediate when mode=exclude
+                data = indications if mode=='include' else 100-indications
+                data= s.region.applyMask(data, 255.0)
                 s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
 
         # exclude the indicated area from the total availability
@@ -966,11 +1052,12 @@ class ExclusionCalculator(object):
             raise GlaesError("mode must be 'exclude' or 'include'")
 
         # add exclusion to eclusion list str
-        s._exclusionStr=s._exclusionStr + f"({basename(sourcePath)}/value: {value}/buffer: {buffer}m), "
+        s._exclusionStr=s._exclusionStr + f"({basename(sourcePath)}/value: {value}/buffer: {buffer if isinstance(buffer, int) else 0}m), "
 
     def excludeVectorType(s, source, where=None, buffer=None, 
         bufferMethod='geom', invert=False, mode="exclude", resolutionDiv=1, 
-        intermediate=None, regionPad=None, useRegionmask=True, **kwargs):
+        intermediate=None, regionPad=None, useRegionmask=True, default=False,
+        **kwargs):
         """Exclude areas based off the features in a vector datasource
 
         Parameters:
@@ -1042,6 +1129,13 @@ class ExclusionCalculator(object):
             * If True, vector dataset will be pre-loaded via regionmask 
             to save time loading huge vector datasets. Defaults to True
 
+        default: bool; optional 
+            If True, no source must be passed and am empty, fully eligible 
+            default intermediate file (or 0% if mode=include) will be returned. 
+            If a string is passed as source, it will be written into the 
+            sourcePath as well as the _exclusionStr instead of the actual 
+            source. Defaults to False.
+            
         kwargs
             * All other keyword arguments are passed on to a call to
               geokit.RegionMask.indicateFeatures
@@ -1051,62 +1145,51 @@ class ExclusionCalculator(object):
         if regionPad is None:
             regionPad = buffer
         
-        # create sourcePath
-        if isinstance(source, str):
-            sourcePath=str(source)
+        # create sourcePath and assert that input source is of suitable type
+        # null can only occur for default intermediates
+        if default and pd.isnull(source):
+            sourcePath = "n/a"
+        elif isinstance(source, str):
+            sourcePath = str(source)
         elif isinstance(source, gdal.Dataset):
-            sourcePath="from memory"
+            sourcePath = "from memory"
         else:
-            raise GlaesError("Source must be gdal.Dataset or path to raster file.")
+            raise GlaesError("Source must be gdal.Dataset or path to vector file.")
                 
         # Perform check for intermediate file
         if intermediate is not None:
-            # hash the source to create unique identifier for intermediate metadata
-            # TODO: Find a way to get a hash signiture of an in-memory vector file
-            if isinstance(source, gdal.Dataset):
-                glaes_logger.warning("Intermediate from in-memory vector file is not implemented. " +
-                                     "Intermediate will be created but cannot be reloaded.")
-                source_id = str(time.time())
-            else:
-                h = hashlib.sha256()
-                with open(source,'rb') as file:
-                    chunk = 0
-                    while chunk != b'':
-                        chunk = file.read(1024)
-                        h.update(chunk)
-                source_id = str(h.hexdigest())
-
-            # create dictionary of function arguments to compare against metadata
-            metadata = {
-                'AREA_OR_POINT': 'Area',
-                'exclusion_type': "Vector",
-                'source': source_id,
-                'sourcePath': str(sourcePath),
-                'where': str(where),
-                'buffer': str(buffer),
-                'bufferMethod': str(bufferMethod),
-                'invert': str(invert),
-                'resolutionDiv': str(resolutionDiv),
-                'mode': str(mode),
-                'regionPad': str(regionPad)
-            }
-
-            for k, v in kwargs.items():
-                metadata[k] = str(v)
+            # create metadata dictionnary from input parameters
+            #TODO find a way to automatically pass ALL main function parameters 
+            # plus exclusionType and sourcePath, including kwargs
+            metadata = s._createIntermediateMetadata(source=source, 
+                buffer=buffer, resolutionDiv=resolutionDiv, invert=invert, 
+                mode=mode, exclusiontype='vector', where=where, 
+                sourcePath=sourcePath, bufferMethod=bufferMethod, 
+                regionPad=regionPad, useRegionmask=useRegionmask , 
+                default=default,**kwargs)
 
             # compare metadata and define if recalculation is required
             recalculate = s._compareIntermediates(
                 metadata=metadata, 
                 intermediate=intermediate)
         else:
-            # if no internmediate is passed, "re"calculation is always required
+            # if no intermediate is passed, "re"calculation is always required
             recalculate = True
 
         if not recalculate:
             # load indications matrix (always inverted) from intermediate; 
             # set to 100 - intermediate matrix to invert from non-inverted 
             # intermediates
-            indications = 100 - gk.raster.extractMatrix(intermediate)
+            data = gk.raster.extractMatrix(intermediate)
+            indications = 100 - data if mode=='exclude' else data
+        elif default and intermediate is not None:
+            # create an artificial indications matrix and save a 100% eligible 
+            # (or ineligible for mode=include) default intermediate
+            indications = np.zeros(s.region.mask.shape)
+            data = indications if mode=='include' else 100-indications
+            data = s.region.applyMask(data, 255.0)
+            s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
+            glaes_logger.info(f"NOTE: Default intermediate was created as {intermediate}.")
         else:
             # (re)calculate the exclusions
             if isinstance(source, PriorSource):
@@ -1144,8 +1227,9 @@ class ExclusionCalculator(object):
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
             if intermediate is not None:
-                # un-invert (inverted) indications matrix for intermediate 
-                data= s.region.applyMask(100-indications, 255.0)
+                # invert indications matrix for intermediate when mode=exclude
+                data = indications if mode=='include' else 100-indications
+                data= s.region.applyMask(data, 255.0)
                 s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
 
         # exclude the indicated area from the total availability
@@ -1167,7 +1251,7 @@ class ExclusionCalculator(object):
             raise GlaesError("mode must be 'exclude' or 'include'")
 
         # add exclusion to eclusion list str
-        s._exclusionStr=s._exclusionStr + f"({basename(sourcePath)}/where: {where}/buffer: {buffer}m), "
+        s._exclusionStr=s._exclusionStr + f"({basename(sourcePath)}/where: {where}/buffer: {buffer if isinstance(buffer, int) else 0}m), "
 
 
     def excludePoints(s, source, geometry_shape, scale=None, where=None,
