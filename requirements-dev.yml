@@ -19,8 +19,4 @@ dependencies:
   - scikit-learn
   - gdal>2.2.0,<3.2.1
   - pip:
-<<<<<<< HEAD
-      - https://github.com/FZJ-IEK3-VSA/geokit/archive/v1.3.0.zip
-=======
->>>>>>> issue26_testing
       - -e .
