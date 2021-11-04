@@ -197,8 +197,8 @@ class ExclusionCalculator(object):
 
         # Create spatial reference system (but only if a RegionMask isnt already given)
         if not isinstance(region, gk.RegionMask) and isinstance(srs, str) and srs[0:4] == "LAEA":
-            import osr
-            import ogr
+            import osgeo.osr
+            import osgeo.ogr
             if len(srs) > 4:  # A center point was given
                 m = re.compile("LAEA:([0-9.-]+),([0-9.-]+)").match(srs)
                 if m is None:
@@ -207,7 +207,7 @@ class ExclusionCalculator(object):
                 center_y, center_x = map(float, m.groups())
 
             else:  # A center point should be determined
-                if isinstance(region, ogr.Geometry):
+                if isinstance(region, osgeo.ogr.Geometry):
                     if not region.GetSpatialReference().IsSame(gk.srs.EPSG4326):
                         region = gk.geom.transform(
                             region, toSRS=gk.srs.EPSG4326)
@@ -226,7 +226,7 @@ class ExclusionCalculator(object):
                     raise RuntimeError(
                         "Automatic center determination is only possible when the 'region' input is an ogr.Geometry Object or a path to a vector file")
 
-            srs = osr.SpatialReference()
+            srs = osgeo.osr.SpatialReference()
             srs.ImportFromProj4(
                 '+proj=laea +lat_0={} +lon_0={} +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'.format(
                     center_y, center_x))
