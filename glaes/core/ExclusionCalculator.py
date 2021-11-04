@@ -688,18 +688,6 @@ class ExclusionCalculator(object):
 
         return True
 
-<<<<<<< HEAD
-    def _createIntermediateMetadata(s, buffer, resolutionDiv, invert, mode,
-                                    exclusiontype, source=np.nan, value=np.nan, prewarp=np.nan,
-                                    threshold=np.nan, minSize=np.nan, where=np.nan, bufferMethod=np.nan,
-                                    regionPad=np.nan, default=np.nan, sourcePath=np.nan,
-                                    useRegionmask=np.nan, **kwargs):
-
-        # make sure that the 'type' string value is correct to avoid issues in if statements
-        # TODO possibly add prior later on
-        assert exclusiontype in [
-            'raster', 'vector'], "type parameter must be either 'raster' or 'vector'"
-=======
     def _createIntermediateMetadata(s, buffer, resolutionDiv, invert, mode, 
         exclusiontype, source=np.nan, value=np.nan, prewarp=np.nan, 
         threshold=np.nan, minSize=np.nan, where=np.nan, bufferMethod=np.nan, 
@@ -711,7 +699,6 @@ class ExclusionCalculator(object):
     
         # make sure that the 'type' string value is correct to avoid issues in if statements
         assert exclusiontype in ['raster','vector'], "type parameter must be either 'raster' or 'vector'"
->>>>>>> dev
 
         # hash the source to create unique identifier for metadata
         if default and isinstance(source, str):
@@ -752,38 +739,19 @@ class ExclusionCalculator(object):
                 'exclusion_type': "Raster",
                 'value': str(value),
                 'prewarp': str(prewarp),
-<<<<<<< HEAD
-                'threshold': str(threshold),
-                # TODO move this to the main dict once implemented in excludeVectorType as well
-                'minSize': str(minSize),
-            }
-            metadata = {**metadata, **metadata_raster}
-        elif exclusiontype == 'vector':
-=======
                 'threshold' : str(threshold),
                 'minSize' : str(minSize),
                 }
             metadata={**metadata, **metadata_raster}
         elif exclusiontype=='vector':
->>>>>>> dev
             metadata_vector = {
                 'exclusion_type': "Vector",
                 'where': str(where),
                 'bufferMethod': str(bufferMethod),
-<<<<<<< HEAD
-                # TODO discuss if useRegionmask is required - should not influence the results but would reduce flexibility to use regionmask preprocessing or not
-                # 'useRegionmask':str(useRegionmask),
-                # TODO move this to the main dict once implemented in excludeRasterType as well
-                'regionPad': str(regionPad),
-            }
-            metadata = {**metadata, **metadata_vector}
-
-=======
                 'regionPad': str(regionPad),
                 }
             metadata={**metadata, **metadata_vector}
         
->>>>>>> dev
         # add kwargs to metadata
         for k, v in kwargs.items():
             metadata[k] = str(v)
@@ -1042,18 +1010,6 @@ class ExclusionCalculator(object):
             if not minSize == None:
 
                 # Create a vector file of geometries larger than 'minSize'
-<<<<<<< HEAD
-                # TODO speed up the process: Either possibly invert the process
-                # and remove holes/inner rings to save time or use gdal sieve
-                # TODO agree on solution for int 0-100 values for cell exclusion
-                # what value should be excluded? Overlay isolated areas with 0-100
-                # indications matrix to preserve exclusions <50% and possibly also
-                # keep exclusion values 50-100% (instead of setting them to 0 i.e.
-                # 100% exclusion) - if so what value to assign to additionally excluded
-                # isolated (former eligible) areas? 0 or rather 49 to reduce impact
-                # on ec.üercentAvailable?
-=======
->>>>>>> dev
                 if invert:
                     geoms = gk.geom.polygonizeMask((indications) >= threshold,
                                                    bounds=s.region.extent.xyXY,
@@ -1212,23 +1168,12 @@ class ExclusionCalculator(object):
         # Perform check for intermediate file
         if intermediate is not None:
             # create metadata dictionnary from input parameters
-<<<<<<< HEAD
-            # TODO find a way to automatically pass ALL main function parameters
-            # plus exclusionType and sourcePath, including kwargs
-            metadata = s._createIntermediateMetadata(source=source,
-                                                     buffer=buffer, resolutionDiv=resolutionDiv, invert=invert,
-                                                     mode=mode, exclusiontype='vector', where=where,
-                                                     sourcePath=sourcePath, bufferMethod=bufferMethod,
-                                                     regionPad=regionPad, useRegionmask=useRegionmask,
-                                                     default=default, **kwargs)
-=======
             metadata = s._createIntermediateMetadata(source=source, 
                 buffer=buffer, resolutionDiv=resolutionDiv, invert=invert, 
                 mode=mode, exclusiontype='vector', where=where, 
                 sourcePath=sourcePath, bufferMethod=bufferMethod, 
                 regionPad=regionPad, useRegionmask=useRegionmask , 
                 default=default,**kwargs)
->>>>>>> dev
 
             # compare metadata and define if recalculation is required
             recalculate = s._compareIntermediates(
