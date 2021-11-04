@@ -1172,91 +1172,88 @@ class ExclusionCalculator(object):
 
     def excludePoints(s, source, geometry_shape, scale=None, where=None,
                       direction=None, save_to_ec=None):
-        # pd.DataFrame(columns=["geom", "scale", "direction"])
-        if isinstance(source, str):
+        if isinstance(source, str) or isinstance(source, gdal.Dataset):
             points = gk.vector.extractFeatures(source, where=where)
+            try:
+                points["scale"] = [eval(i) for i in points["scale"]]
+            except:
+                raise TypeError("Couldn't convert scale to tuple.")
         elif isinstance(source, pd.DataFrame):
-            # TODO: filtering with where statement (see excludeVectorType)
-            # TODO: think about loading the points like in vectorType 
-            # (with buffer and regionmask)
-            points = source
-            arr_existing = []
-            vec_exclusion = pd.DataFrame(columns=["geom"])
-            if "scale" in points.columns:
-                pass
-            elif scale is not None:
-                points["scale"] = scale
+            if where is not None:
+                raise GlaesError("Where statement only allowed when " +
+                                 "gdal.Dataset or shape is provided.")
+        arr_existing = []
+        vec_exclusion = pd.DataFrame(columns=["geom"])
+        if "scale" in points.columns:
+            pass
+        elif scale is not None:
+            points["scale"] = scale
+        else:
+            raise GlaesError("Scale has to be defined.")
+        if not all([isinstance(i, tuple) for i in points["scale"]]):
+            raise TypeError("Scale has to be defined as a tuple.")
+        def rotate(pts, center, angle):
+            def _rotate(pt, angle):
+                angle = np.radians(angle)
+                sin = np.sin(angle)
+                cos = np.cos(angle)
+                x = pt[0]
+                y = pt[1]
+                pt[0] = x * cos - y * sin
+                pt[1] = x * sin + y * cos
+                return pt
+
+            for point in pts:
+                point[0] -= center[0]
+                point[1] -= center[1]
+                point = _rotate(point, angle)
+                point[0] += center[0]
+                point[1] += center[1]
+
+            return pts
+        for idx, row in points.iterrows():
+            if "direction" in points.columns and row["direction"] is not None:
+                _direction = row["direction"]
+            elif direction is not None:
+                _direction = direction
             else:
-                raise GlaesError("Scale has to be defined blblbla")
-            def rotate(pts, center, angle):
-                def _rotate(pt, angle):
-                    angle = np.radians(angle)
-                    sin = np.sin(angle)
-                    cos = np.cos(angle)
-                    x = pt[0]
-                    y = pt[1]
-                    pt[0] = x * cos - y * sin
-                    pt[1] = x * sin + y * cos
-                    return pt
+                raise GlaesError("Direction has to be defined.")
+            coor = gk.srs.xyTransform(np.array([[row["geom"].GetX(), row["geom"].GetY()]]),
+                fromSRS=row["geom"].GetSpatialReference(), toSRS=s.region.srs)[0]
+            if geometry_shape == "rectangle":
+                outerRing = [[coor[0]+row["scale"][0], coor[1]+row["scale"][1]],
+                                [coor[0]+row["scale"][0], coor[1]-row["scale"][1]],
+                                [coor[0]-row["scale"][0], coor[1]-row["scale"][1]],
+                                [coor[0]-row["scale"][0], coor[1]+row["scale"][1]]]
+                outerRing = rotate(outerRing, coor, _direction)
+            elif geometry_shape == "ellipse":
+                outerRing = []
+                # Function to rotate the points.
+                # Create the outerRing of an ellipse around the coor
+                # with 30 points.
+                for i in range(0, 30):
+                    ang = i/30*2*np.pi
+                    outerRing.append(
+                        [coor[0] + row["scale"][0] * np.cos(ang),
+                            coor[1] + row["scale"][1] * np.sin(ang)])
+                # Rotate the created ellipse
+                # (outerRing, with center coor in wind_dir)
+                outerRing = rotate(outerRing, coor, _direction)
 
-                for point in pts:
-                    point[0] -= center[0]
-                    point[1] -= center[1]
-                    point = _rotate(point, angle)
-                    point[0] += center[0]
-                    point[1] += center[1]
-
-                return pts
-            # Transform maybe
-            # TODO: Scale has a factor /2 in it. Has to be changed below and
-            # double checked
-            # TODO: maybe use itertuples for performance reasons or just use geoms
-            for idx, row in points.iterrows():
-                if "direction" in points.columns and row["direction"] is not None:
-                    _direction = row["direction"]
-                elif direction is not None:
-                    _direction = direction
-                else:
-                    raise GlaesError("blabla")
-                # TODO: check if scale is either a list with length of the points
-                # or length is one
-                coor = gk.srs.xyTransform(np.array([[row["geom"].GetX(), row["geom"].GetY()]]),
-                    fromSRS=row["geom"].GetSpatialReference(), toSRS=s.region.srs)[0] # TODO: apply for each srs
-                if geometry_shape == "rectangle":
-                    outerRing = [[coor[0]+row["scale"][0], coor[1]+row["scale"][1]],
-                                 [coor[0]+row["scale"][0], coor[1]-row["scale"][1]],
-                                 [coor[0]-row["scale"][0], coor[1]-row["scale"][1]],
-                                 [coor[0]-row["scale"][0], coor[1]+row["scale"][1]]]
-                    outerRing = rotate(outerRing, coor, _direction)
-                elif geometry_shape == "ellipse":
-                    outerRing = []
-                    # Function to rotate the points.
-                    # Create the outerRing of an ellipse around the coor
-                    # with 30 points.
-                    for i in range(0, 30):
-                        ang = i/30*2*np.pi
-                        outerRing.append(
-                            [coor[0] + row["scale"][0] * np.cos(ang),
-                             coor[1] + row["scale"][1] * np.sin(ang)])
-                    # Rotate the created ellipse
-                    # (outerRing, with center coor in wind_dir)
-                    outerRing = rotate(outerRing, coor, _direction)
-
-                existing = gk.geom.polygon(outerRing, srs=s.region.srs)
-                arr_existing.append(existing)
-            # create dataframe with geom in style of gk.vector and
-            # exclude the total vector for better performance
-            vec_exclusion["geom"] = arr_existing
-            s.excludeVectorType(gk.vector.createVector(vec_exclusion))
-            if save_to_ec is not None:
-                if s._additional_points is None:
-                    s._additional_points = {}
-                s._additional_points.update({save_to_ec: {}})
-                s._additional_points[save_to_ec]["points"] = np.array([i[0] for i in points.apply(
-                    lambda x: np.array(gk.srs.xyTransform(np.array([
-                        [x["geom"].GetX(), x["geom"].GetY()]]),
-                        fromSRS=x["geom"].GetSpatialReference(), toSRS=s.region.srs)), axis=1).values]) #TODO: ceck that SRS is always correct
-                    # TODO: nicer implementation
+            existing = gk.geom.polygon(outerRing, srs=s.region.srs)
+            arr_existing.append(existing)
+        # create dataframe with geom in style of gk.vector and
+        # exclude the total vector for better performance
+        vec_exclusion["geom"] = arr_existing
+        s.excludeVectorType(gk.vector.createVector(vec_exclusion))
+        if save_to_ec is not None:
+            if s._additional_points is None:
+                s._additional_points = {}
+            s._additional_points.update({save_to_ec: {}})
+            s._additional_points[save_to_ec]["points"] = np.array([i[0] for i in points.apply(
+                lambda x: np.array(gk.srs.xyTransform(np.array([
+                    [x["geom"].GetX(), x["geom"].GetY()]]),
+                    fromSRS=x["geom"].GetSpatialReference(), toSRS=s.region.srs)), axis=1).values])
 
     def excludePrior(s, prior, value=None, buffer=None, invert=False, mode="exclude", **kwargs):
         """Exclude areas based off the values in one of the Prior data sources
