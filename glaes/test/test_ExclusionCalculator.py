@@ -35,12 +35,13 @@ def test_excludePoints():
     ec2 = gl.ExclusionCalculator(aachenShape)
     points = gk.vector.extractFeatures(pointData)
 
-    ec1.excludePoints(source=pointData, geometry_shape="ellipse", direction=45)
-    ec2.excludePoints(source=points, geometry_shape="ellipse", direction=45)
+    ec1.excludePoints(source=pointData, geometryShape="ellipse", direction=45)
+    ec2.excludePoints(source=points, geometryShape="ellipse", direction=45,
+                      saveToEC="Test")
     assert np.isclose(ec1.percentAvailable, 95.61485115020298)
     assert np.isclose(ec2.percentAvailable, 95.61485115020298)
-    ec1.excludePoints(source=pointData, geometry_shape="rectangle", direction=25)
-    ec2.excludePoints(source=points, geometry_shape="rectangle", direction=25)
+    ec1.excludePoints(source=pointData, geometryShape="rectangle", direction=25)
+    ec2.excludePoints(source=points, geometryShape="rectangle", direction=25)
     assert np.isclose(ec1.percentAvailable, 94.36879792512404)
     assert np.isclose(ec2.percentAvailable, 94.36879792512404)
 
