@@ -262,7 +262,7 @@ class ExclusionCalculator(object):
         s.itemCoords = None
         s._itemCoords = None
         s._areas = None
-        s._additional_points = None
+        s._additionalPoints = None
 
     def save(s, output, threshold=None, **kwargs):
         """Save the current availability matrix to a raster file
@@ -312,7 +312,7 @@ class ExclusionCalculator(object):
              itemsColor=(51/255, 153/255, 255/255), legend=True,
              legendargs={"loc": "lower left"},
              srs=None, dataScalingFactor=1, geomSimplificationFactor=None,
-             german=False, additional_items=None, **kwargs):
+             german=False, additionalPoints=True, **kwargs):
         """Draw the current availability matrix on a matplotlib figure
 
         Note:
@@ -356,6 +356,14 @@ class ExclusionCalculator(object):
 
         german: bool
             If true legend will be in German
+
+        additionalPoints: bool or dict
+            If True the internal additional points of the ec are plotted (can
+            be set to False if not wanted). Else a dictionary with the legend
+            naming as the key, the points and the color can be passed:
+            {"Name": {"points": point_items, "color": "red"}}
+            point_items can be a path to shape or an array with coords.
+            Default colors are given if not passed in the dict
 
         **kwargs:
             All keyword arguments are passed on to a call to geokit.drawImage
@@ -485,18 +493,32 @@ class ExclusionCalculator(object):
                 h = axh1.ax.plot([], [], color=itemsColor, marker='o', linestyle='None', label="{}: {:,d}".format(
                     'Elemente' if german else 'Items', s._itemCoords.shape[0]))
                 patches.append(h[0])
-        # Draw existing points
-        if s._additional_points is not None and additional_items is None:
-            additional_items = s._additional_points
-        if additional_items is not None:
-            for i, point_items in enumerate(additional_items.keys()):
-                if isinstance(additional_items[point_items]["points"], str):
-                    points = gk.vector.extractFeatures()  # TODO
-                elif isinstance(additional_items[point_items]["points"], np.ndarray):
-                    points = additional_items[point_items]["points"]
+        # Draw points 
+        # the check for ==True is here because just additionalPoints would be
+        # catched also when the input is e.g. a string
+        if type(additionalPoints) in [str, pd.DataFrame]:
+            pass
+        elif s._additionalPoints is not None and additionalPoints==True:
+            additionalPoints = s._additionalPoints
+        else:
+            additionalPoints = None
+        if additionalPoints is not None:
+            for i, point_items in enumerate(additionalPoints.keys()):
+                if isinstance(additionalPoints[point_items]["points"], str):
+                    _points = gk.vector.extractFeatures(
+                        additionalPoints[point_items]["points"])
+                    points = np.empty(shape=(len(_points), 3))
+                    for idx, row in _points.iterrows():
+                        points[idx] = gk.srs.xyTransform(
+                            np.array([[row["geom"].GetX(),
+                                       row["geom"].GetY()]]),
+                            fromSRS=row["geom"].GetSpatialReference(),
+                            toSRS=s.region.srs)[0]
+                elif isinstance(additionalPoints[point_items]["points"], np.ndarray):
+                    points = additionalPoints[point_items]["points"]
                 else:
-                    raise GlaesError("Blabla")  # TODO
-                # TODO: convert to numpy array with locations
+                    raise GlaesError("Point items have to be either passed "
+                                     "as a shape or an array with coords.")
                 if not srs.IsSame(s.region.srs):
                     points = gk.srs.xyTransform(
                         points,
@@ -506,8 +528,8 @@ class ExclusionCalculator(object):
                     )
 
                     points = np.column_stack([points.x, points.y])
-                if additional_items[point_items].get("color") is not None:
-                    _ex_item_color = additional_items[point_items].get("color")
+                if additionalPoints[point_items].get("color") is not None:
+                    _ex_item_color = additionalPoints[point_items].get("color")
                 else:
                     _ex_item_colors = [(176/255, 99/255, 214/255), "orange"]
                     _ex_item_color = _ex_item_colors[i]
@@ -654,10 +676,6 @@ class ExclusionCalculator(object):
             return False
 
         ri_extent = gk.Extent.fromRaster(source)
-#         if not ri_extent == self.region.extent: #TODO remove when block hereunder works
-#             if verbose: print("Extent mismatch!")
-#             return False
-        start = time.time()  # TODO remove before merge to dev
         if (ri_extent.xMin != self.region.extent.xMin or
             ri_extent.xMax != self.region.extent.xMax or
             ri_extent.yMin != self.region.extent.yMin or
@@ -666,9 +684,6 @@ class ExclusionCalculator(object):
                 print("Extent mismatch!")
             return False
 
-#         if (gk.raster.extractMatrix(source)>=255).sum() != (~self.region.mask).sum(): #TODO remove when block hereunder works
-#             if verbose: print("Mask not equal!")
-#             return False
         # create a mask for source raster based on noData value (set noData to False, all valid values 0-100 to True)
         source_mask = gk.raster.extractMatrix(source)
         source_mask[source_mask <= 100] = True
@@ -678,8 +693,6 @@ class ExclusionCalculator(object):
             if verbose:
                 print("Masks not equal.")
             return False
-        # TODO remove before merge to dev
-        print(f"#47 test code block take {time.time() - start}", flush=True)
 
         if not ri_extent.srs.IsSame(self.srs):
             if verbose:
@@ -1264,15 +1277,15 @@ class ExclusionCalculator(object):
         s._exclusionStr = s._exclusionStr + \
             f"({basename(sourcePath)}/where: {where}/buffer: {buffer if isinstance(buffer, int) else 0}m), "
 
-    def excludePoints(s, source, geometry_shape, scale=None, where=None,
-                      direction=None, save_to_ec=None):
+    def excludePoints(s, source, geometryShape, scale=None, where=None,
+                      direction=None, saveToEC=None):
         """Exclude points with different buffer shapes.
 
         Parameters
         ----------
         source : str or gdal.Dataset or pd.DataFrame
             The datasource with point geometries
-        geometry_shape : str
+        geometryShape : str
             choose "rectangle" or "ellipse"
         scale : tuple, optional
             size of the buffer geometry, by default None
@@ -1289,7 +1302,7 @@ class ExclusionCalculator(object):
                     where="type='protected'", by default None
         direction : int, optional
             orientation of the buffer geometry in degrees, by default None
-        save_to_ec : str, optional
+        saveToEC : str, optional
             name for points in ec plot, by default None
         """
         if isinstance(source, str) or isinstance(source, gdal.Dataset):
@@ -1344,13 +1357,13 @@ class ExclusionCalculator(object):
                 raise GlaesError("Direction has to be defined.")
             coor = gk.srs.xyTransform(np.array([[row["geom"].GetX(), row["geom"].GetY()]]),
                                       fromSRS=row["geom"].GetSpatialReference(), toSRS=s.region.srs)[0]
-            if geometry_shape == "rectangle":
+            if geometryShape == "rectangle":
                 outerRing = [[coor[0]+row["scale"][0], coor[1]+row["scale"][1]],
                              [coor[0]+row["scale"][0], coor[1]-row["scale"][1]],
                              [coor[0]-row["scale"][0], coor[1]-row["scale"][1]],
                              [coor[0]-row["scale"][0], coor[1]+row["scale"][1]]]
                 outerRing = rotate(outerRing, coor, _direction)
-            elif geometry_shape == "ellipse":
+            elif geometryShape == "ellipse":
                 outerRing = []
                 # Function to rotate the points.
                 # Create the outerRing of an ellipse around the coor
@@ -1370,11 +1383,11 @@ class ExclusionCalculator(object):
         # exclude the total vector for better performance
         vec_exclusion["geom"] = arr_existing
         s.excludeVectorType(gk.vector.createVector(vec_exclusion))
-        if save_to_ec is not None:
-            if s._additional_points is None:
-                s._additional_points = {}
-            s._additional_points.update({save_to_ec: {}})
-            s._additional_points[save_to_ec]["points"] = np.array([i[0] for i in points.apply(
+        if saveToEC is not None:
+            if s._additionalPoints is None:
+                s._additionalPoints = {}
+            s._additionalPoints.update({saveToEC: {}})
+            s._additionalPoints[saveToEC]["points"] = np.array([i[0] for i in points.apply(
                 lambda x: np.array(gk.srs.xyTransform(np.array([
                     [x["geom"].GetX(), x["geom"].GetY()]]),
                     fromSRS=x["geom"].GetSpatialReference(), toSRS=s.region.srs)), axis=1).values])
