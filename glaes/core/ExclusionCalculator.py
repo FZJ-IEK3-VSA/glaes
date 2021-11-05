@@ -1185,8 +1185,7 @@ class ExclusionCalculator(object):
                 buffer=buffer, resolutionDiv=resolutionDiv, invert=invert, 
                 mode=mode, exclusiontype='vector', where=where, 
                 sourcePath=sourcePath, bufferMethod=bufferMethod, 
-                regionPad=regionPad, useRegionmask=useRegionmask , 
-                default=default,**kwargs)
+                regionPad=regionPad, default=default,**kwargs)
 
             # compare metadata and define if recalculation is required
             recalculate = s._compareIntermediates(
