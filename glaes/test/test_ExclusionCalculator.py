@@ -16,7 +16,7 @@ aachenShape = gl._test_data_["aachenShapefile.shp"]
 clcRaster = gl._test_data_["clc-aachen_clipped.tif"]
 priorSample = gl._test_data_["roads_prior_clip.tif"]
 cddaVector = gl._test_data_["CDDA_aachenClipped.shp"]
-
+pointData = gl._test_data_["aachen_points.shp"]
 
 def test_multiple_exclusions():
     pr = gl.core.priors.PriorSource(priorSample)
@@ -30,6 +30,16 @@ def test_multiple_exclusions():
     assert np.isclose(np.nanmean(ec.availability), 37.1109619141, 1e-6)
     assert np.isclose(np.nanstd(ec.availability), 48.3101692200, 1e-6)
 
+def test_excludePoints():
+    ec1 = gl.ExclusionCalculator(aachenShape)
+    points = gk.vector.extractFeatures(pointData)
+
+    ec1.excludePoints(source=points, geometryShape="ellipse", direction=45,
+                      saveToEC="Test")
+    assert np.isclose(ec1.percentAvailable, 95.61485115020298)
+    ec1.excludePoints(source=pointData, geometryShape="rectangle", direction=25)
+    assert np.isclose(ec1.percentAvailable, 94.36879792512404)
+    assert len(ec1._additionalPoints["Test"]["points"]) == 13
 
 def test_ExclusionCalculator___init__():
     # Test by giving a shapefile
