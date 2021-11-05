@@ -32,18 +32,14 @@ def test_multiple_exclusions():
 
 def test_excludePoints():
     ec1 = gl.ExclusionCalculator(aachenShape)
-    ec2 = gl.ExclusionCalculator(aachenShape)
     points = gk.vector.extractFeatures(pointData)
 
-    ec1.excludePoints(source=pointData, geometryShape="ellipse", direction=45)
-    ec2.excludePoints(source=points, geometryShape="ellipse", direction=45,
+    ec1.excludePoints(source=points, geometryShape="ellipse", direction=45,
                       saveToEC="Test")
     assert np.isclose(ec1.percentAvailable, 95.61485115020298)
-    assert np.isclose(ec2.percentAvailable, 95.61485115020298)
     ec1.excludePoints(source=pointData, geometryShape="rectangle", direction=25)
-    ec2.excludePoints(source=points, geometryShape="rectangle", direction=25)
     assert np.isclose(ec1.percentAvailable, 94.36879792512404)
-    assert np.isclose(ec2.percentAvailable, 94.36879792512404)
+    assert len(ec1._additionalPoints["Test"]["points"]) == 13
 
 def test_ExclusionCalculator___init__():
     # Test by giving a shapefile
