@@ -1303,7 +1303,8 @@ class ExclusionCalculator(object):
         direction : int, optional
             orientation of the buffer geometry in degrees, by default None
         saveToEC : str, optional
-            name for points in ec plot, by default None
+            name for points in ec plot, by default None. The points are only
+            saved if a string is passed.
         """
         if isinstance(source, str) or isinstance(source, gdal.Dataset):
             points = gk.vector.extractFeatures(source, where=where)
