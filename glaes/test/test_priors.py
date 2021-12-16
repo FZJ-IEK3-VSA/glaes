@@ -8,7 +8,6 @@ import pytest
 import glaes as gl
 from glaes.core.priors import PriorSource, PriorSet
 
-GDAL_VERSION = gdal.VersionInfo()
 TESTDIR = dirname(__file__)
 DATADIR = join(TESTDIR, "data")
 RESULTDIR = join(TESTDIR, "results")
@@ -90,19 +89,17 @@ def test_Prior_generateVector():
     v = p.generateVector(ext, value=4000,
                          output=join(RESULTDIR, "generatedVector1.shp"))
     g = gk.vector.extractFeature(v, onlyGeom=True)
-    # Tests are failing for gdal>=3.0.0 due to a bug inside gdal
-    if int(GDAL_VERSION[0]) < 3:
-        assert np.isclose(g.Area(), 1684940000.0)
-    else:
-        assert np.isclose(g.Area(), 1690360000.0)
+    # Tests below are failing for 3.0.0<=gdal<3.4.0 due to problems when
+    # polygonizing
+    assert np.isclose(g.Area(), 1684940000.0)
 
     # Test an off-edge generation
     v = p.generateVector(ext, value=5500,
                          output=join(RESULTDIR, "generatedVector2.shp"))
     g = gk.vector.extractFeature(v, onlyGeom=True)
-    # Tests are failing for gdal>=3.0.0 due to a bug inside gdal
-    if int(GDAL_VERSION[0]) < 3:
-        assert np.isclose(g.Area(), 1851537325.6536)
+    # Tests below are failing for 3.0.0<=gdal<3.4.0 due to problems when
+    # polygonizing
+    assert np.isclose(g.Area(), 1851537325.6536)
 
 @pytest.mark.skip(reason="Todo")
 def test_Prior_extractValues():
