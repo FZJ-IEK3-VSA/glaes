@@ -1751,7 +1751,8 @@ class ExclusionCalculator(object):
 
             avoidRegionBorders - bool: If True, a distance of half the separation distance (or the mean for different values 
                 in axial and transversal direction) is kept from the region edges to avoid placements in immediate proximity
-                in neighbouring regions, by default False.
+                in neighbouring regions. Other that excludeRegionEdge, this will not affect the eligibiliyt of the region, 
+                only the locations of the placements will be adapted. By default False.
         """
 
         # TODO: CLEAN UP THIS FUNCTION BY REMOVING AREA DISTRIBUTION AND FILE SAVING, AND ASSOCIATED PARAMETERS
