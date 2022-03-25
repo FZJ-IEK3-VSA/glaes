@@ -7,6 +7,7 @@ import geokit as gk
 import glaes as gl
 import pandas as pd
 import statistics
+from copy import copy
 
 
 TESTDIR = dirname(__file__)
@@ -281,6 +282,8 @@ def test_ExclusionCalculator_distributeItems():
     pr = gl.core.priors.PriorSource(priorSample)
     ec = gl.ExclusionCalculator(aachenShape)
     ec.excludePrior(pr, value=(400, None))
+    # create a copy to repeat the process
+    ec2 = copy(ec)
 
     # Do a regular distribution
     ec.distributeItems(1000, output=join(RESULTDIR, "distributeItems1.shp"),
@@ -297,6 +300,16 @@ def test_ExclusionCalculator_distributeItems():
                 I = (gi, gj)
 
     assert minDist >= 999
+
+    ec2.distributeItems(1000, output=join(RESULTDIR, "distributeItems1b.shp"),
+                       outputSRS=3035)
+    geoms = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems1b.shp"))
+    assert geoms.shape[0] == 252       
+    # make sure that all placements fall within the region less the 500m border corridor
+    assert gk.vector.extractFeatures(
+        "distributeItems1b.shp",
+        geoms=gk.drawGeoms(ec.region.geometry.Buffer(-500))
+        ).shape[0] == 252
 
     # Do an axial distribution
     ec.distributeItems((1000, 300), axialDirection=180,
