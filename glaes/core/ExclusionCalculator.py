@@ -1706,7 +1706,7 @@ class ExclusionCalculator(object):
             s._availability = s.region.indicateFeatures(
                 vec, applyMask=False).astype(np.uint8) * 100
 
-    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, maxAcceptableDistance=None, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5, _stamping=True):
+    def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, maxAcceptableDistance=None, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5, _stamping=True, avoidRegionBorders=False):
         """Distribute the maximal number of minimally separated items within the available areas
 
         Returns a list of x/y coordinates (in the ExclusionCalculator's srs) of each placed item
@@ -1748,12 +1748,41 @@ class ExclusionCalculator(object):
                 - float : The scaling to apply to all points
                 - np.ndarray : The scalings at each pixel (must match availability matrix shape)
                 - str : A path to a raster file containing scaling factors
+
+            avoidRegionBorders - bool: If True, a distance of half the separation distance (or the mean for different values 
+                in axial and transversal direction) is kept from the region edges to avoid placements in immediate proximity
+                in neighbouring regions, by default False.
         """
 
         # TODO: CLEAN UP THIS FUNCTION BY REMOVING AREA DISTRIBUTION AND FILE SAVING, AND ASSOCIATED PARAMETERS
 
         # Preprocess availability
-        workingAvailability = s._availability >= threshold
+
+        # check if we must first exclude the edges of the regions from eligible placements
+        if avoidRegionBorders:
+            # first calculate average buffer distance from separation(s)
+            if isinstance(separation, tuple) and len(separation)==2:
+                distance=int((separation[0]+separation[1])/2/2)
+            elif isinstance(separation, int):
+                distance=separation
+            else:
+                message=f"Separation must be either tuple with length 2 or integer, here {type(separation)}: {separation}."
+                raise ValueError(message)
+            # calculate the exclusion indications based on region shape and negative buffer
+            indications = (
+                s.region.indicateFeatures(
+                    gk.vector.createVector(s.region.geometry),
+                    buffer=-distance,
+                ) * 100
+            ).astype(np.uint8)
+
+            # exclude the additional indications at the region edges from the availability matrix
+            _availability_less_borders = np.min([s._availability, indications], axis=0)
+            # define working availability as these values above threshold based on new avaiulability less region edges
+            workingAvailability = _availability_less_borders >= threshold
+        else:
+            workingAvailability = s._availability >= threshold
+
         if not workingAvailability.dtype == 'bool':
             raise s.GlaesError("Working availability must be boolean type")
 
