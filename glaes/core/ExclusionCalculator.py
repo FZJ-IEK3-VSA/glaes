@@ -1763,8 +1763,9 @@ class ExclusionCalculator(object):
             # first calculate average buffer distance from separation(s)
             if isinstance(separation, tuple) and len(separation)==2:
                 distance=int((separation[0]+separation[1])/2/2)
+                print(distance)
             elif isinstance(separation, int):
-                distance=separation
+                distance=int(separation/2)
             else:
                 message=f"Separation must be either tuple with length 2 or integer, here {type(separation)}: {separation}."
                 raise ValueError(message)
