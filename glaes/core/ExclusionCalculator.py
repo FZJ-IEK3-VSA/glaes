@@ -2215,7 +2215,13 @@ class ExclusionCalculator(object):
         vec = gk.vector.createVector(
             geoms, fieldVals={"pid": range(1, len(geoms) + 1)})
         areaMap = s.region.rasterize(
-            vec, value="pid", dtype=int) * (s._availability > threshold)
+            vec, value="pid", dtype=int) 
+
+        # assert that the WHOLE ec region is covered by (rasterized) voronoi regions
+        assert len(areaMap[areaMap>0])==s.region.mask.sum(), f"Voronoi distribution failed to cover the whole region extent. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding and/or _voronoiBoundaryPoints."
+        
+        # reduce the (rasterized) voronois to only the eligible areas
+        areaMap = areaMap * (s._availability > threshold)
 
         geoms = gk.geom.polygonizeMatrix(
             areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True)
