@@ -5,8 +5,8 @@ stages:
 
 test:
   stage: test
-  # tags: 
-  #   - linux
+  tags: 
+    - linux
 
   script:
     - conda install mamba -c conda-forge
