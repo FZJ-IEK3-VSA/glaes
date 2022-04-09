@@ -307,7 +307,7 @@ def test_ExclusionCalculator_distributeItems():
     assert geoms.shape[0] == 252       
     # make sure that all placements fall within the region less the 500m border corridor
     assert gk.vector.extractFeatures(
-        "distributeItems1b.shp",
+        join(RESULTDIR, "distributeItems1b.shp"),
         geoms=gk.drawGeoms(ec.region.geometry.Buffer(-500))
         ).shape[0] == 252
 
