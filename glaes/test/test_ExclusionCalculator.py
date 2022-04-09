@@ -302,7 +302,7 @@ def test_ExclusionCalculator_distributeItems():
     assert minDist >= 999
 
     ec2.distributeItems(1000, output=join(RESULTDIR, "distributeItems1b.shp"),
-                       outputSRS=3035)
+                       outputSRS=3035, avoidRegionBorders=True)
     geoms = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems1b.shp"))
     assert geoms.shape[0] == 252       
     # make sure that all placements fall within the region less the 500m border corridor
