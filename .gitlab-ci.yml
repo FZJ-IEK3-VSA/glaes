@@ -16,10 +16,14 @@ test:
     - cd geokit
     - mamba env update -n glaes --file=requirements-dev.yml
     - cd ..
-    - python -m pip show geokit
     - mamba env update -n glaes --file=requirements-dev.yml
+    - cd geokit
+    - pip install -e .
     - source deactivate
     - source activate glaes
-    - python -m pip install -e .
+    - pip show geokit
+    - pip show gdal
+    - cd ..
+    - pip install -e .
     - mamba info --envs
-    - python -m pytest --cov=glaes glaes/test/
+    - pytest --cov=glaes glaes/test/
