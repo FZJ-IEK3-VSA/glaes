@@ -8,8 +8,8 @@ from warnings import warn
 from numpy.core.numeric import outer
 import pandas as pd
 import hashlib
-from osgeo import gdal
-
+from osgeo import gdal, ogr, osr
+import multiprocessing
 
 from .util import GlaesError, glaes_logger
 from .priors import Priors, PriorSource
@@ -1078,7 +1078,7 @@ class ExclusionCalculator(object):
     def excludeVectorType(s, source, where=None, buffer=None,
                           bufferMethod='geom', invert=False, mode="exclude", resolutionDiv=1,
                           intermediate=None, regionPad=None, useRegionmask=True, default=False,
-                          **kwargs):
+                          _spawnNewProcess=True, **kwargs):
         """Exclude areas based off the features in a vector datasource
 
         Parameters:
@@ -1156,6 +1156,9 @@ class ExclusionCalculator(object):
             If a string is passed as source, it will be written into the 
             sourcePath as well as the _exclusionStr instead of the actual 
             source. Defaults to False.
+        
+        _spawnNewProcess: boolean, option.
+            If true, the core calulation is spaned inside a new process to free RAM from heavy osgeo objects.
 
         kwargs
             * All other keyword arguments are passed on to a call to
@@ -1222,7 +1225,7 @@ class ExclusionCalculator(object):
             # reduce vector dataset to padded region shape to avoid loading
             # huge vector datasets in next step in indicate features
             if not isinstance(source, gdal.Dataset) and useRegionmask:
-                source = s.region.mutateVector(source, regionPad=regionPad)
+                source = s.region.mutateVector(source, regionPad=regionPad) #small ram increase
             if source is None:
                 # create an empty indications matrix since no exclusions in
                 # region shape of exclusion calculator object
@@ -1233,18 +1236,54 @@ class ExclusionCalculator(object):
                                                     **kwargs)
             else:
                 # calculate the actual exclusions
-                indications = (
-                    s.region.indicateFeatures(
-                        source,
-                        where=where,
-                        buffer=buffer,
-                        resolutionDiv=resolutionDiv,
-                        bufferMethod=bufferMethod,
-                        applyMask=False,
-                        forceMaskShape=True,
-                        regionPad=regionPad,
-                        **kwargs) * 100
-                ).astype(np.uint8)
+                
+                #try in new process:
+                try:
+                    if _spawnNewProcess:
+                        manager = multiprocessing.Manager()
+                        sharedDict = manager.dict()
+
+                        p = multiprocessing.Process(
+                            target=s.region.indicateFeaturesMultiprocess,
+                            args=(
+                                source,
+                            ),
+                            kwargs={**{
+                                'where': where,
+                                'buffer': buffer,
+                                'bufferMethod': bufferMethod,
+                                'resolutionDiv': resolutionDiv,
+                                'forceMaskShape': True,
+                                'applyMask': False,
+                                'noData': 0,   
+                                'preBufferSimplification': None,
+                                'sharedDict': sharedDict,
+                                'regionPad': regionPad,
+                            }, **kwargs}
+                        )
+                        p.start()
+                        p.join()
+
+                        indications_raw = sharedDict['indicationMatrix']
+                        indications = (indications_raw * 100).astype(np.uint8)
+                        manager.shutdown()
+                    else:
+                        raise ValueError('Nothing to worry, just jump to exception')
+                
+                except:
+                    warn('Memory efficient way failed, returning to save method')
+                    indications = (
+                        s.region.indicateFeatures(
+                            source,
+                            where=where,
+                            buffer=buffer,
+                            resolutionDiv=resolutionDiv,
+                            bufferMethod=bufferMethod,
+                            applyMask=False,
+                            forceMaskShape=True,
+                            regionPad=regionPad,
+                            **kwargs) * 100
+                    ).astype(np.uint8)
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
             if intermediate is not None:
