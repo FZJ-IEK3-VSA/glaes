@@ -840,7 +840,7 @@ class ExclusionCalculator(object):
     # General excluding functions
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1,
                           intermediate=None, prewarp=False, invert=False, mode="exclude",
-                          minSize=None, threshold=50, default=False, _spawnNewProcess=False, **kwargs):
+                          minSize=None, threshold=50, default=False, _spawnNewProcess=True, **kwargs):
         """Exclude areas based off the values in a raster datasource
 
         Parameters:
