@@ -642,6 +642,16 @@ class ExclusionCalculator(object):
         return s._availability_per_criterion.sum(dtype=np.int64) / s.region.mask.sum()
 
     @property
+    def percentAvailableAreaReductionPerCriterion(s):
+        """The percent of the region which remains available after pruning or distributeAreas with minsize"""
+        return s._areaAfterReduction / s._areaBeforeReduction *100 #in %
+    
+    @property
+    def percentAvailableAfterAreaReduction(s):
+        """The percent of the region which remains available after pruning or distributeAreas"""
+        return s._areaAfterReduction / (s.region.mask.sum()* s.region.pixelWidth * s.region.pixelHeight) * 100 #in %
+
+    @property
     def clearPercentAvailablePerCriterion(s):
         """The percent of the region which remains available"""
         s._availability_per_criterion = np.array(
@@ -1769,6 +1779,7 @@ class ExclusionCalculator(object):
         * minSize is given in units of the calculator's srs
         """
         # Create a vector file of geometries larger than 'minSize'
+        s._areaBeforeReduction = s.areaAvailable
         geoms = gk.geom.polygonizeMask(
             s._availability >= threshold, bounds=s.region.extent.xyXY, srs=s.region.srs, flat=False)
         geoms = list(filter(lambda x: x.Area() >= minSize, geoms))
@@ -1781,6 +1792,9 @@ class ExclusionCalculator(object):
             # Replace current availability matrix
             s._availability = s.region.indicateFeatures(
                 vec, applyMask=False).astype(np.uint8) * 100
+        
+        s._areaAfterReduction = s.areaAvailable
+        s._availability_per_criterion = s._availability
 
     def distributeItems(s, separation, pixelDivision=5, threshold=50, maxItems=10000000, outputSRS=None, output=None, asArea=False, minArea=100000, maxAcceptableDistance=None, axialDirection=None, sepScaling=None, _voronoiBoundaryPoints=10, _voronoiBoundaryPadding=5, _stamping=True):
         """Distribute the maximal number of minimally separated items within the available areas
@@ -2239,6 +2253,8 @@ class ExclusionCalculator(object):
 
     def distributeAreas(s, points=None, minArea=100000, threshold=50, _voronoiBoundaryPoints=10,
                         _voronoiBoundaryPadding=5):
+
+        s._areaBeforeReduction = s.areaAvailable
         if points is None:
             try:
                 points = s._itemCoords
@@ -2296,6 +2312,8 @@ class ExclusionCalculator(object):
         geoms = gk.geom.polygonizeMatrix(
             areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True)
         geoms = list(filter(lambda x: x.Area() >= minArea, geoms.geom))
+
+        s._areaAfterReduction = sum([g.Area() for g in geoms])
 
         # Save in the s._areas container
         s._areas = geoms
