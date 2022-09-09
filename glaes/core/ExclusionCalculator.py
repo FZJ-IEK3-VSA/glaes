@@ -1024,7 +1024,7 @@ class ExclusionCalculator(object):
             # calculate the actual exclusions
                 
 
-            if _spawnNewProcess:
+            if spawnNewProcess:
                 manager = multiprocessing.Manager()
                 sharedDict = manager.dict()
 
@@ -1120,7 +1120,7 @@ class ExclusionCalculator(object):
     def excludeVectorType(s, source, where=None, buffer=None,
                           bufferMethod='geom', invert=False, mode="exclude", resolutionDiv=1,
                           intermediate=None, regionPad=None, useRegionmask=True, default=False,
-                          _spawnNewProcess=True, **kwargs):
+                          spawnNewProcess=True, **kwargs):
         """Exclude areas based off the features in a vector datasource
 
         Parameters:
@@ -1199,7 +1199,7 @@ class ExclusionCalculator(object):
             sourcePath as well as the _exclusionStr instead of the actual 
             source. Defaults to False.
         
-        _spawnNewProcess: boolean, option.
+        spawnNewProcess: boolean, option.
             If true, the core calulation is spaned inside a new process to free RAM from heavy osgeo objects.
 
         kwargs
@@ -1279,41 +1279,36 @@ class ExclusionCalculator(object):
             else:
                 # calculate the actual exclusions
                 
-                #try in new process:
-                try:
-                    if _spawnNewProcess:
-                        manager = multiprocessing.Manager()
-                        sharedDict = manager.dict()
+                if spawnNewProcess:
+                    manager = multiprocessing.Manager()
+                    sharedDict = manager.dict()
 
-                        p = multiprocessing.Process(
-                            target=s.region.indicateFeaturesMultiprocess,
-                            args=(
-                                source,
-                            ),
-                            kwargs={**{
-                                'where': where,
-                                'buffer': buffer,
-                                'bufferMethod': bufferMethod,
-                                'resolutionDiv': resolutionDiv,
-                                'forceMaskShape': True,
-                                'applyMask': False,
-                                'noData': 0,   
-                                'preBufferSimplification': None,
-                                'sharedDict': sharedDict,
-                                'regionPad': regionPad,
-                            }, **kwargs}
-                        )
-                        p.start()
-                        p.join()
+                    p = multiprocessing.Process(
+                        target=s.region.indicateFeaturesMultiprocess,
+                        args=(
+                            source,
+                        ),
+                        kwargs={**{
+                            'where': where,
+                            'buffer': buffer,
+                            'bufferMethod': bufferMethod,
+                            'resolutionDiv': resolutionDiv,
+                            'forceMaskShape': True,
+                            'applyMask': False,
+                            'noData': 0,   
+                            'preBufferSimplification': None,
+                            'sharedDict': sharedDict,
+                            'regionPad': regionPad,
+                        }, **kwargs}
+                    )
+                    p.start()
+                    p.join()
 
-                        indications_raw = sharedDict['indicationMatrix']
-                        indications = (indications_raw * 100).astype(np.uint8)
-                        manager.shutdown()
-                    else:
-                        raise ValueError('Nothing to worry, just jump to exception')
-                
-                except:
-                    warn('Memory efficient way failed, returning to save method')
+                    indications_raw = sharedDict['indicationMatrix']
+                    indications = (indications_raw * 100).astype(np.uint8)
+                    manager.shutdown()
+                else:
+
                     indications = (
                         s.region.indicateFeatures(
                             source,
