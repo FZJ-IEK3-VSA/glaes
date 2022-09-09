@@ -850,7 +850,7 @@ class ExclusionCalculator(object):
     # General excluding functions
     def excludeRasterType(s, source, value=None, buffer=None, resolutionDiv=1,
                           intermediate=None, prewarp=False, invert=False, mode="exclude",
-                          minSize=None, threshold=50, default=False, _spawnNewProcess=True, **kwargs):
+                          minSize=None, threshold=50, default=False, spawnNewProcess=False, **kwargs):
         """Exclude areas based off the values in a raster datasource
 
         Parameters:
@@ -955,8 +955,8 @@ class ExclusionCalculator(object):
             sourcePath as well as the _exclusionStr instead of the actual 
             source. Defaults to False.
         
-        _spawnNewProcess: boolean, option.
-            If true, the core calulation is spaned inside a new process to free RAM from heavy osgeo objects.
+        spawnNewProcess: boolean, option.
+            If true, the core calulation is spawned inside a new process to free RAM from heavy osgeo objects.
 
         kwargs
             * All other keyword arguments are passed on to a call to
@@ -1023,38 +1023,33 @@ class ExclusionCalculator(object):
             
             # calculate the actual exclusions
                 
-            #try in new process:
-            try:
-                if _spawnNewProcess:
-                    manager = multiprocessing.Manager()
-                    sharedDict = manager.dict()
 
-                    p = multiprocessing.Process(
-                        target=s.region.indicateValuesMultiprocess,
-                        args=(
-                            source,
-                        ),
-                        kwargs={**{
-                        'value': value,
-                        'buffer': buffer,
-                        'resolutionDiv': resolutionDiv,
-                        'forceMaskShape': True,
-                        'applyMask': False,
-                        'sharedDict': sharedDict,
-                        }, **kwargs}
-                    )
-                    p.start()
-                    p.join()
+            if _spawnNewProcess:
+                manager = multiprocessing.Manager()
+                sharedDict = manager.dict()
 
-                    indications_raw = sharedDict['indications']
-                    indications = (indications_raw * 100).astype(np.uint8)
-                    manager.shutdown()
-                else:
-                    raise ValueError('Nothing to worry, just jump to exception')
-            
-            except:
-                warn('Memory efficient way failed, returning to save method')
-                    # Indicate on the source
+                p = multiprocessing.Process(
+                    target=s.region.indicateValuesMultiprocess,
+                    args=(
+                        source,
+                    ),
+                    kwargs={**{
+                    'value': value,
+                    'buffer': buffer,
+                    'resolutionDiv': resolutionDiv,
+                    'forceMaskShape': True,
+                    'applyMask': False,
+                    'sharedDict': sharedDict,
+                    }, **kwargs}
+                )
+                p.start()
+                p.join()
+
+                indications_raw = sharedDict['indications']
+                indications = (indications_raw * 100).astype(np.uint8)
+                manager.shutdown()
+            else:
+                # Indicate on the source
                 indications = (
                     s.region.indicateValues(
                         source,

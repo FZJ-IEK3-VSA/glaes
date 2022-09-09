@@ -27,3 +27,4 @@ test:
     - pip install -e .
     - mamba info --envs
     - pytest --cov=glaes glaes/test/
+
