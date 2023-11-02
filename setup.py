@@ -8,7 +8,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        "geokit>=1.2.8",
+        "geokit>=1.4.0",
         "gdal==3.4.*",
         "numpy",
         "descartes",

@@ -5,7 +5,7 @@ stages:
 
 test:
   stage: test
-  # tags: 
+  # tags:
   #   - linux
 
   script:
