@@ -14,10 +14,11 @@ dependencies:
   - matplotlib
   - descartes
   - pandas
-  - numpy
+  - numpy<1.24
   - scipy
   - scikit-learn
-  - gdal>2.2.0,<3.0.0
+  - geokit>=1.4.0
+  - gdal=3.4.*
   - pip:
-      - https://github.com/FZJ-IEK3-VSA/geokit/archive/v1.3.0.zip
       - -e .
+
