@@ -18,12 +18,8 @@ test:
     - cd ..
     - mamba env update -n glaes --file=requirements-dev.yml
     - cd geokit
-    - pip install -e .
-    - source deactivate
-    - source activate glaes
-    - pip show geokit
-    - pip show gdal
+    - pip install -e . --no-deps
     - cd ..
-    - pip install -e .
+    - pip install -e . --no-deps
     - mamba info --envs
     - pytest --cov=glaes glaes/test/
