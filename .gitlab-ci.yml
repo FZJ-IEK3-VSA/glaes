@@ -6,7 +6,7 @@ stages:
 test:
   stage: test
   script:
-    - micromamba create -n glaes --file=requirements.yml
+    - micromamba create -n glaes --file=requirements-dev.yml
     - eval "$(micromamba shell hook --shell bash)"
     - micromamba activate glaes
     - pip install -e . --no-deps
