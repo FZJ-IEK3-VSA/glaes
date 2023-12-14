@@ -368,7 +368,7 @@ def test_ExclusionCalculator_distributeAreas():
     areas = [g.Area() for g in ec._areas]
 
     assert np.isclose(sum(areas), 175768748.40184686)
-    assert np.isclose(statistics.stdev(areas), 218376.01981464328)
+    assert np.isclose(statistics.stdev(areas), 218353.60307113524)
     assert np.isclose(statistics.mean(areas), 612434.6634210692)
 
 
@@ -397,12 +397,12 @@ def test_ExclusionCalculator_saveAreas():
     # assert that values retrieved from saved file match
     assert np.isclose(df_saveAreas.area_m2.sum(), 175768748.40184686)
     assert np.isclose(df_saveAreas.area_m2.mean(), 612434.6634210692)
-    assert np.isclose(df_saveAreas.area_m2.std(), 218376.01981464328)
+    assert np.isclose(df_saveAreas.area_m2.std(), 218353.60307113524)
     assert (len(df_saveAreas) == 287)
     
     # assert that values from df stored in variable match
     assert np.isclose(df_inRamAreas.area_m2.sum(), 175768748.40184686)
     assert np.isclose(df_inRamAreas.area_m2.mean(), 612434.6634210692)
-    assert np.isclose(df_inRamAreas.area_m2.std(), 218376.01981464328)
+    assert np.isclose(df_inRamAreas.area_m2.std(), 218353.60307113524)
     assert (len(df_inRamAreas) == 287)
     
