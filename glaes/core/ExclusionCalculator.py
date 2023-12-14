@@ -686,6 +686,10 @@ class ExclusionCalculator(object):
 
         # create a mask for source raster based on noData value (set noData to False, all valid values 0-100 to True)
         source_mask = gk.raster.extractMatrix(source)
+        if source_mask is None:
+            # sometimes, saving errors lead to None matrices being reloaded from disk, simply re-calculate
+            print("Source matrix was saved to disk empty.")
+            return False
         source_mask[source_mask <= 100] = True
         source_mask[source_mask == ri.noData] = False
         # compare the two masks and check if they are alike for all cells
