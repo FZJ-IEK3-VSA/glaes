@@ -20,4 +20,4 @@ test-formatting:
   # will fail.
   - black --version
   - black --check glaes
-  - black --check test
+  - black --check Examples
