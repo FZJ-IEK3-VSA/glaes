@@ -1999,6 +1999,7 @@ class ExclusionCalculator(object):
         _voronoiBoundaryPoints=10,
         _voronoiBoundaryPadding=5,
         _stamping=True,
+        avoidRegionBorders=False,
     ):
         """Distribute the maximal number of minimally separated items within the available areas
 
@@ -2041,13 +2042,44 @@ class ExclusionCalculator(object):
                 - float : The scaling to apply to all points
                 - np.ndarray : The scalings at each pixel (must match availability matrix shape)
                 - str : A path to a raster file containing scaling factors
+
+            avoidRegionBorders - bool: If True, a distance of half the separation distance (or the mean for different values 
+                in axial and transversal direction) is kept from the region edges to avoid placements in immediate proximity
+                in neighbouring regions. Other than excludeRegionEdge, this will not affect the eligibiliyt of the region, 
+                only the locations of the placements will be adapted. By default False.
         """
 
         # TODO: CLEAN UP THIS FUNCTION BY REMOVING AREA DISTRIBUTION AND FILE SAVING, AND ASSOCIATED PARAMETERS
 
         # Preprocess availability
-        workingAvailability = s._availability >= threshold
-        if not workingAvailability.dtype == "bool":
+
+        # check if we must first exclude the edges of the regions from eligible placements
+        if avoidRegionBorders:
+            # first calculate average buffer distance from separation(s)
+            if isinstance(separation, tuple) and len(separation)==2:
+                distance=int((separation[0]+separation[1])/2/2)
+                print(distance)
+            elif isinstance(separation, int):
+                distance=int(separation/2)
+            else:
+                message=f"Separation must be either tuple with length 2 or integer, here {type(separation)}: {separation}."
+                raise ValueError(message)
+            # calculate the exclusion indications based on region shape and negative buffer
+            indications = (
+                s.region.indicateFeatures(
+                    gk.vector.createVector(s.region.geometry),
+                    buffer=-distance,
+                ) * 100
+            ).astype(np.uint8)
+
+            # exclude the additional indications at the region edges from the availability matrix
+            _availability_less_borders = np.min([s._availability, indications], axis=0)
+            # define working availability as these values above threshold based on new avaiulability less region edges
+            workingAvailability = _availability_less_borders >= threshold
+        else:
+            workingAvailability = s._availability >= threshold
+
+        if not workingAvailability.dtype == 'bool':
             raise s.GlaesError("Working availability must be boolean type")
 
         workingAvailability[~s.region.mask] = False

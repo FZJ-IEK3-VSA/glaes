@@ -1,29 +1,13 @@
-image: continuumio/miniconda3:latest
+image: mambaorg/micromamba
 
 stages:
   - test
 
 test:
   stage: test
-  # tags: 
-  #   - linux
-
   script:
-    - conda install mamba -c conda-forge
-    - mamba create -n glaes
-    - source activate glaes
-    - git clone --branch dev https://CIGlaes:${GeokitAccessToken}@jugit.fz-juelich.de/iek-3/shared-code/geokit.git
-    - cd geokit
-    - mamba env update -n glaes --file=requirements-dev.yml
-    - cd ..
-    - mamba env update -n glaes --file=requirements-dev.yml
-    - cd geokit
-    - pip install -e .
-    - source deactivate
-    - source activate glaes
-    - pip show geokit
-    - pip show gdal
-    - cd ..
-    - pip install -e .
-    - mamba info --envs
+    - micromamba create -n glaes --file=requirements-dev.yml
+    - eval "$(micromamba shell hook --shell bash)"
+    - micromamba activate glaes
+    - pip install -e . --no-deps
     - pytest --cov=glaes glaes/test/

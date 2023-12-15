@@ -17,6 +17,7 @@ dependencies:
   - numpy
   - scipy
   - scikit-learn
-  - gdal=3.4
+  - geokit>=1.4.0
+  - gdal=3.4.*
   - pip:
       - .
