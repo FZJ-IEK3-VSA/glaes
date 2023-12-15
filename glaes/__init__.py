@@ -1,6 +1,6 @@
 """The Geospatial Land Availability for Energy Systems (GLAES) model is intended for land eligbility analysis in any context"""
 
-__version__ = "1.2.1"
+__version__ = "1.2.2"
 
 from .core import util
 from .core.priors import Priors
@@ -11,6 +11,7 @@ from .predefinedExclusions import ExclusionSets
 from os.path import join as _join, dirname as _dirname, basename as _basename
 from collections import OrderedDict as _OrderedDict
 from glob import glob as _glob
+
 _test_data_ = _OrderedDict()
 
 for f in _glob(_join(_dirname(__file__), "test", "data", "*")):

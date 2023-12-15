@@ -3,11 +3,14 @@ from .util import *
 # Sort out the data paths
 defaultPriorDir = join(dirname(dirname(__file__)), "data", "priors")
 
+
 # Prior datasource class
 class PriorSource(object):
-    """The PriorSource object loads one of the Prior datasets and makes it 
+    """The PriorSource object loads one of the Prior datasets and makes it
     accessible for use in general purpose geospatial analyses"""
-    class _LoadFail(Exception):pass
+
+    class _LoadFail(Exception):
+        pass
 
     def __init__(s, path):
         """Initialize a PriorSource object by passing it a path on disk"""
@@ -16,11 +19,12 @@ class PriorSource(object):
         ri = gk.raster.rasterInfo(ds)
 
         # Check if we're dealing with a GLAES prior
-        if ri.meta.get("GLAES_PRIOR", "NO") != "YES": raise PriorSource._LoadFail()
+        if ri.meta.get("GLAES_PRIOR", "NO") != "YES":
+            raise PriorSource._LoadFail()
 
         # Load basic values
         s.displayName = ri.meta.get("DISPLAY_NAME", splitext(basename(path))[0])
-        
+
         s.unit = ri.meta.get("UNIT", "Unknown")
         s.description = ri.meta.get("DESCRIPTION", "Unknown")
         s.alternateName = ri.meta.get("ALTERNATE_NAME", None)
@@ -52,8 +56,10 @@ class PriorSource(object):
         qualifiers = []
         for i in range(253):
             try:
-                valString = valMap["%d"%i]
-            except KeyError: # should fail when we've reached the end of the precalculated edges
+                valString = valMap["%d" % i]
+            except (
+                KeyError
+            ):  # should fail when we've reached the end of the precalculated edges
                 break
 
             s.edgeStr.append(valString)
@@ -70,36 +76,43 @@ class PriorSource(object):
         # set values
         for i in range(len(rawValues)):
             # estimate a value
-            if qualifiers[i]=="<": s.values.append( rawValues[i]-0.001 ) # subtract a little bit
-            elif qualifiers[i]==">": s.values.append( rawValues[i]+0.001 ) # add a little bit
-            else: 
-                if qualifiers[i]=="<=" and i!=0: 
-                    val = (rawValues[i]+rawValues[i-1])/2
-                elif qualifiers[i]==">=" and i!=(len(rawValues)-1): 
-                    val = (rawValues[i]+rawValues[i+1])/2 
+            if qualifiers[i] == "<":
+                s.values.append(rawValues[i] - 0.001)  # subtract a little bit
+            elif qualifiers[i] == ">":
+                s.values.append(rawValues[i] + 0.001)  # add a little bit
+            else:
+                if qualifiers[i] == "<=" and i != 0:
+                    val = (rawValues[i] + rawValues[i - 1]) / 2
+                elif qualifiers[i] == ">=" and i != (len(rawValues) - 1):
+                    val = (rawValues[i] + rawValues[i + 1]) / 2
                 else:
                     val = rawValues[i]
 
                 s.values.append(val)
-        
+
         # make into numpy arrays
         s.edges = np.array(rawValues)
         s.values = np.array(s.values)
 
-        if not s.edges.size == s.values.size: raise RuntimeError(basename(path)+": edges length does not match values length")
+        if not s.edges.size == s.values.size:
+            raise RuntimeError(
+                basename(path) + ": edges length does not match values length"
+            )
 
         # make nodata and untouched value
-        qualifier, value = numRE.search( valMap["%d"%(s.values.size-1)] ).groups() # Get the last calculated edge
+        qualifier, value = numRE.search(
+            valMap["%d" % (s.values.size - 1)]
+        ).groups()  # Get the last calculated edge
         value = float(value)
 
         # estimate a value
-        if qualifier=="<=": # set the untouched value to everything above value
-            s.untouchedTight = value+0.001 
-            s.untouchedWide = value+100000000000000 
-        elif qualifier==">=": # do the opposite in this case
-            s.untouchedTight = value-0.001 
-            s.untouchedWide = value-100000000000000
-        else: 
+        if qualifier == "<=":  # set the untouched value to everything above value
+            s.untouchedTight = value + 0.001
+            s.untouchedWide = value + 100000000000000
+        elif qualifier == ">=":  # do the opposite in this case
+            s.untouchedTight = value - 0.001
+            s.untouchedWide = value - 100000000000000
+        else:
             s.untouchedValue = value
         s.noData = -999999
 
@@ -113,13 +126,17 @@ class PriorSource(object):
 
         # Make the doc string
         doc = ""
-        doc += "%s\n"%s.description
-        doc += "UNITS: %s\n"%s.unit
+        doc += "%s\n" % s.description
+        doc += "UNITS: %s\n" % s.unit
         doc += "VALUE MAP:\n"
         doc += "  Raw Value : Precalculated Edge : Estimated Value\n"
-        for i in range(len(s.edges)): 
-            doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(i, s.edgeStr[i], s.values[i])
-        doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(254, "untouched", s.untouchedTight)
+        for i in range(len(s.edges)):
+            doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(
+                i, s.edgeStr[i], s.values[i]
+            )
+        doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(
+            254, "untouched", s.untouchedTight
+        )
         doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(255, "no-data", s.noData)
 
         s.__doc__ = doc
@@ -130,11 +147,15 @@ class PriorSource(object):
         * If 'verbose' is true, a warning is issued when the given value is outside
         of the Prior's known edge values
         """
-        if val <= s.edges.max() and val >= s.edges.min(): 
+        if val <= s.edges.max() and val >= s.edges.min():
             return True
-        else: 
+        else:
             if verbose:
-                warn("%s: %f is outside the predefined boundaries (%f - %f)"%(s.displayName,val,s.edges.min(),s.edges.max()), UserWarning)
+                warn(
+                    "%s: %f is outside the predefined boundaries (%f - %f)"
+                    % (s.displayName, val, s.edges.min(), s.edges.max()),
+                    UserWarning,
+                )
             return False
 
     def valueOnEdge(s, val, verbose=False):
@@ -143,32 +164,36 @@ class PriorSource(object):
         * If 'verbose' is true, a warning is issued when the given value is more
         than 5% deviant from the closest precomputed edge
         """
-        bestI = np.argmin(np.abs(s.edges-val))
+        bestI = np.argmin(np.abs(s.edges - val))
         bestEdge = s.edges[bestI]
 
-        if (abs(bestEdge-val) < 0.0001):
+        if abs(bestEdge - val) < 0.0001:
             return True
-        elif abs((bestEdge-val)/(bestEdge if bestEdge!=0 else val)) <= 0.05:
+        elif abs((bestEdge - val) / (bestEdge if bestEdge != 0 else val)) <= 0.05:
             return False
         else:
             if verbose:
-                warn("PRIORS-%s: %f is significantly different from the closest precalculated edge (%f)"%(s.displayName,val,bestEdge), UserWarning)
+                warn(
+                    "PRIORS-%s: %f is significantly different from the closest precalculated edge (%f)"
+                    % (s.displayName, val, bestEdge),
+                    UserWarning,
+                )
             return False
 
     #### Make a datasource generator
-    def generateRaster(s, extent, untouched='tight', **kwargs):
+    def generateRaster(s, extent, untouched="tight", **kwargs):
         """Generates a raster datasource around the indicated extent
 
         Parameters:
         -----------
         extent: geokit.Extent or tuple
-            Describes the geographic boundaries around which to create the new 
+            Describes the geographic boundaries around which to create the new
             raster dataset
             * Using an Extent object is the most robust method
             * If a tuple is given, (lonMin, latMin, lonMax, latMax) is expected
                 - In this case, an Extent object is created immediately and cast
                   to the Prior's srs (EPSG3035)
-            * In truth, anything acceptable to geokit.Extent.load() could be 
+            * In truth, anything acceptable to geokit.Extent.load() could be
               given as an input here
 
         untouched: str; optional
@@ -176,8 +201,8 @@ class PriorSource(object):
             * If 'tight', pixels which are untouched are given a value slightly
               beyond than the final edge
             * If 'wide', they are given a value far away from the final edge
-        
-        **kwargs: 
+
+        **kwargs:
             All keyword arguments are passed along to geokit.raster.mutateRaster
 
         Returns:
@@ -188,19 +213,19 @@ class PriorSource(object):
         # Be sure we have an extent object which fits to the srs and resolution of the Priors
         if not isinstance(extent, gk.Extent):
             extent = gk.Extent.load(extent).castTo(gk.srs.EPSG3035).fit(100)
-        
+
         # make better values
         values = s.values
-        if untouched.lower()=='tight':
+        if untouched.lower() == "tight":
             untouchedValue = s.untouchedTight
-        elif untouched.lower()=='wide':
+        elif untouched.lower() == "wide":
             untouchedValue = s.untouchedWide
         else:
             raise RuntimeError("'untouched' must be 'Tight' or 'Wide")
 
         # make a mutator function to make indexes to estimated values
         def mutator(data):
-            noData = data == 255 
+            noData = data == 255
             untouched = data == 254
             result = np.interp(data, range(len(values)), values)
             result[untouched] = untouchedValue
@@ -208,8 +233,14 @@ class PriorSource(object):
             return result
 
         # mutate main source
-        mutDS = gk.raster.mutateRaster(s.path, bounds=extent.xyXY, boundsSRS=extent.srs, 
-                                       processor=mutator, noData=s.noData, **kwargs)
+        mutDS = gk.raster.mutateRaster(
+            s.path,
+            bounds=extent.xyXY,
+            boundsSRS=extent.srs,
+            processor=mutator,
+            noData=s.noData,
+            **kwargs
+        )
 
         # return
         return mutDS
@@ -218,35 +249,35 @@ class PriorSource(object):
     def generateVector(s, extent, value, output=None):
         """Generates a vector datasource around the indicated extent and at an
         approximation at the indicated value
-        
+
         * If a value is given that corresponds to one of the pre-calculated edges,
           the Prior source is 'polygonized' exactly at that edge
         * If a value is given which falls between two edges, the closest edge is
           polygonized and the resulting geometry is shrunk or grown to make up
           the difference
-          - Be careful, this is a costly procedure! 
+          - Be careful, this is a costly procedure!
 
         Note:
         -----
-        This procedure really only makes sense for the Priors which represent 
+        This procedure really only makes sense for the Priors which represent
         the distance from something, such as 'roads proximity'. It isn't very
         meaningful to use this for a quantity-based prior, such as "terrain slope"
 
         Parameters:
         -----------
         extent: geokit.Extent or tuple
-            Describes the geographic boundaries around which to create the new 
+            Describes the geographic boundaries around which to create the new
             raster dataset
             * Using an Extent object is the most robust method
             * If a tuple is given, (lonMin, latMin, lonMax, latMax) is expected
                 - In this case, an Extent object is created immediately and cast
                   to the Prior's srs (EPSG3035)
-            * In truth, anything acceptable to geokit.Extent.load() could be 
+            * In truth, anything acceptable to geokit.Extent.load() could be
               given as an input here
 
         value: numeric
             The edge to attempt to reconstruct
-            
+
         output: str; optional
             A place to put the output if its not needed in memory
 
@@ -258,21 +289,23 @@ class PriorSource(object):
         # Be sure we have an extent object which fits to the srs and resolution of the Priors
         if not isinstance(extent, gk.Extent):
             extent = gk.Extent.load(extent)
-        extent= extent.castTo(gk.srs.EPSG3035).fit(100)
+        extent = extent.castTo(gk.srs.EPSG3035).fit(100)
 
         # get closest edge
-        edgeDiffs = np.abs(value-s.edges)
-        edgeI = np.argmin( edgeDiffs )
+        edgeDiffs = np.abs(value - s.edges)
+        edgeI = np.argmin(edgeDiffs)
 
         # Extract the matrix around the extent and test against edge index
-        mat = extent.extractMatrix( s.path, strict=True ) <= edgeI
-        
+        mat = extent.extractMatrix(s.path, strict=True) <= edgeI
+
         # Polygonize
-        geoms = gk.geom.polygonizeMask(mat, bounds=extent.xyXY, srs=extent.srs, flat=False, shrink=False)
+        geoms = gk.geom.polygonizeMask(
+            mat, bounds=extent.xyXY, srs=extent.srs, flat=False, shrink=False
+        )
 
         # Do extra grow
-        if edgeDiffs[edgeI]/s.edges[edgeI] > 0.01: 
-            extraDist = value-s.edges[edgeI]
+        if edgeDiffs[edgeI] / s.edges[edgeI] > 0.01:
+            extraDist = value - s.edges[edgeI]
             geoms = [g.Buffer(extraDist) for g in geoms]
 
         # merge to one geometry
@@ -289,12 +322,13 @@ class PriorSource(object):
         values.append(s.untouchedTight)
 
         indicies = gk.raster.extractValues(s.path, points=points, **kwargs)
-        
-        if isinstance(indicies, list): 
-            return np.array([values[i.data] for i in indicies ])
-        else: 
+
+        if isinstance(indicies, list):
+            return np.array([values[i.data] for i in indicies])
+        else:
             return values[indicies.data]
-        
+
+
 # Load priors
 class PriorSet(object):
     """The PriorSet object loads and manages Prior datasets
@@ -304,7 +338,8 @@ class PriorSet(object):
     * If one needs to change the the Prior directory, this can be done by calling
       the Priors.loadDirectory( <directory> ) function
     """
-    def __init__(s,path):
+
+    def __init__(s, path):
         """Initialize a PriorSet object by passing a path, normally a user shouldn't
         need to interact with this initializer"""
         s._sources = OrderedDict()
@@ -316,18 +351,19 @@ class PriorSet(object):
 
         * Each call to this function adds to any other previously identified Priors
         """
-        for f in glob(join(path,"*.tif")):
-            if basename(f) == 'goodAreas.tif':continue
-            
-            try:
+        for f in glob(join(path, "*.tif")):
+            if basename(f) == "goodAreas.tif":
+                continue
 
+            try:
                 p = PriorSource(f)
-                
-                if hasattr(s,p.displayName): warn("Overwriting '%s'"%p.displayName, UserWarning)
+
+                if hasattr(s, p.displayName):
+                    warn("Overwriting '%s'" % p.displayName, UserWarning)
 
                 s.sources[p.displayName] = p
                 setattr(s, p.displayName, p)
-                
+
                 if p.alternateName != "NONE":
                     # make a new prior and update the displayName
                     p2 = PriorSource(f)
@@ -336,7 +372,7 @@ class PriorSet(object):
                     setattr(s, p.alternateName, p2)
 
             except PriorSource._LoadFail:
-                warn("Could not parse file: %s"%(basename(f)), UserWarning)
+                warn("Could not parse file: %s" % (basename(f)), UserWarning)
 
     def regionIsOkay(s, region):
         """Checks if a given region is valid within the Prior Datasets
@@ -344,20 +380,22 @@ class PriorSet(object):
         * Not really intended for external use and will probably fail
         """
         # Check if region is okay
-        goodPixels = region.indicateValues(join(s.path,"goodArea.tif"), value=1).sum()
+        goodPixels = region.indicateValues(join(s.path, "goodArea.tif"), value=1).sum()
 
-        goodRatio = goodPixels/region.mask.sum()
+        goodRatio = goodPixels / region.mask.sum()
         if goodRatio > 0.9999:
             # Evertyhing is okay
             return True
         elif goodRatio > 0.95:
-            print("PRIORS-WARNING: A portion of the defined region is not included of the precalculated exclusion areas")
+            print(
+                "PRIORS-WARNING: A portion of the defined region is not included of the precalculated exclusion areas"
+            )
             return True
         else:
             return False
 
     @property
-    def sources(s): 
+    def sources(s):
         """An easily indexable/searchable list of the PriorSet's sources"""
         return s._sources
 
@@ -366,11 +404,15 @@ class PriorSet(object):
         """Returns the keys of ll loaded Priors"""
         k = list(s._sources.keys())
         k.sort()
-        for _k in k: print(_k)
+        for _k in k:
+            print(_k)
 
-    def __getitem__(s,prior):
-        if len(s.sources)==0:
-            raise GlaesError("No priors have been installed. Use gl.setPriorDirectory( <path> ) or else place the files directly in the default prior data directory (%s)"%defaultPriorDir)
+    def __getitem__(s, prior):
+        if len(s.sources) == 0:
+            raise GlaesError(
+                "No priors have been installed. Use gl.setPriorDirectory( <path> ) or else place the files directly in the default prior data directory (%s)"
+                % defaultPriorDir
+            )
         try:
             output = s.sources[prior]
         except KeyError:
@@ -380,28 +422,28 @@ class PriorSet(object):
 
             bestMatch = priorNames[np.argmax(scores)]
 
-            warn("Mapping '%s' to '%s'"%(prior, bestMatch), UserWarning)
+            warn("Mapping '%s' to '%s'" % (prior, bestMatch), UserWarning)
 
             output = s.sources[bestMatch]
 
         return output
 
-    def combinePriors(s, reg, priorNames, combiner='min'):
+    def combinePriors(s, reg, priorNames, combiner="min"):
         """Combines two or more priors into a single prior
 
         * Still experimental, and will probably fail
         """
 
         # make output matrix
-        outputMatrix = np.ones(reg.mask.shape)*999999999
+        outputMatrix = np.ones(reg.mask.shape) * 999999999
 
         # append each matrix
         for name in priorNames:
             tmp = reg.warp(s[name].generateRaster(reg.extent, "Wide"), applyMask=False)
-            if combiner == 'min':
-                outputMatrix = np.min([outputMatrix,tmp], 0)
-            elif combiner == 'max':
-                outputMatrix = np.max([outputMatrix,tmp], 0)
+            if combiner == "min":
+                outputMatrix = np.min([outputMatrix, tmp], 0)
+            elif combiner == "max":
+                outputMatrix = np.max([outputMatrix, tmp], 0)
 
         # make an output
         outputRaster = reg.createRaster(data=outputMatrix)
