@@ -65,8 +65,7 @@ def test_Prior_generateRaster():
     p = PriorSource(priorSample)
 
     ext = gk.Extent.load(aachenShape)
-    r = p.generateRaster(extent=ext,
-                         output=join(RESULTDIR, "generatedRaster1.tif"))
+    r = p.generateRaster(extent=ext, output=join(RESULTDIR, "generatedRaster1.tif"))
     mat = gk.raster.extractMatrix(r)
     assert np.isclose(269719875, mat.sum())
     assert np.isclose(1287.87195567, mat.std())
@@ -74,8 +73,7 @@ def test_Prior_generateRaster():
     ri = gk.raster.rasterInfo(r)
     assert np.isclose(ri.dx, 100)
     assert np.isclose(ri.dy, 100)
-    assert np.isclose(ri.bounds, (4035500.0, 3048700.0,
-                                  4069500.0, 3101000.0)).all()
+    assert np.isclose(ri.bounds, (4035500.0, 3048700.0, 4069500.0, 3101000.0)).all()
     assert ri.dtype == gdal.GDT_Float64
 
 
@@ -86,20 +84,23 @@ def test_Prior_generateVector():
     ext = gk.Extent.load(aachenShape)
 
     # Test an on-edge generation
-    v = p.generateVector(ext, value=4000,
-                         output=join(RESULTDIR, "generatedVector1.shp"))
+    v = p.generateVector(
+        ext, value=4000, output=join(RESULTDIR, "generatedVector1.shp")
+    )
     g = gk.vector.extractFeature(v, onlyGeom=True)
     # Tests below are failing for 3.0.0<=gdal<3.4.0 due to problems when
     # polygonizing
     assert np.isclose(g.Area(), 1684940000.0)
 
     # Test an off-edge generation
-    v = p.generateVector(ext, value=5500,
-                         output=join(RESULTDIR, "generatedVector2.shp"))
+    v = p.generateVector(
+        ext, value=5500, output=join(RESULTDIR, "generatedVector2.shp")
+    )
     g = gk.vector.extractFeature(v, onlyGeom=True)
     # Tests below are failing for 3.0.0<=gdal<3.4.0 due to problems when
     # polygonizing
     assert np.isclose(g.Area(), 1851537325.6536)
+
 
 @pytest.mark.skip(reason="Todo")
 def test_Prior_extractValues():

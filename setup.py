@@ -1,10 +1,10 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='glaes',
-    version='1.2.2',
-    author='GLAES Developer Team',
-    url='https://github.com/FZJ-IEK3-VSA/glaes',
+    name="glaes",
+    version="1.2.2",
+    author="GLAES Developer Team",
+    url="https://github.com/FZJ-IEK3-VSA/glaes",
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
@@ -15,5 +15,5 @@ setup(
         "pandas",
         "scipy",
         "matplotlib",
-    ]
+    ],
 )
