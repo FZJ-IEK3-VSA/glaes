@@ -726,12 +726,16 @@ class ExclusionCalculator(object):
     @property
     def percentAvailableAreaReductionPerCriterion(s):
         """The percent of the region which remains available after pruning or distributeAreas with minsize"""
-        return s._areaAfterReduction / s._areaBeforeReduction *100 #in %
-    
+        return s._areaAfterReduction / s._areaBeforeReduction * 100  # in %
+
     @property
     def percentAvailableAfterAreaReduction(s):
         """The percent of the region which remains available after pruning or distributeAreas"""
-        return s._areaAfterReduction / (s.region.mask.sum()* s.region.pixelWidth * s.region.pixelHeight) * 100 #in %
+        return (
+            s._areaAfterReduction
+            / (s.region.mask.sum() * s.region.pixelWidth * s.region.pixelHeight)
+            * 100
+        )  # in %
 
     @property
     def clearPercentAvailablePerCriterion(s):
@@ -1000,7 +1004,7 @@ class ExclusionCalculator(object):
         minSize=None,
         threshold=50,
         default=False,
-        spawnNewProcess=False, 
+        spawnNewProcess=False,
         **kwargs,
     ):
         """Exclude areas based off the values in a raster datasource
@@ -1106,7 +1110,7 @@ class ExclusionCalculator(object):
             If a string is passed as source, it will be written into the
             sourcePath as well as the _exclusionStr instead of the actual
             source. Defaults to False.
-        
+
         spawnNewProcess: boolean, option.
             If true, the core calulation is spawned inside a new process to free RAM from heavy osgeo objects.
 
@@ -1181,11 +1185,9 @@ class ExclusionCalculator(object):
                 elif isinstance(prewarp, dict):
                     prewarpArgs.update(prewarp)
 
-                source = s.region.warp(
-                    source, returnMatrix=False, **prewarpArgs)
-            
+                source = s.region.warp(source, returnMatrix=False, **prewarpArgs)
+
             # calculate the actual exclusions
-                
 
             if spawnNewProcess:
                 manager = multiprocessing.Manager()
@@ -1193,22 +1195,23 @@ class ExclusionCalculator(object):
 
                 p = multiprocessing.Process(
                     target=s.region.indicateValuesMultiprocess,
-                    args=(
-                        source,
-                    ),
-                    kwargs={**{
-                    'value': value,
-                    'buffer': buffer,
-                    'resolutionDiv': resolutionDiv,
-                    'forceMaskShape': True,
-                    'applyMask': False,
-                    'sharedDict': sharedDict,
-                    }, **kwargs}
+                    args=(source,),
+                    kwargs={
+                        **{
+                            "value": value,
+                            "buffer": buffer,
+                            "resolutionDiv": resolutionDiv,
+                            "forceMaskShape": True,
+                            "applyMask": False,
+                            "sharedDict": sharedDict,
+                        },
+                        **kwargs,
+                    },
                 )
                 p.start()
                 p.join()
 
-                indications_raw = sharedDict['indications']
+                indications_raw = sharedDict["indications"]
                 indications = (indications_raw * 100).astype(np.uint8)
                 manager.shutdown()
             else:
@@ -1221,9 +1224,11 @@ class ExclusionCalculator(object):
                         resolutionDiv=resolutionDiv,
                         forceMaskShape=True,
                         applyMask=False,
-                        **kwargs) * 100
+                        **kwargs,
+                    )
+                    * 100
                 ).astype(np.uint8)
-            
+
             # drop all isolated areas below minSize if given
             if not minSize == None:
                 # Create a vector file of geometries larger than 'minSize'
@@ -1315,7 +1320,7 @@ class ExclusionCalculator(object):
         regionPad=None,
         useRegionmask=True,
         default=False,
-        spawnNewProcess=True, 
+        spawnNewProcess=True,
         **kwargs,
     ):
         """Exclude areas based off the features in a vector datasource
@@ -1395,7 +1400,7 @@ class ExclusionCalculator(object):
             If a string is passed as source, it will be written into the
             sourcePath as well as the _exclusionStr instead of the actual
             source. Defaults to False.
-        
+
         spawnNewProcess: boolean, option.
             If true, the core calulation is spaned inside a new process to free RAM from heavy osgeo objects.
 
@@ -1474,7 +1479,9 @@ class ExclusionCalculator(object):
             # reduce vector dataset to padded region shape to avoid loading
             # huge vector datasets in next step in indicate features
             if not isinstance(source, gdal.Dataset) and useRegionmask:
-                source = s.region.mutateVector(source, regionPad=regionPad) #small ram increase
+                source = s.region.mutateVector(
+                    source, regionPad=regionPad
+                )  # small ram increase
             if source is None:
                 # create an empty indications matrix since no exclusions in
                 # region shape of exclusion calculator object
@@ -1487,37 +1494,37 @@ class ExclusionCalculator(object):
                 )
             else:
                 # calculate the actual exclusions
-                
+
                 if spawnNewProcess:
                     manager = multiprocessing.Manager()
                     sharedDict = manager.dict()
 
                     p = multiprocessing.Process(
                         target=s.region.indicateFeaturesMultiprocess,
-                        args=(
-                            source,
-                        ),
-                        kwargs={**{
-                            'where': where,
-                            'buffer': buffer,
-                            'bufferMethod': bufferMethod,
-                            'resolutionDiv': resolutionDiv,
-                            'forceMaskShape': True,
-                            'applyMask': False,
-                            'noData': 0,   
-                            'preBufferSimplification': None,
-                            'sharedDict': sharedDict,
-                            'regionPad': regionPad,
-                        }, **kwargs}
+                        args=(source,),
+                        kwargs={
+                            **{
+                                "where": where,
+                                "buffer": buffer,
+                                "bufferMethod": bufferMethod,
+                                "resolutionDiv": resolutionDiv,
+                                "forceMaskShape": True,
+                                "applyMask": False,
+                                "noData": 0,
+                                "preBufferSimplification": None,
+                                "sharedDict": sharedDict,
+                                "regionPad": regionPad,
+                            },
+                            **kwargs,
+                        },
                     )
                     p.start()
                     p.join()
 
-                    indications_raw = sharedDict['indicationMatrix']
+                    indications_raw = sharedDict["indicationMatrix"]
                     indications = (indications_raw * 100).astype(np.uint8)
                     manager.shutdown()
                 else:
-
                     indications = (
                         s.region.indicateFeatures(
                             source,
@@ -1528,7 +1535,9 @@ class ExclusionCalculator(object):
                             applyMask=False,
                             forceMaskShape=True,
                             regionPad=regionPad,
-                            **kwargs) * 100
+                            **kwargs,
+                        )
+                        * 100
                     ).astype(np.uint8)
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
@@ -2055,9 +2064,10 @@ class ExclusionCalculator(object):
             vec = gk.core.util.quickVector(geoms)
 
             # Replace current availability matrix
-            s._availability = s.region.indicateFeatures(
-                vec, applyMask=False).astype(np.uint8) * 100
-        
+            s._availability = (
+                s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8) * 100
+            )
+
         s._areaAfterReduction = s.areaAvailable
         s._availability_per_criterion = s._availability
 
@@ -2597,9 +2607,14 @@ class ExclusionCalculator(object):
             else:
                 return coords
 
-    def distributeAreas(s, points=None, minArea=100000, threshold=50, _voronoiBoundaryPoints=10,
-                        _voronoiBoundaryPadding=5):
-
+    def distributeAreas(
+        s,
+        points=None,
+        minArea=100000,
+        threshold=50,
+        _voronoiBoundaryPoints=10,
+        _voronoiBoundaryPadding=5,
+    ):
         s._areaBeforeReduction = s.areaAvailable
         if points is None:
             try:
