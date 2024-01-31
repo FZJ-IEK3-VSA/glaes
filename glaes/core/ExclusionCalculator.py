@@ -15,6 +15,7 @@ from .util import GlaesError, glaes_logger
 from .priors import Priors, PriorSource
 
 Areas = namedtuple("Areas", "coordinates geoms")
+Areas = namedtuple("Areas", "coordinates geoms")
 
 ###############################
 # Make an Exclusion Calculator
@@ -2043,9 +2044,9 @@ class ExclusionCalculator(object):
                 - np.ndarray : The scalings at each pixel (must match availability matrix shape)
                 - str : A path to a raster file containing scaling factors
 
-            avoidRegionBorders - bool: If True, a distance of half the separation distance (or the mean for different values 
+            avoidRegionBorders - bool: If True, a distance of half the separation distance (or the mean for different values
                 in axial and transversal direction) is kept from the region edges to avoid placements in immediate proximity
-                in neighbouring regions. Other than excludeRegionEdge, this will not affect the eligibiliyt of the region, 
+                in neighbouring regions. Other than excludeRegionEdge, this will not affect the eligibiliyt of the region,
                 only the locations of the placements will be adapted. By default False.
         """
 
@@ -2056,20 +2057,21 @@ class ExclusionCalculator(object):
         # check if we must first exclude the edges of the regions from eligible placements
         if avoidRegionBorders:
             # first calculate average buffer distance from separation(s)
-            if isinstance(separation, tuple) and len(separation)==2:
-                distance=int((separation[0]+separation[1])/2/2)
+            if isinstance(separation, tuple) and len(separation) == 2:
+                distance = int((separation[0] + separation[1]) / 2 / 2)
                 print(distance)
             elif isinstance(separation, int):
-                distance=int(separation/2)
+                distance = int(separation / 2)
             else:
-                message=f"Separation must be either tuple with length 2 or integer, here {type(separation)}: {separation}."
+                message = f"Separation must be either tuple with length 2 or integer, here {type(separation)}: {separation}."
                 raise ValueError(message)
             # calculate the exclusion indications based on region shape and negative buffer
             indications = (
                 s.region.indicateFeatures(
                     gk.vector.createVector(s.region.geometry),
                     buffer=-distance,
-                ) * 100
+                )
+                * 100
             ).astype(np.uint8)
 
             # exclude the additional indications at the region edges from the availability matrix
@@ -2079,7 +2081,7 @@ class ExclusionCalculator(object):
         else:
             workingAvailability = s._availability >= threshold
 
-        if not workingAvailability.dtype == 'bool':
+        if not workingAvailability.dtype == "bool":
             raise s.GlaesError("Working availability must be boolean type")
 
         workingAvailability[~s.region.mask] = False
@@ -2510,6 +2512,9 @@ class ExclusionCalculator(object):
                 geoms = gk.LocationSet(s._itemCoords, srs=s.srs).asGeom(
                     srs=srs if outputSRS is None else outputSRS
                 )
+                geoms = gk.LocationSet(s._itemCoords, srs=s.srs).asGeom(
+                    srs=srs if outputSRS is None else outputSRS
+                )
 
             gk.vector.createVector(geoms, output=output)
         else:
@@ -2584,6 +2589,7 @@ class ExclusionCalculator(object):
                     ][1:-1],
                 ]
             )
+
 
             v = Voronoi(pts)
 
