@@ -15,6 +15,7 @@ from .util import GlaesError, glaes_logger
 from .priors import Priors, PriorSource
 
 Areas = namedtuple("Areas", "coordinates geoms")
+Areas = namedtuple("Areas", "coordinates geoms")
 
 ###############################
 # Make an Exclusion Calculator
@@ -2511,6 +2512,9 @@ class ExclusionCalculator(object):
                 geoms = gk.LocationSet(s._itemCoords, srs=s.srs).asGeom(
                     srs=srs if outputSRS is None else outputSRS
                 )
+                geoms = gk.LocationSet(s._itemCoords, srs=s.srs).asGeom(
+                    srs=srs if outputSRS is None else outputSRS
+                )
 
             gk.vector.createVector(geoms, output=output)
         else:
@@ -2526,6 +2530,7 @@ class ExclusionCalculator(object):
         threshold=50,
         _voronoiBoundaryPoints=10,
         _voronoiBoundaryPadding=5,
+        maxIteration=10,
     ):
         if points is None:
             try:
@@ -2544,56 +2549,83 @@ class ExclusionCalculator(object):
             if not s.any():
                 raise GlaesError("None of the given points are in the extent")
 
-        ext = s.region.extent.pad(_voronoiBoundaryPadding, percent=True)
-
         # Do Voronoi
         from scipy.spatial import Voronoi
 
-        # Add boundary points around the 'good' points so that we get bounded regions for each 'good' point
-        pts = np.concatenate(
-            [
-                points,
+        # iterate over voronoi creation until all cells are covered or until max. iteration is reached
+        _allcovered = False
+        i = 1
+        while (not _allcovered) and i <= maxIteration:
+            # get the buffered extent, increase buffer every iteration
+            ext = s.region.extent.pad(_voronoiBoundaryPadding * i, percent=True)
+
+            # Add boundary points around the 'good' points so that we get bounded regions for each 'good' point
+            pts = np.concatenate(
                 [
-                    (x, ext.yMin)
-                    for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)
-                ],
-                [
-                    (x, ext.yMax)
-                    for x in np.linspace(ext.xMin, ext.xMax, _voronoiBoundaryPoints)
-                ],
-                [
-                    (ext.xMin, y)
-                    for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)
-                ][1:-1],
-                [
-                    (ext.xMax, y)
-                    for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints)
-                ][1:-1],
-            ]
-        )
+                    points,
+                    [
+                        (x, ext.yMin)
+                        for x in np.linspace(
+                            ext.xMin, ext.xMax, _voronoiBoundaryPoints * i
+                        )
+                    ],
+                    [
+                        (x, ext.yMax)
+                        for x in np.linspace(
+                            ext.xMin, ext.xMax, _voronoiBoundaryPoints * i
+                        )
+                    ],
+                    [
+                        (ext.xMin, y)
+                        for y in np.linspace(
+                            ext.yMin, ext.yMax, _voronoiBoundaryPoints * i
+                        )
+                    ][1:-1],
+                    [
+                        (ext.xMax, y)
+                        for y in np.linspace(
+                            ext.yMin, ext.yMax, _voronoiBoundaryPoints * i
+                        )
+                    ][1:-1],
+                ]
+            )
 
-        v = Voronoi(pts)
 
-        # Create regions
-        geoms = []
-        for reg in v.regions:
-            path = []
-            if -1 in reg or len(reg) == 0:
-                continue
-            for pid in reg:
-                path.append(v.vertices[pid])
-            path.append(v.vertices[reg[0]])
+            v = Voronoi(pts)
 
-            geoms.append(gk.geom.polygon(path, srs=s.region.srs))
+            # Create regions
+            geoms = []
+            for reg in v.regions:
+                path = []
+                if -1 in reg or len(reg) == 0:
+                    continue
+                for pid in reg:
+                    path.append(v.vertices[pid])
+                path.append(v.vertices[reg[0]])
 
-        if not len(geoms) == len(s._itemCoords):
-            raise RuntimeError("Mismatching geometry count")
+                geoms.append(gk.geom.polygon(path, srs=s.region.srs))
 
-        # Create a list of geometry from each region WITH availability
-        vec = gk.vector.createVector(geoms, fieldVals={"pid": range(1, len(geoms) + 1)})
-        areaMap = s.region.rasterize(vec, value="pid", dtype=int) * (
-            s._availability > threshold
-        )
+            if not len(geoms) == len(s._itemCoords):
+                raise RuntimeError("Mismatching geometry count")
+
+            # Create a list of geometry from each region WITH availability
+            vec = gk.vector.createVector(
+                geoms, fieldVals={"pid": range(1, len(geoms) + 1)}
+            )
+            areaMap = s.region.rasterize(vec, value="pid", dtype=int)
+
+            # determine if all cells of the regionmask are covered by voronoi polygons
+            _allcovered = len(areaMap[areaMap > 0]) == s.region.mask.sum()
+
+            i += 1
+
+        # assert that the WHOLE ec region is covered by (rasterized) voronoi regions
+        assert (
+            _allcovered
+        ), f"Voronoi distribution failed to cover the whole region extent after {maxIteration} buffer iterations. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding further and/or _voronoiBoundaryPoints."
+
+        # reduce the (rasterized) voronois to only the eligible areas
+        areaMap = areaMap * (s._availability > threshold)
 
         geoms = gk.geom.polygonizeMatrix(
             areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True
