@@ -2590,7 +2590,6 @@ class ExclusionCalculator(object):
                 ]
             )
 
-
             v = Voronoi(pts)
 
             # Create regions
