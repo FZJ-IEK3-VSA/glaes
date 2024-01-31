@@ -13,7 +13,7 @@ import sys
 
 # Configure Logging
 glaes_logger = logging.getLogger("GLAES")
-glaes_logger.setLevel(logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 class GlaesError(Exception):
