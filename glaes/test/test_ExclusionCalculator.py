@@ -344,9 +344,7 @@ def test_ExclusionCalculator_distributeItems():
     y = np.array([g.GetY() for g in geoms.geom])
 
     for gi in range(geoms.shape[0] - 1):
-        d = (x[gi] - x[gi + 1 :]) ** 2 / 1000**2 + (
-            y[gi] - y[gi + 1 :]
-        ) ** 2 / 300**2
+        d = (x[gi] - x[gi + 1 :]) ** 2 / 1000**2 + (y[gi] - y[gi + 1 :]) ** 2 / 300**2
         assert (d >= 1).all()  # Axial objects too close
 
     # Do make areas
