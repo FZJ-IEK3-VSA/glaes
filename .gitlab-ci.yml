@@ -3,7 +3,7 @@ image: mambaorg/micromamba
 stages:
   - test
 
-test:
+test-code:
   stage: test
   script:
     - micromamba create -n glaes --file=requirements-dev.yml
@@ -11,3 +11,13 @@ test:
     - micromamba activate glaes
     - pip install -e . --no-deps
     - pytest --cov=glaes glaes/test/
+
+test-formatting:
+  stage: test
+  image: pyfound/black:latest_release
+  script:
+  # Dry-run black auto-formatter. If the code needs reformatting this test
+  # will fail.
+  - black --version
+  - black --check glaes
+  - black --check Examples
