@@ -6,7 +6,7 @@ dependencies:
   - conda-forge::matplotlib
   - conda-forge::descartes
   - conda-forge::pandas
-  - conda-forge::numpy<=1.23.1
+  - conda-forge::numpy<=1.24
   - conda-forge::scipy
   - conda-forge::scikit-learn
   - conda-forge::gdal>2.4,<=2.4.4
