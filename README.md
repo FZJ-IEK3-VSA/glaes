@@ -59,6 +59,30 @@ Objective:
 
 ## Installation
 
+### Recommended installation
+
+The recommended way to install GLAES is to use the conda-package manager. This will ensure that all dependancies are installed correctly and that the package is compatible with your system.
+
+Using the conda package manager of your choice (we recommend [mambaforge](https://github.com/conda-forge/miniforge)), you can install GLAES with the following command:
+
+```bash
+conda install -c conda-forge glaes
+```
+
+If you are installing GLAES into an environment using and environment.yml file, make sure to add the conda-forge channel to the file:
+
+```yaml
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - conda-forge::glaes
+```
+
+However, we **highly recommend** that you install the package into a new, empty environment, as the dependancies of GLAES may conflict with other packages you have installed.
+
+### Alternative installation
+
 The primary dependancies of GLAES are:
 
 1. gdal>2.0.0,<3.0.0
@@ -101,46 +125,6 @@ conda env update --file requirements.yml -n <ENVIRONMENT-NAME>
 
 ```
 conda env create --file requirements-dev.yml
-```
-
----
-
-## Docker
-
-We are trying to get GLAES to work within a Docker container. Try it out!
-
-- First pull the image with:
-
-```bash
-docker pull sevberg/glaes:latest
-```
-
-- You can then start a basic python interpreter with:
-
-```bash
-docker run -it sevberg/glaes:latest -c "python"
-```
-
-- Or you can start a jupyter notebook using:
-
-```bash
-docker run -it \
-    -p 8888:8888 \
-    sevberg/glaes:latest \
-    -c "jupyter notebook --ip='*' --port=8888 --no-browser --allow-root"
-```
-
-- Which can then be connected to at the address "localhost:8888:<API-KEY>"
-- The API Key can be found from the output of the earlier command
-
-* Finally, you might want to mount a volume to access geospatial data. For this you can use:
-
-```bash
-docker run -it \
-    --mount target=/notebooks,type=bind,src=<PATH-TO-DIRECTORY> \
-    -p 8888:8888 \
-    sevberg/glaes:latest  \
-    -c "jupyter notebook --notebook-dir=/notebooks --ip='*' --port=8888 --no-browser --allow-root"
 ```
 
 ---
