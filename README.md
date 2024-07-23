@@ -69,7 +69,7 @@ Using the conda package manager of your choice (we recommend [mambaforge](https:
 conda install -c conda-forge glaes
 ```
 
-If you are installing GLAES into an environment using and environment.yml file, make sure to add the conda-forge channel to the file:
+If you are installing GLAES into an environment using an environment.yml file, make sure to add the conda-forge channel to the file:
 
 ```yaml
 channels:
@@ -79,7 +79,7 @@ dependencies:
   - conda-forge::glaes
 ```
 
-However, we **highly recommend** that you install the package into a new, empty environment, as the dependancies of GLAES may conflict with other packages you have installed.
+However, we **highly recommend** that you install the package into a new, empty environment, as the dependancies of GLAES may conflict with other packages you have installed. We currently working on a new release which will be compatible with later versions of GDAL (>3.0).
 
 ### Alternative installation
 
