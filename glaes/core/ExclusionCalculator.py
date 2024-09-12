@@ -2529,7 +2529,7 @@ class ExclusionCalculator(object):
         minArea=100000,
         threshold=50,
         _voronoiBoundaryPoints=10,
-        _voronoiBoundaryPadding=5,
+        _voronoiBoundaryPadding=100,
         maxIteration=10,
     ):
         if points is None:
