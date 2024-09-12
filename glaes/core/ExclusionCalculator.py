@@ -2607,15 +2607,27 @@ class ExclusionCalculator(object):
             if not len(geoms) == len(s._itemCoords):
                 raise RuntimeError("Mismatching geometry count")
 
-            # Create a list of geometry from each region WITH availability
+            # Create a list of geometry from each region WITH availability and rasterize
             vec = gk.vector.createVector(
                 geoms, fieldVals={"pid": range(1, len(geoms) + 1)}
             )
             areaMap = s.region.rasterize(vec, value="pid", dtype=int)
-
+            
             # determine if all cells of the regionmask are covered by voronoi polygons
-            _allcovered = len(areaMap[areaMap > 0]) == s.region.mask.sum()
+            
+            # generate an area map copy and make it binary (1 for covered, 0 for not)
+            _areaMap = areaMap.copy()
+            _areaMap[_areaMap>0] = 1 # note that non-covered are 0, not NaN
+            # create a binary availability raster copy with NaN for not eligible and 1 for eligible
+            _avail = s.availability
+            assert all([np.isnan(x) or x in [0,100] for x in np.unique(s.availability)])
+            _avail[_avail==0] = np.nan
+            _avail[_avail==100] = 1
 
+            # any eligible cell (value=1) must be met with a voronoi-covered cell (value=1)
+            # i.e. eligible cells must have a value of 2 when adding the rasters, all others are NaN
+            _allcovered = all([np.isnan(x) or x==2 for x in np.unique(_avail+_areaMap)])
+            # _allcovered = len(areaMap[areaMap > 0]) == s.region.mask.sum() #TODO DELETE THIS LINE, WRONG OLD CODE
             i += 1
 
         # assert that the WHOLE ec region is covered by (rasterized) voronoi regions
