@@ -902,11 +902,6 @@ class ExclusionCalculator(object):
             boolean: If 'recalculate' is True, new (re)calculation is
             required
         """
-        # try to load the intermediate file, recalculate if file is corrupted
-        try:
-            gk.raster.rasterInfo(intermediate)
-        except:
-            return True
         # initiate variable indicating need for recalculation as False
         recalculate = False
         # create a str containing a comparison of all non-matching metadata entries of old and new intermediate
@@ -914,6 +909,11 @@ class ExclusionCalculator(object):
         # extract metadata information from existing intermediate tif file and drop those arguments that shall not be compared
         metaNotConsidered = ["sourcePath"]
         if intermediate is not None and isfile(intermediate):
+            # try to load the intermediate file, recalculate if file is corrupted
+            try:
+                gk.raster.rasterInfo(intermediate)
+            except:
+                return True
             meta_intermediate_compare = {
                 k: gk.raster.rasterInfo(intermediate).meta[k]
                 for k in gk.raster.rasterInfo(intermediate).meta
