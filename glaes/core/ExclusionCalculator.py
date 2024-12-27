@@ -913,6 +913,9 @@ class ExclusionCalculator(object):
             try:
                 gk.raster.rasterInfo(intermediate)
             except:
+                glaes_logger.info(
+                    f"Intermediate exclusion file could not be loaded. Recalculating intermediate data: {intermediate}"
+                )
                 return True
             meta_intermediate_compare = {
                 k: gk.raster.rasterInfo(intermediate).meta[k]
