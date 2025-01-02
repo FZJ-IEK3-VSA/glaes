@@ -909,6 +909,14 @@ class ExclusionCalculator(object):
         # extract metadata information from existing intermediate tif file and drop those arguments that shall not be compared
         metaNotConsidered = ["sourcePath"]
         if intermediate is not None and isfile(intermediate):
+            # try to load the intermediate file, recalculate if file is corrupted
+            try:
+                gk.raster.rasterInfo(intermediate)
+            except:
+                glaes_logger.info(
+                    f"Intermediate exclusion file could not be loaded. Recalculating intermediate data: {intermediate}"
+                )
+                return True
             meta_intermediate_compare = {
                 k: gk.raster.rasterInfo(intermediate).meta[k]
                 for k in gk.raster.rasterInfo(intermediate).meta
