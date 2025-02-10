@@ -1,18 +1,23 @@
-image: continuumio/miniconda3:latest
+image: mambaorg/micromamba
 
 stages:
   - test
 
-test:
+test-code:
   stage: test
-  tags: 
-    - linux
+  script:
+    - micromamba create -n glaes --file=requirements-dev.yml
+    - eval "$(micromamba shell hook --shell bash)"
+    - micromamba activate glaes
+    - pip install -e . --no-deps
+    - pytest --cov=glaes glaes/test/
 
-  script: 
-    - conda install mamba -c conda-forge
-    - mamba env update -n glaes --file=requirements.yml
-    - mamba env update -n glaes --file=requirements-dev.yml
-    - mamba info --envs
-    - source activate glaes
-    - python -m pip install -e .
-    - python -m pytest --cov=glaes glaes/test/
+test-formatting:
+  stage: test
+  image: pyfound/black:latest_release
+  script:
+  # Dry-run black auto-formatter. If the code needs reformatting this test
+  # will fail.
+  - black --version
+  - black --check glaes
+  - black --check Examples
