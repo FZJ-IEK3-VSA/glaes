@@ -19,6 +19,3 @@ dependencies:
   - conda-forge::scikit-learn
   - conda-forge::geokit>=1.4.0
   - conda-forge::gdal=3.4.*
-  - pip:
-      - -e .
-
