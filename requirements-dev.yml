@@ -2,23 +2,20 @@ name: glaes
 channels:
   - conda-forge
 dependencies:
-  - python
-  - pytest
-  - pytest-cov
-  - pylint
-  - autopep8
-  - jupyter
-  - notebook
-  - jupyterlab
-  - pip
-  - matplotlib
-  - descartes
-  - pandas
-  - numpy<1.24
-  - scipy
-  - scikit-learn
-  - geokit>=1.4.0
-  - gdal=3.4.*
-  - pip:
-      - -e .
-
+  - conda-forge::python
+  - conda-forge::pytest
+  - conda-forge::pytest-cov
+  - conda-forge::pylint
+  - conda-forge::autopep8
+  - conda-forge::jupyter
+  - conda-forge::notebook
+  - conda-forge::jupyterlab
+  - conda-forge::pip
+  - conda-forge::matplotlib
+  - conda-forge::descartes
+  - conda-forge::pandas
+  - conda-forge::numpy<1.24
+  - conda-forge::scipy
+  - conda-forge::scikit-learn
+  - conda-forge::geokit>=1.4.0
+  - conda-forge::gdal=3.4.*
