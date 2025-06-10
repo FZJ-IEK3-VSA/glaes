@@ -2476,8 +2476,8 @@ class ExclusionCalculator(object):
                 if -1 in reg or len(reg) == 0:
                     continue
                 for pid in reg:
-                    path.append(v.vertices[pid])
-                path.append(v.vertices[reg[0]])
+                    path.append(tuple(v.vertices[pid]))
+                path.append(tuple(v.vertices[reg[0]]))
 
                 geoms.append(gk.geom.polygon(path, srs=s.region.srs))
 
@@ -2607,8 +2607,8 @@ class ExclusionCalculator(object):
                 if -1 in reg or len(reg) == 0:
                     continue
                 for pid in reg:
-                    path.append(v.vertices[pid])
-                path.append(v.vertices[reg[0]])
+                    path.append(tuple(v.vertices[pid]))
+                path.append(tuple(v.vertices[reg[0]]))
 
                 geoms.append(gk.geom.polygon(path, srs=s.region.srs))
 
