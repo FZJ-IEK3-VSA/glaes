@@ -24,7 +24,7 @@ def test_multiple_exclusions():
     ec = gl.ExclusionCalculator(aachenShape)
 
     # apply exclusions
-    ec.excludePrior(pr, value=(None, 400))
+    ec.excludePrior(pr, value=(None, 400))                      #TODO #Issue 70 # doubling with test for priors
     ec.excludeVectorType(cddaVector, where="YEAR>2000")
     ec.excludeRasterType(clcRaster, value=(None, 12))
 
@@ -219,7 +219,7 @@ def test_ExclusionCalculator_excludeVectorType():
         assert np.isclose(np.nanstd(ec.availability), 41.45823669)
 
 
-def test_ExclusionCalculator_excludePrior():
+def test_ExclusionCalculator_excludePrior():    #TODO #Issue 70
     # make a prior source
     pr = gl.core.priors.PriorSource(priorSample)
 

@@ -1030,7 +1030,7 @@ def evaluate_AG_ARABLE(regSource, ftrID, tail):
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=(12, 14), applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=(12, 14), applyMask=False) > 0.5   #Indicates those pixels in the RegionMask which correspond to a particular value, or range of values, from a given raster datasource
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix

@@ -8,6 +8,9 @@ import pytest
 import glaes as gl
 from glaes.core.priors import PriorSource, PriorSet
 
+
+#TODO #Issue 70
+
 TESTDIR = dirname(__file__)
 DATADIR = join(TESTDIR, "data")
 RESULTDIR = join(TESTDIR, "results")
@@ -20,7 +23,7 @@ cddaVector = gl._test_data_["CDDA_aachenClipped.shp"]
 
 def test_Prior___init__():
     # Test success
-    p = PriorSource(priorSample)
+    p = PriorSource(priorSample)    #loads prior dataset (tif file)
 
     assert p.path == priorSample
 
@@ -147,7 +150,7 @@ def test_PriorSet___getitem__():
 def test_PriorSet_combinePriors():
     print("PriorSet_combinePriors not tested")
 
-
+# TODO: This function is not excisting. Can be deleted. 
 @pytest.mark.skip(reason="Todo")
 def test_setPriorDirectory():
     print("setPriorDirectory not tested")

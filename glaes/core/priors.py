@@ -1,12 +1,15 @@
+# Hier werden die Priors geladen und verarbeitet
+
+
 from .util import *
 
 # Sort out the data paths
-defaultPriorDir = join(dirname(dirname(__file__)), "data", "priors")
+defaultPriorDir = join(dirname(dirname(__file__)), "data", "priors") #TODO #Issue 70 #refers to empty directory
 
 
 # Prior datasource class
 class PriorSource(object):
-    """The PriorSource object loads one of the Prior datasets and makes it
+    """The PriorSource object loads one of the Prior datasets (tif file) and makes it
     accessible for use in general purpose geospatial analyses"""
 
     class _LoadFail(Exception):
@@ -407,10 +410,10 @@ class PriorSet(object):
         for _k in k:
             print(_k)
 
-    def __getitem__(s, prior):
+    def __getitem__(s, prior): 
         if len(s.sources) == 0:
             raise GlaesError(
-                "No priors have been installed. Use gl.setPriorDirectory( <path> ) or else place the files directly in the default prior data directory (%s)"
+                "No priors have been installed. Use gl.setPriorDirectory( <path> ) or else place the files directly in the default prior data directory (%s)" #TODO 'Issue 70 #refers to another directory than in Priors = PriorSet(defaultPriorDir)
                 % defaultPriorDir
             )
         try:
