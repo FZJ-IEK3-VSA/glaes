@@ -909,6 +909,14 @@ class ExclusionCalculator(object):
         # extract metadata information from existing intermediate tif file and drop those arguments that shall not be compared
         metaNotConsidered = ["sourcePath"]
         if intermediate is not None and isfile(intermediate):
+            # try to load the intermediate file, recalculate if file is corrupted
+            try:
+                gk.raster.rasterInfo(intermediate)
+            except:
+                glaes_logger.info(
+                    f"Intermediate exclusion file could not be loaded. Recalculating intermediate data: {intermediate}"
+                )
+                return True
             meta_intermediate_compare = {
                 k: gk.raster.rasterInfo(intermediate).meta[k]
                 for k in gk.raster.rasterInfo(intermediate).meta
@@ -1615,7 +1623,9 @@ class ExclusionCalculator(object):
                 # (outerRing, with center coor in wind_dir)
                 outerRing = rotate(outerRing, coor, _direction)
 
-            existing = gk.geom.polygon(outerRing, srs=s.region.srs)
+            existing = gk.geom.polygon(
+                [tuple(el) for el in outerRing], srs=s.region.srs
+            )
             arr_existing.append(existing)
         # create dataframe with geom in style of gk.vector and
         # exclude the total vector for better performance
@@ -2468,8 +2478,8 @@ class ExclusionCalculator(object):
                 if -1 in reg or len(reg) == 0:
                     continue
                 for pid in reg:
-                    path.append(v.vertices[pid])
-                path.append(v.vertices[reg[0]])
+                    path.append(tuple(v.vertices[pid]))
+                path.append(tuple(v.vertices[reg[0]]))
 
                 geoms.append(gk.geom.polygon(path, srs=s.region.srs))
 
@@ -2529,7 +2539,7 @@ class ExclusionCalculator(object):
         minArea=100000,
         threshold=50,
         _voronoiBoundaryPoints=10,
-        _voronoiBoundaryPadding=5,
+        _voronoiBoundaryPadding=100,
         maxIteration=10,
     ):
         if points is None:
@@ -2599,23 +2609,39 @@ class ExclusionCalculator(object):
                 if -1 in reg or len(reg) == 0:
                     continue
                 for pid in reg:
-                    path.append(v.vertices[pid])
-                path.append(v.vertices[reg[0]])
+                    path.append(tuple(v.vertices[pid]))
+                path.append(tuple(v.vertices[reg[0]]))
 
                 geoms.append(gk.geom.polygon(path, srs=s.region.srs))
 
             if not len(geoms) == len(s._itemCoords):
                 raise RuntimeError("Mismatching geometry count")
 
-            # Create a list of geometry from each region WITH availability
+            # Create a list of geometry from each region WITH availability and rasterize
             vec = gk.vector.createVector(
                 geoms, fieldVals={"pid": range(1, len(geoms) + 1)}
             )
             areaMap = s.region.rasterize(vec, value="pid", dtype=int)
 
             # determine if all cells of the regionmask are covered by voronoi polygons
-            _allcovered = len(areaMap[areaMap > 0]) == s.region.mask.sum()
 
+            # generate an area map copy and make it binary (1 for covered, 0 for not)
+            _areaMap = areaMap.copy()
+            _areaMap[_areaMap > 0] = 1  # note that non-covered are 0, not NaN
+            # create a binary availability raster copy with NaN for not eligible and 1 for eligible
+            _avail = s.availability
+            assert all(
+                [np.isnan(x) or x in [0, 100] for x in np.unique(s.availability)]
+            )
+            _avail[_avail == 0] = np.nan
+            _avail[_avail == 100] = 1
+
+            # any eligible cell (value=1) must be met with a voronoi-covered cell (value=1)
+            # i.e. eligible cells must have a value of 2 when adding the rasters, all others are NaN
+            _allcovered = all(
+                [np.isnan(x) or x == 2 for x in np.unique(_avail + _areaMap)]
+            )
+            # _allcovered = len(areaMap[areaMap > 0]) == s.region.mask.sum() #TODO DELETE THIS LINE, WRONG OLD CODE
             i += 1
 
         # assert that the WHOLE ec region is covered by (rasterized) voronoi regions
