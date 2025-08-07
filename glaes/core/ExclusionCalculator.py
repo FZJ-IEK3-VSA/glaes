@@ -1623,7 +1623,7 @@ class ExclusionCalculator(object):
                 # (outerRing, with center coor in wind_dir)
                 outerRing = rotate(outerRing, coor, _direction)
 
-            existing = gk.geom.polygon(outerRing, srs=s.region.srs)
+            existing = gk.geom.polygon([tuple(el) for el in outerRing], srs=s.region.srs)
             arr_existing.append(existing)
         # create dataframe with geom in style of gk.vector and
         # exclude the total vector for better performance
