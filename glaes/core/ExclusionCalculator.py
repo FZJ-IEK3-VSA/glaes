@@ -448,6 +448,8 @@ class ExclusionCalculator(object):
 
             srs = s.region.srs
         else:
+            # load as actual SRS instance in case srs is given as epsg int
+            srs = gk.srs.loadSRS(srs)
             mat = s._availability.copy()
             no_data = 255
             mat[~s.region.mask] = no_data
