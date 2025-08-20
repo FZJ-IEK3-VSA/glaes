@@ -1,0 +1,70 @@
+name: Run dev installation dep tests for glaes
+
+on: 
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: 'Manual run' 
+#   push:
+#     branches: 
+#       - main
+
+  
+jobs:
+    TestGlaesDevLocal:
+        name: Test gdal=${{ matrix.gdal-version }},geokit=${{ matrix.geokit-version }} on ${{ matrix.os }} for glaes=${{ matrix.glaes-version }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: ["ubuntu-latest","ubuntu-20.04", "macos-latest","macos-13","macos-12", "windows-latest","windows-2019"]
+                # os: ["ubuntu-latest"]
+                glaes-version: ["1.2.1"]
+                gdal-version: ["2.4.1","2.4.2","2.4.3","2.4.4"]
+                # gdal-version: ["3.4"]
+                geokit-version: ["1.3.0"]
+        steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+          with:
+            repository: FZJ-IEK3-VSA/glaes
+            path: './glaes'  
+            # ref: v${{ matrix.glaes-version }}
+            ref: test-geotkit-version
+            fetch-depth: 0
+        - uses: conda-incubator/setup-miniconda@v3
+          with:
+            miniforge-version: latest
+            channels: conda-forge
+            activate-environment: test_env
+        - name: Run tests
+          shell: pwsh
+          run: |
+            ls
+            echo "LS Done"
+            cd glaes
+            mamba create --name glaes_env gdal=${{ matrix.gdal-version }} geokit=${{ matrix.geokit-version }} python pytest pytest-cov pylint autopep8 jupyter notebook jupyterlab pip matplotlib descartes pandas numpy<1.24 scipy scikit-learn
+            # mamba env update --name glaes_env --yes --file requirements-dev.yml
+            conda run --name glaes_env pip install . --no-deps
+            echo "Installation done"
+            conda list --name glaes_env
+            echo "libaries printed"
+            echo "change directory to test"
+            ls
+            cd glaes
+            echo "start pytest"
+            ls
+            conda run --name glaes_env pytest test/
+            echo "Pytest done"            
+        # - name: Run examples
+        #   shell: pwsh
+        #   run: |
+        #     echo "run examples"
+        #     ls
+        #     cd glaes
+        #     cd Examples            
+        #     echo "Start first example"
+        #     conda run --name glaes_env python jupyter nbconvert --execute 00_basic_workflow.ipynb
+        #     echo "Start second example"
+        #     conda run --name glaes_env python jupyter nbconvert --execute 01_Placement_algorithm.ipynb          
+        #     echo "Running examples terminated"
