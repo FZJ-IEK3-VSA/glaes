@@ -1,32 +1,44 @@
-#from: /fast/home/l-madeisky/models_IEK_3/IEK3_Models/ethos-installation/ethos_suite_repositories/glaes/create_prior.py
 
-
-#%%
 import geokit as gk
 import numpy as np
-from os.path import join, isdir, isfile, basename, splitext
+from os.path import join, isdir
 from os import mkdir
-import sys
 from multiprocessing import Pool
-import time
 from datetime import datetime as dt
-from glob import glob
 from collections import namedtuple, OrderedDict
 from json import dumps
+from pathlib import Path
 
 
 
-#%%
+## CREATE PRIORS ##
+# there are two types of priors using different methods. 
+# First: evaluate by Proximity
+    # indicate pixels by their distance to the target area (pixels to close)
+    # gets a geom object. The geom object is mostly created from a matrix but can also be from: geomExtractor()
+    # proximity: list of buffer distances
+    # for each distance a buffer around the target is created and marked. 
+    # mark the distance from a natural habitat with 100m, 200m, 300m, etc.
+    
+# Second: evaluate by threshold
+    # indicate values of a file  above a certain threshold
+    # gets a tif file file path
+    # thresholds: cut offs.
+    # for each threshold values <= that threshold are marked
+    # elevation <= 10, <= 12 etc.
+    
+    
+# TODO
+# make evaluate_tif_by_proximity_new and evaluate_tif_simple_by_threshold running. 
+# Think about smart things to overhand as arguments. Thing about other smart things to make the functions better
+# create one general function which can be applied to either shape or tif file. Can all files just be treated as region mask and problem slved?
+########################################################################################
+
 #   1. define sources
-# some tif file from severin ?? content unknown
-tif_file_ryberg = "zena_data/CLC/g100_clc12_V18_5_SRS_FIX.tif"
-
-#shape file
-shape_file = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/ethos-installation/ethos_suite_repositories/glaes/Examples/aachen_placement_areas.shp"
-# tif file
-tif_file_complicated = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/ethos-installation/ethos_suite_repositories/glaes/glaes/test/data/roads_prior_clip.tif"
-tif_file = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/ethos-installation/ethos_suite_repositories/glaes/glaes/test/data/roads_prior_clip.tif"
-
+base_path = Path(__file__).resolve().parents[1]
+shape_file = base_path/"Examples/aachen_placement_areas.shp"
+tif_file_roads = base_path/"glaes/test/data/roads_prior_clip.tif"
+tif_file_elevation = base_path/"glaes/test/data/elevation.tif"
 
 #2. evaluation values
 # Indicates distances too close to exclusion criterion
@@ -88,63 +100,73 @@ EVALUATION_VALUES = {
         10000,
         15000,
     ],
+    "windspeed_50m_threshold":
+    # Indicates areas with average wind speed below X (m/s)
+    np.linspace(0, 20, 81),
 }
 
-
 #3. evaluation function
-# tif
-def evaluate_tif(regSource, ftrID, tail, tif_file_ryberg):
-    """creates a prior dataset from a shape file.
+def evaluate_tif_by_proximity(regSource, ftrID, tail, tif_file_ryberg, raster_target_value=None):
+    """creates a prior dataset from a tif file. Loads the evaluation values 
+    and classifies cells around the target area by proximity.
 
     Args:
-        regSource (str): sets the path to the region shape file (could be also the path to a region mask)
+        regSource (str): Region mask path. Sets the outline
         ftrID (str, int; optional): The feature's ID within the dataset
             * Feature attribute name do not need quotes
             * String values should be wrapped in 'single quotes'
+            * e.g. where = "ISO='DEU' AND POP>1000"
         tail (str): extention to the "name". final file name will be: f"{name}.{tail}_{ftrID}.tif"
         tif_file_ryberg(str): string to the raster file which is used for "indicate_values" = Indicates those pixels in the RegionMask which correspond to a particular
         value, or range of values, from a given raster datasource
+        raster_target_value : tuple, defines values of raster that will be selected for proximity calculation
+        
     """
-    name = "agriculture_proximity"  #TODO the following things will later be written as meta data (should probably be part of the function arguments)
+    #TODO the following things will later be written as meta data (should probably be part of the function arguments)
+    name = "agriculture_proximity"  #name used for identifying the proximity values
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from an agriculture area"
-    source = "CLC12"
+    source = "Some source"
 
     output_dir = join("outputs", name)  #output path is beeing set
 
     # Get distances
     distances = EVALUATION_VALUES[name] #distances from distances dict
 
+    # 1. set the area
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, where=ftrID, padExtent=max(distances)) 
     #regSource = shapefile path
     #where = attribute feature
     #padExtent = buffer
+    
 
-#####
-# Diese Funktion wird wohl nicht überall angewandt ?! 
-# nur bei clc Daten
-
-
+    # 2. prepare the target tif file
+    # NOTE The following function is probably not used everywhere?! 
+    # Only for clc data ?
+    # TODO simply overand a geometry or tif file?
     # Indicate values from regionmask which match given raster values and create a geomoetry from the result
     matrix = reg.indicateValues(tif_file_ryberg, #Indicates those pixels in the RegionMask 
                                                  # which correspond to a particular value, or range of values, from a given raster datasource
-                                value=(12, 22),  # values that are accepted 
+                                value=raster_target_value,  # values that are accepted 
                                 applyMask=False) > 0.5 # region mask will not be applied
                                                  #on ylvalues which are > 0.5, means matrix, where values match raster values (=1) or match more than half (>0.5)
     
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs) #convert the array to a geom with mask extent
-######
 
-    # Get edge matrix
-    result = edgesByProximity(reg, geom, distances)
 
-    # make result
+    # 3. create proximity matrix
+    # region mask, gk_geom (like a polygon), distances from evaluation_values
+    result = edgesByProximity(reg, geom, distances)  
+
+    # 4. make result
     writeEdgeFile(
         result, reg, ftrID, output_dir, name, tail, unit, description, source, distances
     )
-
-def evaluate_tif_simple(regSource, ftrID, tail):
+def evaluate_tif_by_threshold(regSource, #area to analyze
+                              ftrID, #set the polygon or cell values that define th area
+                              tif_file, #tif file to analyze
+                              tail):
     name = "dni_threshold"
     unit = "kWh/m2/day"
     description = "Indicates pixels in which the average daily direct-normal irrandiance (DNI) is less-than or equal-to X kWh/m2/day"
@@ -156,9 +178,12 @@ def evaluate_tif_simple(regSource, ftrID, tail):
     thresholds = EVALUATION_VALUES[name]
 
     # Make Region Mask
-    reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=500)
+    reg = gk.RegionMask.load(regSource, where=ftrID, padExtent=500)
 
-    # Create a geometry list from the osm files
+    #TODO
+    #is tif file warping neccessary??
+    #tif_file= gk.raster.warp(tif_file)
+
     result = edgesByThreshold(reg, tif_file, thresholds)
 
     # make result
@@ -174,7 +199,7 @@ def evaluate_tif_simple(regSource, ftrID, tail):
         source,
         thresholds,
     )
-def evaluate_shape_simple(regSource, ftrID, tail):
+def evaluate_shape_by_proximity(regSource, ftrID, tail):
     name = "railway_proximity"
     unit = "meters"
     description = (
@@ -200,10 +225,11 @@ def evaluate_shape_simple(regSource, ftrID, tail):
     writeEdgeFile(
         result, reg, ftrID, output_dir, name, tail, unit, description, source, distances
     )
+def evaluate_shape_by_threshold(regSource, ftrID, tail, tif_file_ryberg, shape_target_value=(10,11,12,13,14,15)):
+    print ("This is just for consistency. In fact, we want a proximity and a threshold function, regardless of the input type")
 
 
-
-##################################################################
+########################################################################################
 ## UTILITY FUNCTIONS
 def calculate_distances(geom, dist):
     """
@@ -230,8 +256,7 @@ def calculate_distances(geom, dist):
     return buffered_geoms
 
 def edgesByProximity(reg, geom, distances):
-    """Calculating a labeled matrix where pixels closer to the geometry get lower values, 
-    pixels further away gethigher values. Buffering/ Distance calculation follows the list of "distances"
+    """ distances from a target area are beeing calculated. Each distance area gets a unique value. Output matrix
 
     Args:
         reg (Regionmask): Regionmask with spatial extent for further processing
@@ -281,9 +306,7 @@ def edgesByProximity(reg, geom, distances):
 
 def edgesByThreshold(reg, source, thresholds):
     """
-    Segments a raster source into threshold-based classes within a RegionMask,
-    producing a labeled matrix. If a raster cell of thre region mask (valid cells 254) 
-    falls into a threshold it's marked with a value
+    Thresholds of a raster file are beeing marked  as a matrix
 
     Args:
         reg (Regionmask): Regionmask with spatial extent for further processing
@@ -435,61 +458,19 @@ def geomExtractor(extent, source, where=None, simplify=None):
     # Return list or None if empty
     return geoms if geoms else None
 
-
-# ###################################################################
-# ## MAIN FUNCTIONALITY
-# if __name__ == "__main__":
-#     START = dt.now()
-#     tail = str(int(dt.now().timestamp()))
-#     print("RUN ID: ", tail)
-#     print("TIME START: ", START)
-
-#     # Choose the function
-#     func = globals()["evaluate_" + sys.argv[1]]
-
-#     # Choose the source
-#     if len(sys.argv) < 3:
-#         source = join("reg", "aachenShapefile.shp")
-#     else:
-#         source = sys.argv[2]
-
-#     # Arange workers
-#     if len(sys.argv) < 4:
-#         doMulti = False
-#     else:
-#         doMulti = True
-#         pool = Pool(int(sys.argv[3]))
-
-#     # submit jobs
-#     res = []
-#     count = -1
-#     for g, a in gk.vector.extractFeatures(source):
-#         count += 1
-#         # if count<1 : continue
-#         # if count == 2:break
-
-#         # Do the analysis
-#         if doMulti:
-#             res.append(pool.apply_async(func, (source, count, tail)))
-#         else:
-#             func(source, count, tail)
-
-#     if doMulti:
-#         # Check for errors
-#         for r, i in zip(res, range(len(res))):
-#             try:
-#                 r.get()
-#             except Exception as e:
-#                 print("EXCEPTION AT ID: " + str(i))
-#                 raise e
-
-#         # Wait for jobs to finish
-#         pool.close()
-#         pool.join()
-
-#     # finished!
-#     END = dt.now()
-#     print("TIME END: ", END)
-#     print("CALC TIME: ", (END - START))
-
-# %%
+########################################################################################
+## TESTING
+evaluate_tif_by_proximity(
+    regSource=shape_file,
+    ftrID= "SITENAME='Buchenwälder bei Zweifall'",
+    tail="testing",
+    tif_file_ryberg=tif_file_elevation,
+    raster_target_value=(10,11,12,13,14,15), #hope that makes snese
+)
+evaluate_tif_by_threshold(
+    regSource=shape_file,
+    ftrID= "SITENAME='Buchenwälder bei Zweifall'",
+    raster_target_value=(10,11,12,13,14,15),
+    tail="testing",
+    tif_file=tif_file_elevation
+)
