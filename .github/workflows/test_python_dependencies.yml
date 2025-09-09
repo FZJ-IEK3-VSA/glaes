@@ -25,7 +25,7 @@ jobs:
                 # os: ["ubuntu-24.04","ubuntu-22.04", "macos-13","windows-2025","windows-2022"]                
                 os: ["self-hosted"]
                 # Proper Gdal Versions
-                python_version: ["1.4.0","1.4.1"]
+                python_version: ["3.7","3.8","3.9","3.10"]
                 # Failing Versions 
                 # python_version: ["2.4.3","2.4.4","3.3.2","3.3.3",]
         steps:
@@ -36,7 +36,7 @@ jobs:
                 channels: conda-forge,nodefaults
                 activate-environment: test_env
                 conda-remove-defaults: "true"  
-            - name: Checkout geokit
+            - name: Checkout
               uses: actions/checkout@v4        
             - name: Update values.yaml
               uses: fjogeleit/yaml-update-action@main
@@ -46,7 +46,7 @@ jobs:
                 method: CreateOrUpdate
                 changes: |
                   {
-                  "dependencies[15]": "python =${{ matrix.python_version }}"
+                  "dependencies[0]": "python =${{ matrix.python_version }}"
                   }
             - name: Install libraries
               shell: pwsh
@@ -59,7 +59,7 @@ jobs:
                     echo "Installation done"
                     mamba list -n test_env
                     echo "libraries printed" 
-            - name: Run pytest for geokit
+            - name: Run pytest
               shell: pwsh
               run: |
                     echo "Start ls"

@@ -1,4 +1,4 @@
-name: Test glaes 1.3.0 for geokit verions
+name: Test pandas versions for glaes 1.3.0
 on: 
   workflow_dispatch:
     inputs:
@@ -12,7 +12,7 @@ on:
     
 jobs:
     TestGeokitForGdalVersions:
-        name: geokit_version=${{ matrix.geokit_version }},${{ matrix.os }}
+        name: pandas_version=${{ matrix.pandas_version }},${{ matrix.os }}
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
@@ -25,9 +25,9 @@ jobs:
                 # os: ["ubuntu-24.04","ubuntu-22.04", "macos-13","windows-2025","windows-2022"]                
                 os: ["self-hosted"]
                 # Proper Gdal Versions
-                geokit_version: ["1.4.0","1.4.1"]
+                pandas_version: ["2.3","2.2","2.1","2.0","1.5","1.4","1.3","1.2","1.1","1.0"]
                 # Failing Versions 
-                # geokit_version: ["2.4.3","2.4.4","3.3.2","3.3.3",]
+                # pandas_version: ["2.4.3","2.4.4","3.3.2","3.3.3",]
         steps:
             - name: Setup Conda
               uses: conda-incubator/setup-miniconda@v3
@@ -36,7 +36,7 @@ jobs:
                 channels: conda-forge,nodefaults
                 activate-environment: test_env
                 conda-remove-defaults: "true"  
-            - name: Checkout geokit
+            - name: Checkout
               uses: actions/checkout@v4        
             - name: Update values.yaml
               uses: fjogeleit/yaml-update-action@main
@@ -46,7 +46,7 @@ jobs:
                 method: CreateOrUpdate
                 changes: |
                   {
-                  "dependencies[15]": "geokit =${{ matrix.geokit_version }}"
+                  "dependencies[11]": "pandas =${{ matrix.pandas_version }}"
                   }
             - name: Install libraries
               shell: pwsh
@@ -59,7 +59,7 @@ jobs:
                     echo "Installation done"
                     mamba list -n test_env
                     echo "libraries printed" 
-            - name: Run pytest for glaes
+            - name: Run pytest
               shell: pwsh
               run: |
                     echo "Start ls"
