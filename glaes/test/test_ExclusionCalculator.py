@@ -437,3 +437,7 @@ def test_ExclusionCalculator_saveAreas():
     assert np.isclose(df_inRamAreas.area_m2.mean(), 612434.6634210692)
     assert np.isclose(df_inRamAreas.area_m2.std(), 218353.60307113524)
     assert len(df_inRamAreas) == 287
+
+
+if __name__=="__main__":
+    test_excludePoints()
