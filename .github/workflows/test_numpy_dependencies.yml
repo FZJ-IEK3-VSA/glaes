@@ -1,18 +1,18 @@
-name: Test python versions for glaes 1.3.0
+name: Test pandas versions for glaes 1.3.0
 on: 
   workflow_dispatch:
     inputs:
       tags:
         description: 'Manual run' 
-  # push:
-  #   branches: 
-  #     - version/1.3.0
+  push:
+    branches: 
+      - version/1.3.0
 
   # Allows to trigger the workflow manually
     
 jobs:
     TestGeokitForGdalVersions:
-        name: python_version=${{ matrix.python_version }},${{ matrix.os }}
+        name: numpy_version=${{ matrix.numpy_version }},${{ matrix.os }}
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
@@ -25,9 +25,9 @@ jobs:
                 # os: ["ubuntu-24.04","ubuntu-22.04", "macos-13","windows-2025","windows-2022"]                
                 os: ["self-hosted"]
                 # Proper Gdal Versions
-                python_version: ["3.7","3.8","3.9","3.10"]
+                numpy_version: ['1.18.1', '1.18.4', '1.18.5', '1.19.0', '1.19.1', '1.19.2', '1.19.4', '1.19.5', '1.20.0', '1.20.1', '1.20.2', '1.20.3', '1.21.0', '1.21.1', '1.21.2', '1.21.3', '1.21.4', '1.21.5', '1.21.6', '1.22.0', '1.22.1', '1.22.2', '1.22.3', '1.22.4', '1.23.0', '1.23.1', '1.23.2', '1.23.3', '1.23.4', '1.23.5', '1.24.0', '1.24.1', '1.24.2', '1.24.3', '1.24.4', '1.25.0', '1.25.1', '1.25.2', '1.26.0', '1.26.2', '1.26.3', '1.26.4', '2.0.0']
                 # Failing Versions 
-                # python_version: ["2.4.3","2.4.4","3.3.2","3.3.3",]
+                # numpy_version: ["2.4.3","2.4.4","3.3.2","3.3.3",]
         steps:
             - name: Setup Conda
               uses: conda-incubator/setup-miniconda@v3
@@ -46,7 +46,7 @@ jobs:
                 method: CreateOrUpdate
                 changes: |
                   {
-                  "dependencies[0]": "python =${{ matrix.python_version }}"
+                  "dependencies[12]": "numpy =${{ matrix.numpy_version }}"
                   }
             - name: Install libraries
               shell: pwsh

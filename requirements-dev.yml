@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - python
+  - python >=3.8,<=3.10
   - pytest
   - pytest-cov
   - pylint
