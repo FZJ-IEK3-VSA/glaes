@@ -20,7 +20,6 @@ testing/results/*.cpg
 testing/results/*.csv
 testing/results/eligibility_plots
 .vscode/settings.json
-extract_dependency_versions/numpy_version.json
+extract_dependency_versions/
 .gitignore
-extract_dependency_versions/read_json.py
-extract_dependency_versions/pandas_version.json
+
