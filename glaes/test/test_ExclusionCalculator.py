@@ -437,3 +437,13 @@ def test_ExclusionCalculator_saveAreas():
     assert np.isclose(df_inRamAreas.area_m2.mean(), 612434.6634210692)
     assert np.isclose(df_inRamAreas.area_m2.std(), 218353.60307113524)
     assert len(df_inRamAreas) == 287
+
+
+def test_percentAvailableAreaGeometries():
+    # make a prior source
+    pr = gl.core.priors.PriorSource(priorSample)
+    ec = gl.ExclusionCalculator(aachenShape)
+    ec.excludePrior(pr, value=(400, None))
+    ec.distributeItems(separation=1000, outputSRS=3035)
+    ec.distributeAreas()
+    assert ec.percentAvailableAreaGeometries == 24.740465043104006
