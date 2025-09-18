@@ -719,26 +719,42 @@ class ExclusionCalculator(object):
 
     @property
     def percentAvailablePerCriterion(s):
-        """The percent of the region which remains available"""
+        """
+        The percent of the region which remains available only for the
+        respective last criteria excluded since the last call to
+        clearPercentAvailablePerCriterion(), or the setup of the
+        ExclusionCalculator instance.
+        """
         return s._availability_per_criterion.sum(dtype=np.int64) / s.region.mask.sum()
 
     @property
     def percentAvailableAreaReductionPerCriterion(s):
-        """The percent of the region which remains available after pruning or distributeAreas with minsize"""
+        """
+        The percent of the formerly available area in the region which is now
+        ineligible after pruning or distributeAreas with minsize.
+        """
+        if not hasattr(s, "_areaAfterReduction"):
+            raise AttributeError(
+                f"ExclusionCalculator object has no attribute '_areaAfterReduction'. First execute distributeAreas() or pruneIsolatedAreas()."
+            )
         return s._areaAfterReduction / s._areaBeforeReduction * 100  # in %
 
     @property
     def percentAvailableAfterAreaReduction(s):
-        """The percent of the region which remains available after pruning or distributeAreas"""
-        return (
-            s._areaAfterReduction
-            / (s.region.mask.sum() * s.region.pixelWidth * s.region.pixelHeight)
-            * 100
-        )  # in %
+        """
+        The percent of the region which remains available after pruning
+        or distributeAreas
+        """
+        if not hasattr(s, "_areaAfterReduction"):
+            raise AttributeError(
+                f"ExclusionCalculator object has no attribute '_areaAfterReduction'. First execute distributeAreas() or pruneIsolatedAreas()."
+            )
+        return s._areaAfterReduction / s.regionArea  # in %
 
     @property
     def clearPercentAvailablePerCriterion(s):
-        """The percent of the region which remains available"""
+        """Reset the _availability_per_criterion attribute to assess only the
+        exclusions caused by the following set of criteria"""
         s._availability_per_criterion = np.array(s.region.mask, dtype=np.uint8) * 100
         return
 
@@ -748,6 +764,17 @@ class ExclusionCalculator(object):
         * Units are defined by the srs used to initialize the ExclusionCalculator"""
         return (
             s._availability[s.region.mask].sum(dtype=np.int64)
+            * s.region.pixelWidth
+            * s.region.pixelHeight
+            / 100
+        )
+
+    @property
+    def regionArea(s):
+        """The total area of the region
+        * Units are defined by the srs used to initialize the ExclusionCalculator"""
+        return (
+            s.region.mask.sum(dtype=np.int64)
             * s.region.pixelWidth
             * s.region.pixelHeight
             / 100
