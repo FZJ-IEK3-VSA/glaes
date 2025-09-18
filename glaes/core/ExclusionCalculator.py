@@ -2694,9 +2694,9 @@ class ExclusionCalculator(object):
             i += 1
 
         # assert that the WHOLE ec region is covered by (rasterized) voronoi regions
-        assert _allcovered, (
-            f"Voronoi distribution failed to cover the whole region extent after {maxIteration} buffer iterations. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding further and/or _voronoiBoundaryPoints."
-        )
+        assert (
+            _allcovered
+        ), f"Voronoi distribution failed to cover the whole region extent after {maxIteration} buffer iterations. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding further and/or _voronoiBoundaryPoints."
 
         # reduce the (rasterized) voronois to only the eligible areas
         areaMap = areaMap * (s._availability > threshold)
