@@ -2580,13 +2580,12 @@ class ExclusionCalculator(object):
         _voronoiBoundaryPadding=100,
         maxIteration=10,
     ):
-        if points is None:
-            try:
-                points = s._itemCoords
-            except:
-                raise GlaesError(
-                    "Point data could not be found. Have you ran 'distributeItems'?"
-                )
+        if points is None and s._itemCoords is None:
+            raise GlaesError(
+                "Point data could not be found. Have you ran 'distributeItems'?"
+            )
+        elif points is None:
+            points = s._itemCoords
         else:
             points = np.array(points)
             s = points[:, 0] >= s.region.extent.xMin
