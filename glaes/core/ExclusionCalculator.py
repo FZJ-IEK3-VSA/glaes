@@ -727,7 +727,6 @@ class ExclusionCalculator(object):
         """
         return s._availability_per_criterion.sum(dtype=np.int64) / s.region.mask.sum()
 
-
     @property
     def percentAvailableAreaGeometries(s):
         """
@@ -735,9 +734,9 @@ class ExclusionCalculator(object):
         total region area in percent. May be reduced compared to the value of
         percentAvailable by e.g. pruneIsolatedAreas()
         """
-        if not hasattr(s, "_areas"):
+        if s._areas is None:
             raise AttributeError(
-                f"ExclusionCalculator object has no attribute '_areas'. First execute distributeAreas() or distributeItems() with asArea=True."
+                f"First execute distributeAreas() or distributeItems() with asArea=True to distribute area geometries."
             )
         _areaGeoms = sum([g.Area() for g in s._areas])
         return _areaGeoms / s.regionArea  # in %
