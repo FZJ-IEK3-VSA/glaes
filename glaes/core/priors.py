@@ -239,7 +239,7 @@ class PriorSource(object):
             boundsSRS=extent.srs,
             processor=mutator,
             noData=s.noData,
-            **kwargs
+            **kwargs,
         )
 
         # return
