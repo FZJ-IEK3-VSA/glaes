@@ -740,20 +740,23 @@ class ExclusionCalculator(object):
         return s._areaAfterReduction / s._areaBeforeReduction * 100  # in %
 
     @property
-    def percentAvailableAfterAreaReduction(s):
+    def percentAvailableAreaGeometries(s):
         """
-        The percent of the region which remains available after pruning
-        or distributeAreas
+        The percent of the region covered with area geometries relative to the
+        total region area in percent. May be reduced compared to the value of
+        percentAvailable by e.g. pruneIsolatedAreas()
         """
-        if not hasattr(s, "_areaAfterReduction"):
+        if not hasattr(s, "_areas"):
             raise AttributeError(
-                f"ExclusionCalculator object has no attribute '_areaAfterReduction'. First execute distributeAreas() or pruneIsolatedAreas()."
+                f"ExclusionCalculator object has no attribute '_areas'. First execute distributeAreas() or distributeItems() with asArea=True."
             )
-        return s._areaAfterReduction / s.regionArea  # in %
+        _areaGeoms = sum([g.Area() for g in s._areas])
+        return _areaGeoms / s.regionArea  # in %
+
 
     @property
     def clearPercentAvailablePerCriterion(s):
-        """Reset the _availability_per_criterion attribute to full eligibility 
+        """Reset the _availability_per_criterion attribute to full eligibility
         to assess only the exclusions caused by the following set of criteria"""
         s._availability_per_criterion = np.array(s.region.mask, dtype=np.uint8) * 100
         return
@@ -1408,6 +1411,7 @@ class ExclusionCalculator(object):
               geokit.RegionMask.indicateFeatures
 
         """
+
         # Set regionPad to buffer size if None
         if regionPad is None:
             regionPad = buffer
@@ -1584,6 +1588,7 @@ class ExclusionCalculator(object):
             name for points in ec plot, by default None. The points are only
             saved if a string is passed.
         """
+
         if isinstance(source, str) or isinstance(source, gdal.Dataset):
             points = gk.vector.extractFeatures(source, where=where)
 
@@ -2020,7 +2025,6 @@ class ExclusionCalculator(object):
         * minSize is given in units of the calculator's srs
         """
         # Create a vector file of geometries larger than 'minSize'
-        s._areaBeforeReduction = s.areaAvailable
         geoms = gk.geom.polygonizeMask(
             s._availability >= threshold,
             bounds=s.region.extent.xyXY,
