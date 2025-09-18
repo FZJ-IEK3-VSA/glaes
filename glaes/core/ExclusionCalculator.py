@@ -727,17 +727,6 @@ class ExclusionCalculator(object):
         """
         return s._availability_per_criterion.sum(dtype=np.int64) / s.region.mask.sum()
 
-    @property
-    def percentAvailableAreaReductionPerCriterion(s):
-        """
-        The percent of the formerly available area in the region which is now
-        ineligible after pruning or distributeAreas with minsize.
-        """
-        if not hasattr(s, "_areaAfterReduction"):
-            raise AttributeError(
-                f"ExclusionCalculator object has no attribute '_areaAfterReduction'. First execute distributeAreas() or pruneIsolatedAreas()."
-            )
-        return s._areaAfterReduction / s._areaBeforeReduction * 100  # in %
 
     @property
     def percentAvailableAreaGeometries(s):
@@ -752,7 +741,6 @@ class ExclusionCalculator(object):
             )
         _areaGeoms = sum([g.Area() for g in s._areas])
         return _areaGeoms / s.regionArea  # in %
-
 
     @property
     def clearPercentAvailablePerCriterion(s):
@@ -2043,7 +2031,6 @@ class ExclusionCalculator(object):
                 s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8) * 100
             )
 
-        s._areaAfterReduction = s.areaAvailable
         s._availability_per_criterion = s._availability
 
     def distributeItems(
@@ -2594,7 +2581,6 @@ class ExclusionCalculator(object):
         _voronoiBoundaryPadding=100,
         maxIteration=10,
     ):
-        s._areaBeforeReduction = s.areaAvailable
         if points is None:
             try:
                 points = s._itemCoords
@@ -2709,8 +2695,6 @@ class ExclusionCalculator(object):
             areaMap, bounds=s.region.extent, srs=s.region.srs, flat=True
         )
         geoms = list(filter(lambda x: x.Area() >= minArea, geoms.geom))
-
-        s._areaAfterReduction = sum([g.Area() for g in geoms])
 
         # Save in the s._areas container
         s._areas = geoms
