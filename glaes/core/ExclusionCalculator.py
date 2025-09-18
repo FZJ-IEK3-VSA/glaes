@@ -5,10 +5,9 @@ import time
 from os.path import isfile, basename
 from collections import namedtuple
 from warnings import warn
-from numpy.core.numeric import outer
 import pandas as pd
 import hashlib
-from osgeo import gdal, ogr, osr
+from osgeo import gdal
 import multiprocessing
 
 from .util import GlaesError, glaes_logger
