@@ -8,7 +8,6 @@ from warnings import warn
 import pandas as pd
 import hashlib
 from osgeo import gdal
-import multiprocessing
 
 from .util import GlaesError, glaes_logger
 from .priors import Priors, PriorSource
@@ -1012,7 +1011,6 @@ class ExclusionCalculator(object):
         minSize=None,
         threshold=50,
         default=False,
-        spawnNewProcess=False,
         **kwargs,
     ):
         """Exclude areas based off the values in a raster datasource
@@ -1119,9 +1117,6 @@ class ExclusionCalculator(object):
             sourcePath as well as the _exclusionStr instead of the actual
             source. Defaults to False.
 
-        spawnNewProcess: boolean, option.
-            If true, the core calulation is spawned inside a new process to free RAM from heavy osgeo objects.
-
         kwargs
             * All other keyword arguments are passed on to a call to
               geokit.RegionMask.indicateValues
@@ -1197,45 +1192,18 @@ class ExclusionCalculator(object):
 
             # calculate the actual exclusions
 
-            if spawnNewProcess:
-                manager = multiprocessing.Manager()
-                sharedDict = manager.dict()
-
-                p = multiprocessing.Process(
-                    target=s.region.indicateValuesMultiprocess,
-                    args=(source,),
-                    kwargs={
-                        **{
-                            "value": value,
-                            "buffer": buffer,
-                            "resolutionDiv": resolutionDiv,
-                            "forceMaskShape": True,
-                            "applyMask": False,
-                            "sharedDict": sharedDict,
-                        },
-                        **kwargs,
-                    },
+            indications = (
+                s.region.indicateValues(
+                    source,
+                    value,
+                    buffer=buffer,
+                    resolutionDiv=resolutionDiv,
+                    forceMaskShape=True,
+                    applyMask=False,
+                    **kwargs,
                 )
-                p.start()
-                p.join()
-
-                indications_raw = sharedDict["indications"]
-                indications = (indications_raw * 100).astype(np.uint8)
-                manager.shutdown()
-            else:
-                # Indicate on the source
-                indications = (
-                    s.region.indicateValues(
-                        source,
-                        value,
-                        buffer=buffer,
-                        resolutionDiv=resolutionDiv,
-                        forceMaskShape=True,
-                        applyMask=False,
-                        **kwargs,
-                    )
-                    * 100
-                ).astype(np.uint8)
+                * 100
+            ).astype(np.uint8)
 
             # drop all isolated areas below minSize if given
             if not minSize == None:
@@ -1328,7 +1296,6 @@ class ExclusionCalculator(object):
         regionPad=None,
         useRegionmask=True,
         default=False,
-        spawnNewProcess=True,
         **kwargs,
     ):
         """Exclude areas based off the features in a vector datasource
@@ -1408,9 +1375,6 @@ class ExclusionCalculator(object):
             If a string is passed as source, it will be written into the
             sourcePath as well as the _exclusionStr instead of the actual
             source. Defaults to False.
-
-        spawnNewProcess: boolean, option.
-            If true, the core calulation is spaned inside a new process to free RAM from heavy osgeo objects.
 
         kwargs
             * All other keyword arguments are passed on to a call to
@@ -1503,50 +1467,20 @@ class ExclusionCalculator(object):
             else:
                 # calculate the actual exclusions
 
-                if spawnNewProcess:
-                    manager = multiprocessing.Manager()
-                    sharedDict = manager.dict()
-
-                    p = multiprocessing.Process(
-                        target=s.region.indicateFeaturesMultiprocess,
-                        args=(source,),
-                        kwargs={
-                            **{
-                                "where": where,
-                                "buffer": buffer,
-                                "bufferMethod": bufferMethod,
-                                "resolutionDiv": resolutionDiv,
-                                "forceMaskShape": True,
-                                "applyMask": False,
-                                "noData": 0,
-                                "preBufferSimplification": None,
-                                "sharedDict": sharedDict,
-                                "regionPad": regionPad,
-                            },
-                            **kwargs,
-                        },
+                indications = (
+                    s.region.indicateFeatures(
+                        source,
+                        where=where,
+                        buffer=buffer,
+                        resolutionDiv=resolutionDiv,
+                        bufferMethod=bufferMethod,
+                        applyMask=False,
+                        forceMaskShape=True,
+                        regionPad=regionPad,
+                        **kwargs,
                     )
-                    p.start()
-                    p.join()
-
-                    indications_raw = sharedDict["indicationMatrix"]
-                    indications = (indications_raw * 100).astype(np.uint8)
-                    manager.shutdown()
-                else:
-                    indications = (
-                        s.region.indicateFeatures(
-                            source,
-                            where=where,
-                            buffer=buffer,
-                            resolutionDiv=resolutionDiv,
-                            bufferMethod=bufferMethod,
-                            applyMask=False,
-                            forceMaskShape=True,
-                            regionPad=regionPad,
-                            **kwargs,
-                        )
-                        * 100
-                    ).astype(np.uint8)
+                    * 100
+                ).astype(np.uint8)
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
             if intermediate is not None:
@@ -2003,7 +1937,7 @@ class ExclusionCalculator(object):
             elif row.type == "vector":
                 if verbose:
                     glaes_logger.info(
-                        f"Excluding Vector {row['name']} with where-statement \"{row.value}\", buffer {buffer}, mode {row.exclusion_mode}, and invert {row.invert} "
+                        f'Excluding Vector {row["name"]} with where-statement "{row.value}", buffer {buffer}, mode {row.exclusion_mode}, and invert {row.invert} '
                     )
 
                 if row.value == "" or row.value == "None":
@@ -2733,9 +2667,9 @@ class ExclusionCalculator(object):
             i += 1
 
         # assert that the WHOLE ec region is covered by (rasterized) voronoi regions
-        assert (
-            _allcovered
-        ), f"Voronoi distribution failed to cover the whole region extent after {maxIteration} buffer iterations. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding further and/or _voronoiBoundaryPoints."
+        assert _allcovered, (
+            f"Voronoi distribution failed to cover the whole region extent after {maxIteration} buffer iterations. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding further and/or _voronoiBoundaryPoints."
+        )
 
         # reduce the (rasterized) voronois to only the eligible areas
         areaMap = areaMap * (s._availability > threshold)
