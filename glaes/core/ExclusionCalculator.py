@@ -753,8 +753,8 @@ class ExclusionCalculator(object):
 
     @property
     def clearPercentAvailablePerCriterion(s):
-        """Reset the _availability_per_criterion attribute to assess only the
-        exclusions caused by the following set of criteria"""
+        """Reset the _availability_per_criterion attribute to full eligibility 
+        to assess only the exclusions caused by the following set of criteria"""
         s._availability_per_criterion = np.array(s.region.mask, dtype=np.uint8) * 100
         return
 
