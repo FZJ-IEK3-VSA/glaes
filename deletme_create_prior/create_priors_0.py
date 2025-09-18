@@ -36,7 +36,7 @@ from pathlib import Path
 
 #   1. define sources
 base_path = Path(__file__).resolve().parents[1]
-shape_file = str(base_path/"/glaes/test/data/aachenShapefile.shp") # has to be a string bacause pathlib paths produce problems for geookit
+shape_file = str(base_path/"glaes/test/data/Natura2000_aachenClipped.shp") # has to be a string bacause pathlib paths produce problems for geookit
 tif_file_elevation = str(base_path/"glaes/test/data/elevation.tif")
 
 #2. evaluation values
