@@ -36,9 +36,8 @@ from pathlib import Path
 
 #   1. define sources
 base_path = Path(__file__).resolve().parents[1]
-shape_file = base_path/"Examples/aachen_placement_areas.shp"
-tif_file_roads = base_path/"glaes/test/data/roads_prior_clip.tif"
-tif_file_elevation = base_path/"glaes/test/data/elevation.tif"
+shape_file = str(base_path/"/glaes/test/data/aachenShapefile.shp") # has to be a string bacause pathlib paths produce problems for geookit
+tif_file_elevation = str(base_path/"glaes/test/data/elevation.tif")
 
 #2. evaluation values
 # Indicates distances too close to exclusion criterion
@@ -54,18 +53,6 @@ EVALUATION_VALUES = {
         500,
         600,
         700,
-        800,
-        900,
-        1000,
-        1200,
-        1400,
-        1600,
-        1800,
-        2000,
-        2500,
-        3000,
-        4000,
-        5000,
     ],
     "airport_proximity":
     # Indicates distances too close to airports (m)
@@ -78,27 +65,6 @@ EVALUATION_VALUES = {
         500,
         600,
         700,
-        800,
-        900,
-        1000,
-        1250,
-        1500,
-        1750,
-        2000,
-        2250,
-        2500,
-        3000,
-        3500,
-        4000,
-        4500,
-        5000,
-        5500,
-        6000,
-        7000,
-        8000,
-        9000,
-        10000,
-        15000,
     ],
     "windspeed_50m_threshold":
     # Indicates areas with average wind speed below X (m/s)
@@ -106,7 +72,7 @@ EVALUATION_VALUES = {
 }
 
 #3. evaluation function
-def evaluate_tif_by_proximity(regSource, ftrID, tail, tif_file_ryberg, raster_target_value=None):
+def evaluate_tif_by_proximity(regSource, ftrID, tail, tif_file_ryberg, output_dir=None, raster_target_value=None):
     """creates a prior dataset from a tif file. Loads the evaluation values 
     and classifies cells around the target area by proximity.
 
@@ -126,16 +92,16 @@ def evaluate_tif_by_proximity(regSource, ftrID, tail, tif_file_ryberg, raster_ta
     name = "agriculture_proximity"  #name used for identifying the proximity values
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from an agriculture area"
-    source = "Some source"
+    source = "Some_source"
 
-    output_dir = join("outputs", name)  #output path is beeing set
+    output_dir = join(output_dir, name)  #output path is beeing set
 
     # Get distances
     distances = EVALUATION_VALUES[name] #distances from distances dict
 
     # 1. set the area
     # Make Region Mask
-    reg = gk.RegionMask.load(regSource, where=ftrID, padExtent=max(distances)) 
+    reg = gk.RegionMask.load(region=regSource, where=ftrID, padExtent=max(distances)) 
     #regSource = shapefile path
     #where = attribute feature
     #padExtent = buffer
@@ -152,7 +118,7 @@ def evaluate_tif_by_proximity(regSource, ftrID, tail, tif_file_ryberg, raster_ta
                                 applyMask=False) > 0.5 # region mask will not be applied
                                                  #on ylvalues which are > 0.5, means matrix, where values match raster values (=1) or match more than half (>0.5)
     
-    geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs) #convert the array to a geom with mask extent
+    geom = gk.geom.polygonizeMatrix(matrix, bounds=reg.extent.xyXY, srs=reg.srs) #convert the array to a geom with mask extent
 
 
     # 3. create proximity matrix
@@ -166,7 +132,9 @@ def evaluate_tif_by_proximity(regSource, ftrID, tail, tif_file_ryberg, raster_ta
 def evaluate_tif_by_threshold(regSource, #area to analyze
                               ftrID, #set the polygon or cell values that define th area
                               tif_file, #tif file to analyze
-                              tail):
+                              tail,
+                              output_dir=None,
+                              ):
     name = "dni_threshold"
     unit = "kWh/m2/day"
     description = "Indicates pixels in which the average daily direct-normal irrandiance (DNI) is less-than or equal-to X kWh/m2/day"
@@ -254,7 +222,6 @@ def calculate_distances(geom, dist):
         buffered_geoms = geom
 
     return buffered_geoms
-
 def edgesByProximity(reg, geom, distances):
     """ distances from a target area are beeing calculated. Each distance area gets a unique value. Output matrix
 
@@ -302,8 +269,6 @@ def edgesByProximity(reg, geom, distances):
 
 
     return proximity_matrix # Return the final labeled matrix
-
-
 def edgesByThreshold(reg, source, thresholds):
     """
     Thresholds of a raster file are beeing marked  as a matrix
@@ -341,10 +306,8 @@ def edgesByThreshold(reg, source, thresholds):
         value += 1
 
     return threshold_matrix # Return the final labeled matrix
-
-
 def writeEdgeFile(
-    result, reg, ftrID, output_dir, name, tail, unit, description, source, values
+    result, reg, ftrID, output_dir, name, tail, unit, description, source, values,
 ):
     """
     Writes a classified result matrix to a GeoTIFF file with metadata and value labeling.
@@ -391,14 +354,13 @@ def writeEdgeFile(
 
     d = reg.createRaster(
         output=join(output_dir, output),
+        #output=output_dir,
         data=result,
         overwrite=True,
         noDataValue=255,
         dtype=1,
         meta=meta,
     )
-
-
 def geomExtractor(extent, source, where=None, simplify=None):
     """
     Create a geometry list from the osm files. Not used yet
@@ -457,7 +419,6 @@ def geomExtractor(extent, source, where=None, simplify=None):
                 )
     # Return list or None if empty
     return geoms if geoms else None
-
 ########################################################################################
 ## TESTING
 evaluate_tif_by_proximity(
@@ -466,11 +427,13 @@ evaluate_tif_by_proximity(
     tail="testing",
     tif_file_ryberg=tif_file_elevation,
     raster_target_value=(10,11,12,13,14,15), #hope that makes snese
+    output_dir = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/ethos-installation/ethos_suite_repositories/glaes/deletme_create_prior/output"
 )
 evaluate_tif_by_threshold(
     regSource=shape_file,
     ftrID= "SITENAME='Buchenwälder bei Zweifall'",
     raster_target_value=(10,11,12,13,14,15),
     tail="testing",
-    tif_file=tif_file_elevation
+    tif_file=tif_file_elevation,
+    output_dir = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/ethos-installation/ethos_suite_repositories/glaes/deletme_create_prior/output"
 )
