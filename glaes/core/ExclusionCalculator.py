@@ -5,11 +5,9 @@ import time
 from os.path import isfile, basename
 from collections import namedtuple
 from warnings import warn
-from numpy.core.numeric import outer
 import pandas as pd
 import hashlib
 from osgeo import gdal
-
 
 from .util import GlaesError, glaes_logger
 from .priors import Priors, PriorSource
@@ -448,6 +446,8 @@ class ExclusionCalculator(object):
 
             srs = s.region.srs
         else:
+            # load as actual SRS instance in case srs is given as epsg int
+            srs = gk.srs.loadSRS(srs)
             mat = s._availability.copy()
             no_data = 255
             mat[~s.region.mask] = no_data
@@ -721,12 +721,32 @@ class ExclusionCalculator(object):
 
     @property
     def percentAvailablePerCriterion(s):
-        """The percent of the region which remains available"""
+        """
+        The percent of the region which remains available only for the
+        respective last criteria excluded since the last call to
+        clearPercentAvailablePerCriterion(), or the setup of the
+        ExclusionCalculator instance.
+        """
         return s._availability_per_criterion.sum(dtype=np.int64) / s.region.mask.sum()
 
     @property
+    def percentAvailableAreaGeometries(s):
+        """
+        The percent of the region covered with area geometries relative to the
+        total region area in percent. May be reduced compared to the value of
+        percentAvailable by e.g. pruneIsolatedAreas()
+        """
+        if s._areas is None:
+            raise AttributeError(
+                f"First execute distributeAreas() or distributeItems() with asArea=True to distribute area geometries."
+            )
+        _areaGeoms = sum([g.Area() for g in s._areas])
+        return _areaGeoms / s.regionArea  # in %
+
+    @property
     def clearPercentAvailablePerCriterion(s):
-        """The percent of the region which remains available"""
+        """Reset the _availability_per_criterion attribute to full eligibility
+        to assess only the exclusions caused by the following set of criteria"""
         s._availability_per_criterion = np.array(s.region.mask, dtype=np.uint8) * 100
         return
 
@@ -736,6 +756,17 @@ class ExclusionCalculator(object):
         * Units are defined by the srs used to initialize the ExclusionCalculator"""
         return (
             s._availability[s.region.mask].sum(dtype=np.int64)
+            * s.region.pixelWidth
+            * s.region.pixelHeight
+            / 100
+        )
+
+    @property
+    def regionArea(s):
+        """The total area of the region
+        * Units are defined by the srs used to initialize the ExclusionCalculator"""
+        return (
+            s.region.mask.sum(dtype=np.int64)
             * s.region.pixelWidth
             * s.region.pixelHeight
             / 100
@@ -1177,7 +1208,9 @@ class ExclusionCalculator(object):
                     prewarpArgs.update(prewarp)
 
                 source = s.region.warp(source, returnMatrix=False, **prewarpArgs)
-            # Indicate on the source
+
+            # calculate the actual exclusions
+
             indications = (
                 s.region.indicateValues(
                     source,
@@ -1367,6 +1400,7 @@ class ExclusionCalculator(object):
               geokit.RegionMask.indicateFeatures
 
         """
+
         # Set regionPad to buffer size if None
         if regionPad is None:
             regionPad = buffer
@@ -1437,7 +1471,9 @@ class ExclusionCalculator(object):
             # reduce vector dataset to padded region shape to avoid loading
             # huge vector datasets in next step in indicate features
             if not isinstance(source, gdal.Dataset) and useRegionmask:
-                source = s.region.mutateVector(source, regionPad=regionPad)
+                source = s.region.mutateVector(
+                    source, regionPad=regionPad
+                )  # small ram increase
             if source is None:
                 # create an empty indications matrix since no exclusions in
                 # region shape of exclusion calculator object
@@ -1450,6 +1486,7 @@ class ExclusionCalculator(object):
                 )
             else:
                 # calculate the actual exclusions
+
                 indications = (
                     s.region.indicateFeatures(
                         source,
@@ -1540,6 +1577,7 @@ class ExclusionCalculator(object):
             name for points in ec plot, by default None. The points are only
             saved if a string is passed.
         """
+
         if isinstance(source, str) or isinstance(source, gdal.Dataset):
             points = gk.vector.extractFeatures(source, where=where)
 
@@ -1920,7 +1958,7 @@ class ExclusionCalculator(object):
             elif row.type == "vector":
                 if verbose:
                     glaes_logger.info(
-                        f"Excluding Vector {row['name']} with where-statement \"{row.value}\", buffer {buffer}, mode {row.exclusion_mode}, and invert {row.invert} "
+                        f'Excluding Vector {row["name"]} with where-statement "{row.value}", buffer {buffer}, mode {row.exclusion_mode}, and invert {row.invert} '
                     )
 
                 if row.value == "" or row.value == "None":
@@ -1993,6 +2031,8 @@ class ExclusionCalculator(object):
             s._availability = (
                 s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8) * 100
             )
+
+        s._availability_per_criterion = s._availability
 
     def distributeItems(
         s,
@@ -2542,13 +2582,12 @@ class ExclusionCalculator(object):
         _voronoiBoundaryPadding=100,
         maxIteration=10,
     ):
-        if points is None:
-            try:
-                points = s._itemCoords
-            except:
-                raise GlaesError(
-                    "Point data could not be found. Have you ran 'distributeItems'?"
-                )
+        if points is None and s._itemCoords is None:
+            raise GlaesError(
+                "Point data could not be found. Have you ran 'distributeItems'?"
+            )
+        elif points is None:
+            points = s._itemCoords
         else:
             points = np.array(points)
             s = points[:, 0] >= s.region.extent.xMin
