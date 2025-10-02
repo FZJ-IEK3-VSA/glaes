@@ -57,9 +57,7 @@ class PriorSource(object):
         for i in range(253):
             try:
                 valString = valMap["%d" % i]
-            except (
-                KeyError
-            ):  # should fail when we've reached the end of the precalculated edges
+            except KeyError:  # should fail when we've reached the end of the precalculated edges
                 break
 
             s.edgeStr.append(valString)
@@ -95,14 +93,10 @@ class PriorSource(object):
         s.values = np.array(s.values)
 
         if not s.edges.size == s.values.size:
-            raise RuntimeError(
-                basename(path) + ": edges length does not match values length"
-            )
+            raise RuntimeError(basename(path) + ": edges length does not match values length")
 
         # make nodata and untouched value
-        qualifier, value = numRE.search(
-            valMap["%d" % (s.values.size - 1)]
-        ).groups()  # Get the last calculated edge
+        qualifier, value = numRE.search(valMap["%d" % (s.values.size - 1)]).groups()  # Get the last calculated edge
         value = float(value)
 
         # estimate a value
@@ -131,12 +125,8 @@ class PriorSource(object):
         doc += "VALUE MAP:\n"
         doc += "  Raw Value : Precalculated Edge : Estimated Value\n"
         for i in range(len(s.edges)):
-            doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(
-                i, s.edgeStr[i], s.values[i]
-            )
-        doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(
-            254, "untouched", s.untouchedTight
-        )
+            doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(i, s.edgeStr[i], s.values[i])
+        doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(254, "untouched", s.untouchedTight)
         doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(255, "no-data", s.noData)
 
         s.__doc__ = doc
@@ -299,9 +289,7 @@ class PriorSource(object):
         mat = extent.extractMatrix(s.path, strict=True) <= edgeI
 
         # Polygonize
-        geoms = gk.geom.polygonizeMask(
-            mat, bounds=extent.xyXY, srs=extent.srs, flat=False, shrink=False
-        )
+        geoms = gk.geom.polygonizeMask(mat, bounds=extent.xyXY, srs=extent.srs, flat=False, shrink=False)
 
         # Do extra grow
         if edgeDiffs[edgeI] / s.edges[edgeI] > 0.01:

@@ -1,6 +1,6 @@
 on:
   pull_request:
-    branches: ["develop"]
+    branches: ["dev"]
 
 jobs:
   TestPullCondaForgeDev:
@@ -10,7 +10,6 @@ jobs:
       matrix:
         runner_tag:
           [
-            "ubuntu-latest",
             "ubuntu-22.04",
             "macos-latest",
             "macos-13",

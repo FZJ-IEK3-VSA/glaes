@@ -36,9 +36,7 @@ def test_excludePoints():
     ec1 = gl.ExclusionCalculator(aachenShape)
     points = gk.vector.extractFeatures(pointData)
 
-    ec1.excludePoints(
-        source=points, geometryShape="ellipse", direction=45, saveToEC="Test"
-    )
+    ec1.excludePoints(source=points, geometryShape="ellipse", direction=45, saveToEC="Test")
     assert np.isclose(ec1.percentAvailable, 95.61485115020298)
     ec1.excludePoints(source=pointData, geometryShape="rectangle", direction=25)
     assert np.isclose(ec1.percentAvailable, 94.36879792512404)
@@ -107,12 +105,8 @@ def test_ExclusionCalculator_excludeRasterType():
     assert np.isclose(np.nanstd(ec.availability), 39.10104752)
 
     # Exclude iterable (should have the same result as the test above)
-    ec = gl.ExclusionCalculator(
-        gl._test_data_["aachenShapefile.shp"], srs=gk.srs.EPSG3035, pixelRes=100
-    )
-    ec.excludeRasterType(
-        gl._test_data_["clc-aachen_clipped.tif"], value=[5, 6, 7, 8, 9, 10, 11, 12]
-    )
+    ec = gl.ExclusionCalculator(gl._test_data_["aachenShapefile.shp"], srs=gk.srs.EPSG3035, pixelRes=100)
+    ec.excludeRasterType(gl._test_data_["clc-aachen_clipped.tif"], value=[5, 6, 7, 8, 9, 10, 11, 12])
 
     assert np.isclose(np.nanmean(ec.availability), 81.16260529)
     assert np.isclose(np.nanstd(ec.availability), 39.10104752)
@@ -146,9 +140,7 @@ def test_ExclusionCalculator_excludeRasterType():
     assert np.isclose(np.nanstd(ec.availability), 32.26681137)
 
     # Test with complex value input
-    ec = gl.ExclusionCalculator(
-        gl._test_data_["aachenShapefile.shp"], srs="latlon", pixelRes=0.005
-    )
+    ec = gl.ExclusionCalculator(gl._test_data_["aachenShapefile.shp"], srs="latlon", pixelRes=0.005)
     ec.excludeRasterType(
         gl._test_data_["clc-aachen_clipped.tif"],
         value="[-2),[5-7),12,(22-26],29,33,[40-]",
@@ -297,9 +289,7 @@ def test_ExclusionCalculator_distributeItems():
     ec2 = copy(ec)
 
     # Do a regular distribution
-    ec.distributeItems(
-        1000, output=join(RESULTDIR, "distributeItems1.shp"), outputSRS=3035
-    )
+    ec.distributeItems(1000, output=join(RESULTDIR, "distributeItems1.shp"), outputSRS=3035)
     geoms = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems1.shp"))
     assert geoms.shape[0] == 287
 
@@ -363,13 +353,9 @@ def test_ExclusionCalculator_distributeItems():
     assert np.isclose(geoms.area.std(), 8.2766693979e-05)
 
     # Do a variable separation distance placement
-    ec = gl.ExclusionCalculator(
-        gl._test_data_["aachenShapefile.shp"], pixelRes=25, srs="LAEA"
-    )
+    ec = gl.ExclusionCalculator(gl._test_data_["aachenShapefile.shp"], pixelRes=25, srs="LAEA")
 
-    ec.excludeRasterType(
-        gl._test_data_["clc-aachen_clipped.tif"], value=(1, 2), invert=True
-    )
+    ec.excludeRasterType(gl._test_data_["clc-aachen_clipped.tif"], value=(1, 2), invert=True)
 
     mat = np.zeros_like(ec.region.mask, dtype=np.uint16)
     for i in range(mat.shape[0]):
