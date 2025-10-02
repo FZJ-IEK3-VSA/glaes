@@ -1,6 +1,6 @@
 on:
-  push:
-    branches: ["111_migrate_pipeline"]
+  pull_request:
+    branches: ["master"]
 
 jobs:
   TestPushCondaForgeDev:
@@ -14,7 +14,6 @@ jobs:
     with:
       runner_tag: ${{ matrix.runner_tag }}
       requirements_file_name: requirements-dev.yml
-      ipynb_example_folder: "examples"
       library_name: "scipy"
       library_version: ${{ matrix.scipy_version }}
       dependency_position_env_file: "7"

@@ -10,7 +10,7 @@ dependencies:
   - descartes
   - pandas <=2.3.2
   - numpy
-  - scipy
+  - scipy <1.15
   - scikit-learn
   - geokit >=1.4.0
   - pytest
