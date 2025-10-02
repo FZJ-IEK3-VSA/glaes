@@ -1,0 +1,28 @@
+# Sets the maximum acceptable line length
+line-length = 120
+
+[lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+
+ignore = [
+    "F403", #`from .util import *` used; unable to detect undefined names
+    "F405", #`np` may be undefined, or defined from star imports
+    "F401", #`osgeo.gdal` imported but unused
+    "F841", # Local variable `I` is assigned to but never used
+    "E741", #Ambiguous variable name: `I`
+    "E714", #[*] Test for object identity should be `is not`
+    "E711", #Comparison to `None` should be `cond is None`
+    "E722", #Do not use bare `except`
+    "F541", #[*] f-string without any placeholders
+    "E713", #[*] Test for membership should be `not in`
+    "E712", # Avoid equality comparisons to `True`; use `additionalPoints:` for truth checks
+]
+unfixable = ["F401"]
+
+
+[lint.pycodestyle]
+max-doc-length = 120
+# E501 reports lines that exceed the length of 100.
+max-line-length = 120

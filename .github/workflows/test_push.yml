@@ -13,4 +13,5 @@ jobs:
     with:
       runner_tag: ${{ matrix.runner_tag }}
       requirements_file_name: requirements-dev.yml
-      ipynb_example_folder: "Examples"
+      # Examples are not tested until issue https://github.com/FZJ-IEK3-VSA/glaes/issues/11 is resolved
+      # ipynb_example_folder: "Examples"

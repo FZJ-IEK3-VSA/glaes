@@ -20,3 +20,7 @@ testing/results/*.cpg
 testing/results/*.csv
 testing/results/eligibility_plots
 .vscode/settings.json
+
+Examples/aachen_placement_areas.*
+Examples/aachen_placements.*
+Examples/aachens_best_pv_spots.tif
