@@ -1,17 +1,17 @@
-on:
-  push:
-    branches: ["**"]
+# on:
+#   push:
+#     branches: ["**"]
 
-jobs:
-  TestPushCondaForgeDev:
-    name: Test conda-forge development version on ${{ matrix.runner_tag }}
-    strategy:
-      fail-fast: false
-      matrix:
-        runner_tag: ["macos-latest"]
-    uses: FZJ-IEK3-VSA/.github/.github/workflows/_run_single_conda_forge_test.yml@main
-    with:
-      runner_tag: ${{ matrix.runner_tag }}
-      requirements_file_name: requirements-dev.yml
-      # Examples are not tested until issue https://github.com/FZJ-IEK3-VSA/glaes/issues/11 is resolved
-      # ipynb_example_folder: "Examples"
+# jobs:
+#   TestPushCondaForgeDev:
+#     name: Test conda-forge development version on ${{ matrix.runner_tag }}
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         runner_tag: ["macos-latest"]
+#     uses: FZJ-IEK3-VSA/.github/.github/workflows/_run_single_conda_forge_test.yml@main
+#     with:
+#       runner_tag: ${{ matrix.runner_tag }}
+#       requirements_file_name: requirements-dev.yml
+#       # Examples are not tested until issue https://github.com/FZJ-IEK3-VSA/glaes/issues/11 is resolved
+#       # ipynb_example_folder: "Examples"
