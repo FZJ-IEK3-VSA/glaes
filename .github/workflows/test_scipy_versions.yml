@@ -1,0 +1,20 @@
+on:
+  pull_request:
+    branches: ["111_migrate_pipeline"]
+
+jobs:
+  TestPushCondaForgeDev:
+    name: Test conda-forge development version on ${{ matrix.runner_tag }} for scipy=${{ matrix.scipy_version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner_tag: ["self-hosted"]
+        scipy_version: ["1.14", "1.12", "1.8"]
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/_run_single_conda_forge_test.yml@main
+    with:
+      runner_tag: ${{ matrix.runner_tag }}
+      requirements_file_name: requirements-dev.yml
+      ipynb_example_folder: "examples"
+      library_name: "scipy"
+      library_version: ${{ matrix.scipy_version }}
+      dependency_position_env_file: "7"

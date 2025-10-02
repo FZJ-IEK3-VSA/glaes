@@ -6,8 +6,6 @@ dependencies:
   - python
   - pip
   - ipykernel
-  - notebook
-  - jupyterlab
   - matplotlib
   - descartes
   - pandas <=2.3.2
