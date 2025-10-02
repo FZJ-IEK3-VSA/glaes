@@ -674,7 +674,7 @@ def test_ExclusionCalculator_distributeAreas():
     ]
 
     assert len(areas) == len(areas_check)
-    assert np.allclose(areas, areas_check), str(np.isclose(areas, areas_check))
+    assert np.allclose(areas, areas_check), str(areas)
     assert np.isclose(sum(areas), 175768748.40184686)
     assert np.isclose(statistics.stdev(areas), 218353.60307113524)
     assert np.isclose(statistics.mean(areas), 612434.6634210692)
