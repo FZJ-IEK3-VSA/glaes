@@ -46,8 +46,10 @@ def test_excludePoints():
 
 
 def test_ExclusionCalculator___init__():
-    # Test by giving a shapefile
-    ec = gl.ExclusionCalculator(aachenShape)
+    # Test by giving a geometry, transformed to non-EPSG 4326 to test conversion
+    aachenShape4326_geom = gk.vector.extractFeatures(aachenShape)["geom"].iloc[0]
+    aachenShape3035_geom = gk.geom.transform(aachenShape4326_geom, toSRS=gk.srs.EPSG3035)
+    ec = gl.ExclusionCalculator(aachenShape3035_geom)
 
     assert ec.region.mask.shape == (509, 304)
     assert np.isclose(ec.region.mask.sum(), 70944)
