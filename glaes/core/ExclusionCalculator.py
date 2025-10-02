@@ -2447,7 +2447,7 @@ class ExclusionCalculator(object):
                 ]
             )
             print("Voronoi points:\n", np.sum(pts))
-            np.isclose(np.sum(pts), 2302893001.8900003)
+            assert np.isclose(np.sum(pts), 2302893001.8900003)
 
             v = Voronoi(pts)
 
@@ -2467,7 +2467,7 @@ class ExclusionCalculator(object):
 
             stdev_check = statistics.stdev([g.Area() for g in geoms])
             print("geoms:", stdev_check)
-            np.isclose(23900538.151746683, stdev_check)
+            assert np.isclose(23900538.151746683, stdev_check)
             if not len(geoms) == len(s._itemCoords):
                 raise RuntimeError("Mismatching geometry count")
 
