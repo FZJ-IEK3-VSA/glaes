@@ -1,6 +1,6 @@
 on:
-  push:
-    # branches: ["**"]
+  # push:
+  #   # branches: ["**"]
 
 jobs:
   TestPushCondaForgeDev:

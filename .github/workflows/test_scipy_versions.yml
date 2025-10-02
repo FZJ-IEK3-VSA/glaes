@@ -1,5 +1,5 @@
 on:
-  pull_request:
+  push:
     branches: ["111_migrate_pipeline"]
 
 jobs:
