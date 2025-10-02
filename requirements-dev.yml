@@ -16,5 +16,6 @@ dependencies:
   - scikit-learn
   - geokit >=1.4.0
   - pytest
+  - pytest-xdist
   - pytest-cov
   - ruff
