@@ -1,15 +1,16 @@
-import geokit as gk
-import re
-import numpy as np
-from glob import glob
-from os.path import dirname, basename, join, isdir, splitext
-from collections import namedtuple, OrderedDict
 import json
-from warnings import warn
-from difflib import SequenceMatcher as SM
-import pandas as pd
 import logging
+import re
 import sys
+from collections import OrderedDict, namedtuple
+from difflib import SequenceMatcher as SM
+from glob import glob
+from os.path import basename, dirname, isdir, join, splitext
+from warnings import warn
+
+import geokit as gk
+import numpy as np
+import pandas as pd
 
 # Configure Logging
 glaes_logger = logging.getLogger("GLAES")

@@ -20,7 +20,7 @@ ignore = [
     "E712", # Avoid equality comparisons to `True`; use `additionalPoints:` for truth checks
 ]
 unfixable = ["F401"]
-
+extend-select = ["I"]
 
 [lint.pycodestyle]
 max-doc-length = 120
