@@ -140,7 +140,7 @@ class ExclusionCalculator(object):
         verbose=True,
         **kwargs,
     ):
-        """Initialize the ExclusionCalculator
+        """Initialize the ExclusionCalculator 
 
         Parameters:
         -----------
