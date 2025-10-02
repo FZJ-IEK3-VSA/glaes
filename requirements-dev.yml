@@ -11,7 +11,7 @@ dependencies:
   - matplotlib
   - descartes
   - pandas <=2.3.2
-  - numpy <1.24
+  - numpy
   - scipy
   - scikit-learn
   - geokit >=1.4.0
