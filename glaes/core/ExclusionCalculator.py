@@ -1,16 +1,17 @@
-import geokit as gk
-import re
-import numpy as np
-import time
-from os.path import isfile, basename
-from collections import namedtuple
-from warnings import warn
-import pandas as pd
 import hashlib
+import re
+import time
+from collections import namedtuple
+from os.path import basename, isfile
+from warnings import warn
+
+import geokit as gk
+import numpy as np
+import pandas as pd
 from osgeo import gdal
 
-from .util import GlaesError, glaes_logger
 from .priors import Priors, PriorSource
+from .util import GlaesError, glaes_logger
 
 Areas = namedtuple("Areas", "coordinates geoms")
 Areas = namedtuple("Areas", "coordinates geoms")
@@ -210,8 +211,8 @@ class ExclusionCalculator(object):
 
         # Create spatial reference system (but only if a RegionMask isnt already given)
         if not isinstance(region, gk.RegionMask) and isinstance(srs, str) and srs[0:4] == "LAEA":
-            import osgeo.osr
             import osgeo.ogr
+            import osgeo.osr
 
             if len(srs) > 4:  # A center point was given
                 m = re.compile("LAEA:([0-9.-]+),([0-9.-]+)").match(srs)
@@ -2445,6 +2446,8 @@ class ExclusionCalculator(object):
                     [(ext.xMax, y) for y in np.linspace(ext.yMin, ext.yMax, _voronoiBoundaryPoints * i)][1:-1],
                 ]
             )
+            print("Voronoi points:\n", np.sum(pts))
+            np.isclose(np.sum(pts), 2302893001.8900003)
 
             v = Voronoi(pts)
 
@@ -2460,6 +2463,11 @@ class ExclusionCalculator(object):
 
                 geoms.append(gk.geom.polygon(path, srs=s.region.srs))
 
+            import statistics
+
+            stdev_check = statistics.stdev([g.Area() for g in geoms])
+            print("geoms:", stdev_check)
+            np.isclose(23900538.151746683, stdev_check)
             if not len(geoms) == len(s._itemCoords):
                 raise RuntimeError("Mismatching geometry count")
 
