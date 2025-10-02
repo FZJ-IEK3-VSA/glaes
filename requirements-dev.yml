@@ -19,3 +19,4 @@ dependencies:
   - pytest-xdist
   - pytest-cov
   - ruff
+  - nbval
