@@ -16,8 +16,6 @@ jobs:
           args: "--version"
           version: "0.13.1"
       - name: Check Linter
-        run: ruff check --output-format=github --config=ruff.toml fine
-
+        run: ruff check --output-format=github --config=ruff.toml
       - name: Check Format
-
         run: ruff format --diff --config ruff.toml

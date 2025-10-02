@@ -18,5 +18,5 @@ dependencies:
   - pytest
   - pytest-xdist
   - pytest-cov
-  - ruff
+  - ruff =0.13.1
   - nbval
