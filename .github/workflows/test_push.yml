@@ -33,9 +33,9 @@ jobs:
               uses: mikefarah/yq@master
               with:
                   cmd: yq eval-all '. as $item ireduce ({}; . *+ $item)' geokit/requirements-dev.yml glaes/requirements-dev.yml > combined_env.yml
-            - name: Get content combined yml
+            - name: Show combined yml
               run: |
-                  get-content combined_env.yml
+                  cat combined_env.yml
             - uses: conda-incubator/setup-miniconda@v3
               with:
                   miniforge-version: 25.3.0-3
@@ -44,10 +44,10 @@ jobs:
                   conda-remove-defaults: "true"
             - name: Setup environment
               run: |
-                  get-content combined_env.yml.yml
+                  cat combined_env.yml
                   ls
                   echo "LS Done"
-                  mamba env create --name test_env --yes --file combined_env.yml.yml 
+                  mamba env create --name test_env --yes --file combined_env.yml
                   mamba run --name test_env pip install -e ./glaes --no-deps
                   mamba run --name test_env pip install -e ./geokit --no-deps
                   echo "Installation done"
