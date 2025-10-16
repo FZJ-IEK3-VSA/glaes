@@ -31,7 +31,8 @@ jobs:
             - name: Merge yaml files
               id: get_username
               uses: mikefarah/yq@master
-              with: yq4 eval-all '. as $item ireduce ({}; . *+ $item)' geokit/requirements-dev.yml glaes/requirements-dev.yml > combined_env.yml
+              with:
+                  cmd: yq4 eval-all '. as $item ireduce ({}; . *+ $item)' geokit/requirements-dev.yml glaes/requirements-dev.yml > combined_env.yml
             - name: Get content combined yml
               run: |
                   get-content combined_env.yml.yml
