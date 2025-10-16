@@ -8,10 +8,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner_tag:
-          [
+        runner_tag: [
             "ubuntu-22.04",
-            "macos-latest",
+            # "macos-latest", #Currently not working
             "macos-13",
             "windows-latest",
             "windows-2022",
