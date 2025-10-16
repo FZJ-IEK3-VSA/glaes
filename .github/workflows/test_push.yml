@@ -4,7 +4,7 @@ on:
 
 defaults:
     run:
-        shell: pwsh
+        shell: bash
 
 jobs:
     run-conda-forge-test:
@@ -15,19 +15,19 @@ jobs:
                 runner_tag: ["ubuntu-latest"]
         runs-on: ${{ matrix.runner_tag }}
         steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+            - name: Checkout glaes
+              uses: actions/checkout@v5
               with:
                   path: "glaes"
-            - name: Checkout
-              uses: actions/checkout@v4
+            - name: Checkout geokit
+              uses: actions/checkout@v5
               with:
                   # Repository name with owner. For example, actions/checkout
                   repository: "FZJ-IEK3-VSA/geokit"
                   path: "geokit"
             - name: Show directory
               run: |
-                  Get-ChildItem -Recurse
+                  ls -R
             - name: Merge yaml files
               id: get_username
               uses: mikefarah/yq@master
