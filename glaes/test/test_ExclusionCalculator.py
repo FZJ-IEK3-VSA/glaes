@@ -71,6 +71,19 @@ def test_ExclusionCalculator___init__():
     assert np.isclose(ec.region.mask.sum(), 90296)
     assert np.isclose(ec.region.mask.std(), 0.496741981394)
 
+    # Test: initialValue = False
+    geom = gk.vector.extractFeatures(aachenShape)["geom"].iloc[0]
+    ec_false = gl.ExclusionCalculator(geom, initialValue=False)
+    assert np.all(ec_false._availability == 0)
+
+    # Test: initialValue = True
+    ec_true = gl.ExclusionCalculator(geom, initialValue=True)
+    # 100 insinde region
+    assert np.all(ec_true._availability[ec_true.region.mask == 1] == 100)
+    # 0 outer region
+    assert np.all(ec_true._availability[ec_true.region.mask == 0] == 0)
+
+
 
 def test_ExclusionCalculator_save():
     ec = gl.ExclusionCalculator(aachenShape)
