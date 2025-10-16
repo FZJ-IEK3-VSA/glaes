@@ -8,7 +8,9 @@ from warnings import warn
 import geokit as gk
 import numpy as np
 import pandas as pd
-from osgeo import gdal
+import hashlib
+from osgeo import gdal, ogr
+import warnings
 
 from .priors import Priors, PriorSource
 from .util import GlaesError, glaes_logger
@@ -133,7 +135,7 @@ class ExclusionCalculator(object):
         s,
         region,
         start_raster=None,
-        srs=3035,
+        srs="LAEA",
         pixelRes=100,
         where=None,
         padExtent=0,
@@ -155,20 +157,17 @@ class ExclusionCalculator(object):
               arguments
 
         srs : str, Anything acceptable to geokit.srs.loadSRS()
-            The srs context of the generated RegionMask object
-            * The default srs EPSG3035 is only valid for a European context
-            * If an integer is given, it is treated as an EPSG identifier
-              - Look here for options: http://spatialreference.org/ref/epsg/
-              * Only effective if 'region' is a path to a vector
-            * If a string is specified, then a new srs can be automatically
-              generated using the Lambert Azimuthal Equal Area projection type
-              - Must follow the form "LAEA" or "LAEA:<lat>,<lon>" where <lat>
-                and <lon> are the latitute and of the center point of the new
-                projection
-              - Specifying "LAEA" instructs the constructor to determine X and Y
-                automatically from the given 'region' input
-                - NOTE: Only works when the 'region' input is an ogr.Geometry or
-                  a path to a vector file
+            The srs context in which the RegionMask object will be generated.
+            * If an integer is given, it is treated as an EPSG identifier. Look
+              here for options: http://spatialreference.org/ref/epsg/
+            * Can also be passed as a str in an "EPSG:<id>" or "ESRI:<id>" format.
+            * Alternatively a string in the format of "LAEA:<lat>,<lon>" where
+              <lat> and <lon> describe center point of the new projection.
+            * Default SRS is simply 'LAEA' i.e. a Lambert Azimuthal Equal Area
+              reference system will be created, centered on the centroid of the
+              region. Does not work with RegionMask inputs for region argument.
+            NOTE: If a RegionMask is provided as region argument, it will not be
+            transformed to the given SRS but matching SRS will be enforced.
 
         pixelRes : float or tuple
             The generated RegionMask's native pixel size(s)
@@ -209,52 +208,45 @@ class ExclusionCalculator(object):
         # Set simple flags
         s.verbose = verbose
 
-        # Create spatial reference system (but only if a RegionMask isnt already given)
-        if (
-            not isinstance(region, gk.RegionMask)
-            and isinstance(srs, str)
-            and srs[0:4] == "LAEA"
-        ):
-            import osgeo.ogr
-            import osgeo.osr
-
-            if len(srs) > 4:  # A center point was given
-                m = re.compile("LAEA:([0-9.-]+),([0-9.-]+)").match(srs)
-                if m is None:
-                    raise RuntimeError(
-                        "SRS string is not understandable. Must be parsable with: 'LAEA:([0-9.-]+),([0-9.-]+)'"
-                    )
-                center_y, center_x = map(float, m.groups())
-
-            else:  # A center point should be determined
-                if isinstance(region, osgeo.ogr.Geometry):
-                    if not region.GetSpatialReference().IsSame(gk.srs.EPSG4326):
-                        region = gk.geom.transform(region, toSRS=gk.srs.EPSG4326)
-                    centroid = region.Centroid()
-                    center_x = centroid.GetX()
-                    center_y = centroid.GetY()
-                elif isinstance(region, str):
-                    _ext = gk.Extent.fromVector(region, where=where)
-
-                    center_x = (_ext.xMin + _ext.xMax) / 2
-                    center_y = (_ext.yMin + _ext.yMax) / 2
-                    if not _ext.srs.IsSame(gk.srs.EPSG4326):
-                        center_x, center_y, _ = gk.srs.xyTransform(
-                            (center_x, center_y),
-                            fromSRS=_ext.srs,
-                            toSRS=gk.srs.EPSG4326,
-                        )
-                else:
-                    raise RuntimeError(
-                        "Automatic center determination is only possible when the 'region' input is an ogr.Geometry Object or a path to a vector file"
-                    )
-
-            srs = osgeo.osr.SpatialReference()
-            srs.ImportFromProj4(
-                "+proj=laea +lat_0={} +lon_0={} +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs".format(
-                    center_y, center_x
-                )
+        # check and preprocess region input
+        if not isinstance(region, (ogr.Geometry, gk.RegionMask, str)):
+            raise TypeError(
+                "region must be of type osgeo.ogr.Geometry, gk.RegionMask or str."
             )
+        # if region is a filepath, extract where-specified features and merge into a single geom
+        if isinstance(region, str):
+            _df = gk.vector.extractFeatures(region, where=where)
+            region = _df.geom.iloc[0]
+            for g in _df.geom.iloc[1:]:
+                region = region.Union(g)
+
+        # deal with special LAEA format - keep for backward compatibility only
+        if isinstance(srs, str):
+            # match with special LAEA str format regex
+            m = re.compile("^([A-Z][0-9]+)+$").match(srs)
+            if m is not None:
+                # we do have a match, it actually is the special LAEA str format
+                warnings.warn(
+                    "Str pattern '^([A-Z][0-9]+)+$' for srs is deprecated. Use 'LAEA' for region-centered SRS or preprocessed LAEA srs instance as srs argument when specific lon/lat center is required.",
+                    DeprecationWarning,
+                )
+                # extract lat and lon of center and generate centered LAEA srs instance
+                center_y, center_x = map(float, m.groups())
+                srs = gk.srs.centeredLAEA(lon=center_x, lat=center_y)
+
+        # convert SRS input for geom regions to a proper SRS instance if needed
+        if isinstance(region, ogr.Geometry):
+            # no need to transform region geom as it is done in SRS.loadSRS()/RegionMask.load()
+            srs = gk.srs.loadSRS(source=srs, geom=region)
+        else:
+            # we have a RegionMask, make sure the SRS matches the RegionMask srs
+            assert not (
+                isinstance(srs, str) and srs.upper()[:4] == "LAEA"
+            ), "srs='LAEA' is not possible when a geokit.RegionMask is passed as region."
+            _srs = gk.srs.loadSRS(source=srs)
+            assert region.srs.IsSame(
+                _srs
+            ), f"Passed srs ({srs}) is not the same as RegionMask srs of region input ({region.srs})"
 
         # load the region
         s.region = gk.RegionMask.load(
@@ -2685,9 +2677,9 @@ class ExclusionCalculator(object):
             i += 1
 
         # assert that the WHOLE ec region is covered by (rasterized) voronoi regions
-        assert _allcovered, (
-            f"Voronoi distribution failed to cover the whole region extent after {maxIteration} buffer iterations. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding further and/or _voronoiBoundaryPoints."
-        )
+        assert (
+            _allcovered
+        ), f"Voronoi distribution failed to cover the whole region extent after {maxIteration} buffer iterations. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding further and/or _voronoiBoundaryPoints."
 
         # reduce the (rasterized) voronois to only the eligible areas
         areaMap = areaMap * (s._availability > threshold)
