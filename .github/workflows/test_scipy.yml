@@ -7,7 +7,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                runner_tag: ["macos-latest"]
+                runner_tag: ["ubuntu-latest"]
                 scipy_version: ["1.14", "1.12", "1.8"]
         uses: FZJ-IEK3-VSA/.github/.github/workflows/_run_single_conda_forge_test.yml@main
         with:
