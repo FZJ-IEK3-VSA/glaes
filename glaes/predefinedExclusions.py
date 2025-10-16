@@ -36,9 +36,7 @@ class WindTurbineExclusionSets(object):
 
         ##### do exclusions #####
         # "Areas above the alpine forest line
-        ec.excludePrior(
-            "elevation_threshold", value=(1750, None)
-        )  # alpine forest line assumed at 1750 m
+        ec.excludePrior("elevation_threshold", value=(1750, None))  # alpine forest line assumed at 1750 m
 
         # "maximum slope (degrees)"
         ec.excludePrior("slope_threshold", value=(11.3, None))
@@ -138,9 +136,7 @@ class WindTurbineExclusionSets(object):
 
         ##### do exclusions #####
         # "Areas above the alpine forest line
-        ec.excludePrior(
-            "elevation_threshold", value=(1750, None)
-        )  # alpine forest line assumed at 1750 m
+        ec.excludePrior("elevation_threshold", value=(1750, None))  # alpine forest line assumed at 1750 m
 
         # "maximum slope (8.5 degrees)"
         ec.excludePrior("slope_threshold", value=(8.5, None))
@@ -243,9 +239,7 @@ class WindTurbineExclusionSets(object):
 
         ##### do exclusions #####
         # "Areas above the alpine forest line
-        ec.excludePrior(
-            "elevation_threshold", value=(1750, None)
-        )  # alpine forest line assumed at 1750 m
+        ec.excludePrior("elevation_threshold", value=(1750, None))  # alpine forest line assumed at 1750 m
 
         # "maximum slope (5.7 degrees)"
         ec.excludePrior("slope_threshold", value=(5.7, None))
