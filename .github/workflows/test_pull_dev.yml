@@ -1,0 +1,41 @@
+on:
+  pull_request:
+    branches: ["dev"]
+
+jobs:
+  TestPullCondaForgeDev:
+    name: Test development version on ${{ matrix.runner_tag }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner_tag: [
+            "ubuntu-22.04",
+            # "macos-latest", Currently not working
+            "macos-13",
+            "windows-latest",
+            "windows-2022",
+          ]
+        python_version: ["3.10"]
+        # These are required when the test pipeline is ready to test multiple Python versions.
+        # The exclusions can then be used to reduce pipeline load by testing a single OS for multiple Python versions.
+        # exclude:
+        #   - runner_tag: "ubuntu-22.04"
+        #     python_version: "3.10"
+        #   - runner_tag: "macos-latest"
+        #     python_version: "3.10"
+        #   - runner_tag: "macos-13"
+        #     python_version: "3.10"
+        #   - runner_tag: "windows-latest"
+        #     python_version: "3.10"
+        #   - runner_tag: "windows-2022"
+        #     python_version: "3.10"
+
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/_run_single_conda_forge_test.yml@main
+    with:
+      runner_tag: ${{ matrix.runner_tag }}
+      requirements_file_name: requirements-dev.yml
+      library_name: "python"
+      library_version: ${{ matrix.python_version }}
+      dependency_position_env_file: "0"
+      # Examples are not tested until issue https://github.com/FZJ-IEK3-VSA/glaes/issues/11 is resolved
+      # ipynb_example_folder: "Examples"
