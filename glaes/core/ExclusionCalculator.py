@@ -1,16 +1,17 @@
-import geokit as gk
-import re
-import numpy as np
-import time
-from os.path import isfile, basename
-from collections import namedtuple
-from warnings import warn
-import pandas as pd
 import hashlib
+import re
+import time
+from collections import namedtuple
+from os.path import basename, isfile
+from warnings import warn
+
+import geokit as gk
+import numpy as np
+import pandas as pd
 from osgeo import gdal
 
-from .util import GlaesError, glaes_logger
 from .priors import Priors, PriorSource
+from .util import GlaesError, glaes_logger
 
 Areas = namedtuple("Areas", "coordinates geoms")
 Areas = namedtuple("Areas", "coordinates geoms")
@@ -214,8 +215,8 @@ class ExclusionCalculator(object):
             and isinstance(srs, str)
             and srs[0:4] == "LAEA"
         ):
-            import osgeo.osr
             import osgeo.ogr
+            import osgeo.osr
 
             if len(srs) > 4:  # A center point was given
                 m = re.compile("LAEA:([0-9.-]+),([0-9.-]+)").match(srs)
@@ -327,7 +328,7 @@ class ExclusionCalculator(object):
         }
 
         data = s.availability
-        if not threshold is None:
+        if threshold is not None:
             data = (data >= threshold).astype(np.uint8) * 100
 
         data[~s.region.mask] = 255
@@ -419,7 +420,7 @@ class ExclusionCalculator(object):
             "bad_to_good", [excludedColor, goodColor]
         )
 
-        if ax is None and not "figsize" in kwargs:
+        if ax is None and "figsize" not in kwargs:
             ratio = s.region.mask.shape[1] / s.region.mask.shape[0]
             kwargs["figsize"] = (8 * ratio * 1.2, 8)
 
@@ -471,7 +472,7 @@ class ExclusionCalculator(object):
         )
 
         # Draw Points, maybe?
-        if not s._itemCoords is None:
+        if s._itemCoords is not None:
             points = s._itemCoords
             if not srs.IsSame(s.region.srs):
                 points = gk.srs.xyTransform(
@@ -488,7 +489,7 @@ class ExclusionCalculator(object):
             )
 
         # Draw Areas, maybe?
-        if not s._areas is None:
+        if s._areas is not None:
             gk.drawGeoms(
                 s._areas,
                 srs=srs,
@@ -539,7 +540,7 @@ class ExclusionCalculator(object):
                     label=f"{'Verfügbar' if german else 'Eligible'}: %.2f%%" % (p),
                 ),
             ]
-            if not s._itemCoords is None:
+            if s._itemCoords is not None:
                 h = axh1.ax.plot(
                     [],
                     [],
@@ -738,7 +739,7 @@ class ExclusionCalculator(object):
         """
         if s._areas is None:
             raise AttributeError(
-                f"First execute distributeAreas() or distributeItems() with asArea=True to distribute area geometries."
+                "First execute distributeAreas() or distributeItems() with asArea=True to distribute area geometries."
             )
         _areaGeoms = sum([g.Area() for g in s._areas])
         return _areaGeoms / s.regionArea  # in %
@@ -951,7 +952,7 @@ class ExclusionCalculator(object):
             meta_intermediate_compare = {
                 k: gk.raster.rasterInfo(intermediate).meta[k]
                 for k in gk.raster.rasterInfo(intermediate).meta
-                if not k in metaNotConsidered
+                if k not in metaNotConsidered
             }
 
         # check if we can apply the intermediate file (check all metadata besides sourcePath which is stored only for user information)
@@ -960,7 +961,7 @@ class ExclusionCalculator(object):
             and isfile(intermediate)
             and s._hasEqualContext(intermediate, verbose=True)
             and meta_intermediate_compare
-            == {k: metadata[k] for k in metadata if not k in metaNotConsidered}
+            == {k: metadata[k] for k in metadata if k not in metaNotConsidered}
         ):
             if s.verbose and intermediate is not None:
                 glaes_logger.info(
@@ -976,7 +977,7 @@ class ExclusionCalculator(object):
                 if isfile(intermediate) and s.verbose:
                     # add all new keys
                     for k in {
-                        k: metadata[k] for k in metadata if not k in metaNotConsidered
+                        k: metadata[k] for k in metadata if k not in metaNotConsidered
                     }.keys() - meta_intermediate_compare.keys():
                         diff = diff + f"\n(not in old metadata / {k}: {metadata[k]}); "
                     # add all missing keys in new set
@@ -985,7 +986,7 @@ class ExclusionCalculator(object):
                         - {
                             k: metadata[k]
                             for k in metadata
-                            if not k in metaNotConsidered
+                            if k not in metaNotConsidered
                         }.keys()
                     ):
                         diff = (
@@ -996,7 +997,7 @@ class ExclusionCalculator(object):
                     for k in set(meta_intermediate_compare).intersection(set(metadata)):
                         if (
                             meta_intermediate_compare[k] != metadata[k]
-                            and not k in metaNotConsidered
+                            and k not in metaNotConsidered
                         ):
                             diff = (
                                 diff
@@ -1761,15 +1762,15 @@ class ExclusionCalculator(object):
         # Check the value input
         if isinstance(value, tuple):
             # Check the boundaries
-            if not value[0] is None:
+            if value[0] is not None:
                 prior.containsValue(value[0], True)
-            if not value[1] is None:
+            if value[1] is not None:
                 prior.containsValue(value[1], True)
 
             # Check edges
-            if not value[0] is None:
+            if value[0] is not None:
                 prior.valueOnEdge(value[0], True)
-            if not value[1] is None:
+            if value[1] is not None:
                 prior.valueOnEdge(value[1], True)
 
         else:
@@ -1782,11 +1783,11 @@ class ExclusionCalculator(object):
         # Project to 'index space'
         try:
             v1, v2 = value
-            if not v1 is None:
+            if v1 is not None:
                 v1 = np.interp(
                     v1, prior._values_wide, np.arange(prior._values_wide.size)
                 )
-            if not v2 is None:
+            if v2 is not None:
                 v2 = np.interp(
                     v2, prior._values_wide, np.arange(prior._values_wide.size)
                 )
@@ -1879,13 +1880,13 @@ class ExclusionCalculator(object):
         assert "type" in exclusion_set.columns
         assert "value" in exclusion_set.columns
 
-        if not "buffer" in exclusion_set.columns:
+        if "buffer" not in exclusion_set.columns:
             exclusion_set["buffer"] = 0
-        if not "exclusion_mode" in exclusion_set.columns:
+        if "exclusion_mode" not in exclusion_set.columns:
             exclusion_set["exclusion_mode"] = "exclude"
-        if not "invert" in exclusion_set.columns:
+        if "invert" not in exclusion_set.columns:
             exclusion_set["invert"] = False
-        if not "resolutionDiv" in exclusion_set.columns:
+        if "resolutionDiv" not in exclusion_set.columns:
             exclusion_set["resolutionDiv"] = 1
 
         for p in paths:
@@ -1942,7 +1943,7 @@ class ExclusionCalculator(object):
                         )
                     )
                     if verbose and len(sources) == 0:
-                        glaes_logger.info(f"  No suitable sources in extent! ")
+                        glaes_logger.info("  No suitable sources in extent! ")
 
                 for source in sources:
                     s.excludeRasterType(
@@ -1979,7 +1980,7 @@ class ExclusionCalculator(object):
                         )
                     )
                     if verbose and len(sources) == 0:
-                        glaes_logger.info(f"  No suitable sources in extent! ")
+                        glaes_logger.info("  No suitable sources in extent! ")
 
                 # print(sources)
                 for source in sources:
@@ -1994,7 +1995,7 @@ class ExclusionCalculator(object):
                     )
 
         if verbose:
-            glaes_logger.info(f"Done!")
+            glaes_logger.info("Done!")
 
     def shrinkAvailability(s, dist, threshold=50):
         """Shrinks the current availability by a given distance in the given SRS"""
@@ -2137,7 +2138,7 @@ class ExclusionCalculator(object):
         workingAvailability[~s.region.mask] = False
 
         # Handle a gradient file, if one is given
-        if not axialDirection is None:
+        if axialDirection is not None:
             if isinstance(
                 axialDirection, str
             ):  # Assume a path to a raster file is given
@@ -2154,7 +2155,7 @@ class ExclusionCalculator(object):
             useGradient = False
 
         # Read separation scaling file, if given
-        if not sepScaling is None:
+        if sepScaling is not None:
             # Assume a path to a raster file is given
             if isinstance(sepScaling, str) or isinstance(sepScaling, gdal.Dataset):
                 sepScaling = s.region.warp(
@@ -2429,7 +2430,7 @@ class ExclusionCalculator(object):
 
         s._itemCoords = coords
 
-        if not outputSRS is None:
+        if outputSRS is not None:
             newCoords = gk.srs.xyTransform(
                 coords, fromSRS=s.region.srs, toSRS=outputSRS
             )
@@ -2543,12 +2544,12 @@ class ExclusionCalculator(object):
             s._areas = geoms
 
         # Make shapefile
-        if not output is None:
+        if output is not None:
             warn(
                 "Shapefile output will soon be removed from 'distributeItems'. Use 'saveItems' or 'saveAreas' instead",
                 DeprecationWarning,
             )
-            srs = gk.srs.loadSRS(outputSRS) if not outputSRS is None else s.region.srs
+            srs = gk.srs.loadSRS(outputSRS) if outputSRS is not None else s.region.srs
             # Should the locations be converted to areas?
             if asArea:
                 if not srs.IsSame(s.region.srs):
@@ -2684,9 +2685,9 @@ class ExclusionCalculator(object):
             i += 1
 
         # assert that the WHOLE ec region is covered by (rasterized) voronoi regions
-        assert (
-            _allcovered
-        ), f"Voronoi distribution failed to cover the whole region extent after {maxIteration} buffer iterations. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding further and/or _voronoiBoundaryPoints."
+        assert _allcovered, (
+            f"Voronoi distribution failed to cover the whole region extent after {maxIteration} buffer iterations. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding further and/or _voronoiBoundaryPoints."
+        )
 
         # reduce the (rasterized) voronois to only the eligible areas
         areaMap = areaMap * (s._availability > threshold)
@@ -2702,7 +2703,7 @@ class ExclusionCalculator(object):
 
     def saveItems(s, output=None, srs=None, data=None):
         # Get srs
-        srs = gk.srs.loadSRS(srs) if not srs is None else s.region.srs
+        srs = gk.srs.loadSRS(srs) if srs is not None else s.region.srs
 
         # transform?
         if not srs.IsSame(s.region.srs):
@@ -2753,7 +2754,7 @@ class ExclusionCalculator(object):
             for centroid location if polygons saved as geom
         """
         # Get srs
-        srs = gk.srs.loadSRS(srs) if not srs is None else s.region.srs
+        srs = gk.srs.loadSRS(srs) if srs is not None else s.region.srs
 
         # extract geoms from _areas attribute in the (metric) srs of the EC object
         geoms = s._areas
@@ -2790,7 +2791,7 @@ class ExclusionCalculator(object):
         df["area_m2"] = areas
 
         # add data list if given
-        if not data is None:
+        if data is not None:
             df["data"] = data
 
         if output == None:

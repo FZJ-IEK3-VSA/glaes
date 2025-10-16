@@ -1,5 +1,4 @@
 import glaes as gl
-import geokit as gk
 
 
 class WindTurbineExclusionSets(object):

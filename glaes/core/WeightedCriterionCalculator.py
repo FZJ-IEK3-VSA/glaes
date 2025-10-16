@@ -223,7 +223,7 @@ class WeightedCriterionCalculator(object):
         s.noData = -1
 
         # Keep an exclusion matrix
-        if not exclusions is None:
+        if exclusions is not None:
             if not exclusions.dtype == np.bool:
                 raise GlaesError("Exclusion matrix must be a boolean type")
             if not exclusions.shape == s.region.mask.shape:
@@ -414,7 +414,7 @@ class WeightedCriterionCalculator(object):
             result = combiner(s._unnormalizedWeights)
 
         # apply mask if one exists
-        if not s.exclusions is None:
+        if s.exclusions is not None:
             result *= s.exclusions
 
         # do combination

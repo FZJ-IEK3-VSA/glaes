@@ -1,12 +1,13 @@
 import warnings
-from os.path import join, dirname
-from osgeo import gdal
-import numpy as np
+from os.path import dirname, join
+
 import geokit as gk
+import numpy as np
 import pytest
+from osgeo import gdal
 
 import glaes as gl
-from glaes.core.priors import PriorSource, PriorSet
+from glaes.core.priors import PriorSet, PriorSource
 
 TESTDIR = dirname(__file__)
 DATADIR = join(TESTDIR, "data")

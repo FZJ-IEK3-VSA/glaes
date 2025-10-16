@@ -1,14 +1,13 @@
-import warnings
-import matplotlib.pyplot as plt
-from os.path import join, dirname, isfile
-from osgeo import gdal
-import numpy as np
-import geokit as gk
-import glaes as gl
-import pandas as pd
 import statistics
 from copy import copy
+from os.path import dirname, isfile, join
 
+import geokit as gk
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+import glaes as gl
 
 TESTDIR = dirname(__file__)
 RESULTDIR = join(TESTDIR, "results")
