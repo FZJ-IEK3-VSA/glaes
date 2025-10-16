@@ -31,10 +31,7 @@ from pathlib import Path
 ####    TODO    ####
 ####################
 
-# During testing: evaluate_tif_by_proximity workflow fails when "calculate_distance" function is called
-# NOTE: problem is that the geom that is overhanded to the function is a pandas dataframe type by using "polygonizeMatrix"
-# but "calculate_distance" needs a geom. Option a: transform geom to an acutal geom or ??
-# b. use another buffer function ??
+# NOTE: evaluate_tif_by_proximity works, but it is unclear whether the results are correct. Needs to be tested. Input and output are in the folder, region_df_clipped = gk.geom.polygonizeMatrix output once and check how it looks.
 # Next: Debug the other function "evaluate_tif_by_threshold"
 # If both functions work:
     #improve arguments tht are overhanded
@@ -44,9 +41,9 @@ from pathlib import Path
 ########################################################################################
 
 #   1. define sources
-base_path = Path(__file__).resolve().parents[1]
-shape_file = str(base_path/"glaes/test/data/Natura2000_aachenClipped.shp") # has to be a string bacause pathlib paths produce problems for geookit
-tif_file_elevation = str(base_path/"glaes/test/data/clc-aachen_clipped.tif")
+base_path = Path(__file__).resolve().parents[0]
+shape_file = str(base_path/"input/Natura2000_aachenClipped.shp") # has to be a string bacause pathlib paths produce problems for geookit
+tif_file_elevation = str(base_path/"input/clc-aachen_clipped.tif")
 
 #2. evaluation values
 # Indicates distances too close to exclusion criterion
@@ -126,13 +123,14 @@ def evaluate_tif_by_proximity(regSource, ftrID, tail, tif_file_ryberg, output_di
                                 value=raster_target_value,  # values that are accepted 
                                 applyMask=False) > 0.5 # region mask will not be applied
                                                  #on ylvalues which are > 0.5, means matrix, where values match raster values (=1) or match more than half (>0.5)
-    
-    geom = gk.geom.polygonizeMatrix(matrix, bounds=reg.extent.xyXY, srs=reg.srs) #convert the array to a geom with mask extent
+                                                 
+    region_df_clipped = gk.geom.polygonizeMatrix(matrix, bounds=reg.extent.xyXY, srs=reg.srs) #convert the array to a geom with mask extent
+
 
 
     # 3. create proximity matrix
     # region mask, gk_geom (like a polygon), distances from evaluation_values
-    result = edgesByProximity(reg, geom, distances)  
+    result = edgesByProximity(reg, region_df_clipped, distances)  
 
     # 4. make result
     writeEdgeFile(
@@ -209,35 +207,40 @@ def evaluate_shape_by_threshold(regSource, ftrID, tail, tif_file_ryberg, shape_t
 
 ########################################################################################
 ## UTILITY FUNCTIONS
-def calculate_distances(geom, dist):
+def calculate_distances(region_df_clipped, dist):
     """
-    Buffers geometry or geometries by a specified distance.
+    Buffers geometry of a df or geometries by a specified distance.
     This function applies a positive buffer (or "grow") operation to either a single geometry 
     or a collection of geometries. If `dist` is zero or negative, the original geometry is returned unchanged.
 
 
     Args:
-        geom (geokit geometrie object): a geokit geometrie object (point, line, polygon) that is used for bffering
+        region_df_clipped (pandas df with geometry column): a geokit geometrie object (point, line, polygon) that is used for bffering
         dist (int; float): one distance of distance dict (List[float or int]): List of increasing distance values from Evaluation_values dict that are used for buffering
 
     Returns:
         Geometry or list of Geometries: The buffered geometry/geometries.
     """
+    #print(type(geom))
     if dist > 0:
-        if isinstance(geom, list) or isinstance(geom, filter):
-            buffered_geom = [g.Buffer(dist) for g in geom]
+        # if isinstance(geom, list) or isinstance(geom, filter):
+        if len(region_df_clipped) > 0:
+            buffered_geom = [g.Buffer(dist) for g in region_df_clipped.geom]
+            #buffered_geom = [g.Buffer(float(dist)) for g in geom]
         else:
-            buffered_geom = geom.Buffer(dist)
+            buffered_geom = region_df_clipped.Buffer(dist)
+            
     else:
-        buffered_geom = geom
+        buffered_geom = region_df_clipped
 
     return buffered_geom
-def edgesByProximity(reg, geom, distances):
+
+def edgesByProximity(reg, region_df_clipped, distances):
     """ distances from a target area are beeing calculated. Each distance area gets a unique value. Output matrix
 
     Args:
         reg (Regionmask): Regionmask with spatial extent for further processing
-        geom (gk geometrie object): geometrie (point, line, polygon) of area/areas that shall be used for distance calculation
+        region_df_clipped (pandas df with geometry column): 
         distances (List[float or int]): distance dict (List[float or int]): List of increasing distance values from Evaluation_values dict that are used for buffering
 
 
@@ -250,7 +253,7 @@ def edgesByProximity(reg, geom, distances):
     proximity_matrix[reg.mask] = 254  # Set all values in the region to untouched (254)
 
     # Only do growing if a geometry is available
-    if geom is not None and len(geom) != 0:
+    if region_df_clipped is not None and len(region_df_clipped) != 0:
 
         # Do distance calculation
         value = 0 #sets the value of the first threshold
@@ -258,7 +261,7 @@ def edgesByProximity(reg, geom, distances):
         for dist in distances:  
             #loops over the distance list
             
-            buffered = calculate_distances(geom, dist) #buffers the geom by distance
+            buffered = calculate_distances(region_df_clipped, dist) #buffers the geom by distance
             try:
                 tmp_buffered_vector = gk.vector.createVector(buffered)  # Make a temporary vector file
             except Exception as e:
