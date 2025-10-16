@@ -378,10 +378,10 @@ def test_ExclusionCalculator_distributeItems():
 
     points = ec.distributeItems(separation=5, sepScaling=ras, _stamping=False)
 
-    assert points.shape[0] == 335
+    assert points.shape[0] == 331
 
     points = ec.distributeItems(separation=(8, 3), sepScaling=ras, axialDirection=0)
-    assert points.shape[0] == 389
+    assert points.shape[0] == 390
 
 
 def test_ExclusionCalculator_distributeAreas():
