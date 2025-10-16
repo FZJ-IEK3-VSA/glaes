@@ -210,9 +210,7 @@ class ExclusionCalculator(object):
 
         # check and preprocess region input
         if not isinstance(region, (ogr.Geometry, gk.RegionMask, str)):
-            raise TypeError(
-                "region must be of type osgeo.ogr.Geometry, gk.RegionMask or str."
-            )
+            raise TypeError("region must be of type osgeo.ogr.Geometry, gk.RegionMask or str.")
         # if region is a filepath, extract where-specified features and merge into a single geom
         if isinstance(region, str):
             _df = gk.vector.extractFeatures(region, where=where)
@@ -240,13 +238,13 @@ class ExclusionCalculator(object):
             srs = gk.srs.loadSRS(source=srs, geom=region)
         else:
             # we have a RegionMask, make sure the SRS matches the RegionMask srs
-            assert not (
-                isinstance(srs, str) and srs.upper()[:4] == "LAEA"
-            ), "srs='LAEA' is not possible when a geokit.RegionMask is passed as region."
+            assert not (isinstance(srs, str) and srs.upper()[:4] == "LAEA"), (
+                "srs='LAEA' is not possible when a geokit.RegionMask is passed as region."
+            )
             _srs = gk.srs.loadSRS(source=srs)
-            assert region.srs.IsSame(
-                _srs
-            ), f"Passed srs ({srs}) is not the same as RegionMask srs of region input ({region.srs})"
+            assert region.srs.IsSame(_srs), (
+                f"Passed srs ({srs}) is not the same as RegionMask srs of region input ({region.srs})"
+            )
 
         # load the region
         s.region = gk.RegionMask.load(
@@ -2482,9 +2480,9 @@ class ExclusionCalculator(object):
             i += 1
 
         # assert that the WHOLE ec region is covered by (rasterized) voronoi regions
-        assert (
-            _allcovered
-        ), f"Voronoi distribution failed to cover the whole region extent after {maxIteration} buffer iterations. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding further and/or _voronoiBoundaryPoints."
+        assert _allcovered, (
+            f"Voronoi distribution failed to cover the whole region extent after {maxIteration} buffer iterations. May be related to Voronoi boundary settings, consider increasing _voronoiBoundaryPadding further and/or _voronoiBoundaryPoints."
+        )
 
         # reduce the (rasterized) voronois to only the eligible areas
         areaMap = areaMap * (s._availability > threshold)
