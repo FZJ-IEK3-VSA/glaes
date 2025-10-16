@@ -8,12 +8,12 @@ defaults:
 
 jobs:
     run-conda-forge-test:
-        name: "Run test for ${{ inputs.library_name }}=${{ inputs.library_version }} on ${{ inputs.runner_tag }}"
+        name: "Run test for glaes on ${{ matrix.runner_tag }}"
         strategy:
             fail-fast: false
             matrix:
                 runner_tag: ["ubuntu-latest"]
-        runs-on: ${{ inputs.runner_tag }}
+        runs-on: ${{ matrix.runner_tag }}
         steps:
             - name: Checkout
               uses: actions/checkout@v4
