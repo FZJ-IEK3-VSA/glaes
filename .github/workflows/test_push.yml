@@ -25,6 +25,11 @@ jobs:
                   # Repository name with owner. For example, actions/checkout
                   repository: "FZJ-IEK3-VSA/geokit"
                   path: "geokit"
+            - name: Setup yq 4.30.6
+              uses: vegardit/gha-setup-yq@v1
+              with:
+                  use-cache: true
+                  version: 4.30.6
             - name: Merge yaml files
               id: get_username
               uses: mikefarah/yq@master
