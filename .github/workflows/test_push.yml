@@ -4,7 +4,7 @@ on:
 
 defaults:
     run:
-        shell: bash
+        shell: pwsh
 
 jobs:
     run-conda-forge-test:
@@ -25,17 +25,14 @@ jobs:
                   # Repository name with owner. For example, actions/checkout
                   repository: "FZJ-IEK3-VSA/geokit"
                   path: "geokit"
-            - name: Show directory
-              run: |
-                  ls -R
             - name: Merge yaml files
               id: get_username
               uses: mikefarah/yq@master
               with:
-                  cmd: yq eval-all '. as $item ireduce ({}; . *+ $item)' geokit/requirements-dev.yml glaes/requirements-dev.yml > combined_env.yml
+                  cmd: yq eval-all '. as $item ireduce ({}; . *+ $item)' geokit\requirements-dev.yml glaes\requirements-dev.yml > combined_env.yml
             - name: Show combined yml
               run: |
-                  cat combined_env.yml
+                  get-content combined_env.yml
             - uses: conda-incubator/setup-miniconda@v3
               with:
                   miniforge-version: 25.3.0-3
@@ -44,12 +41,12 @@ jobs:
                   conda-remove-defaults: "true"
             - name: Setup environment
               run: |
-                  cat combined_env.yml
+                  get-content combined_env.yml
                   ls
                   echo "LS Done"
                   mamba env create --name test_env --yes --file combined_env.yml
-                  mamba run --name test_env pip install -e ./glaes --no-deps
-                  mamba run --name test_env pip install -e ./geokit --no-deps
+                  mamba run --name test_env pip install -e .\glaes --no-deps
+                  mamba run --name test_env pip install -e .\geokit --no-deps
                   echo "Installation done"
                   mamba list --name test_env
                   echo "packages printed"
