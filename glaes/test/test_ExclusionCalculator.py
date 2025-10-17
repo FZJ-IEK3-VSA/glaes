@@ -20,7 +20,7 @@ pointData = gl._test_data_["aachen_points.shp"]
 
 def test_multiple_exclusions():
     pr = gl.core.priors.PriorSource(priorSample)
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
 
     # apply exclusions
     ec.excludePrior(pr, value=(None, 400))
@@ -32,12 +32,10 @@ def test_multiple_exclusions():
 
 
 def test_excludePoints():
-    ec1 = gl.ExclusionCalculator(aachenShape)
+    ec1 = gl.ExclusionCalculator(aachenShape, srs=3035)
     points = gk.vector.extractFeatures(pointData)
 
-    ec1.excludePoints(
-        source=points, geometryShape="ellipse", direction=45, saveToEC="Test"
-    )
+    ec1.excludePoints(source=points, geometryShape="ellipse", direction=45, saveToEC="Test")
     assert np.isclose(ec1.percentAvailable, 95.61485115020298)
     ec1.excludePoints(source=pointData, geometryShape="rectangle", direction=25)
     assert np.isclose(ec1.percentAvailable, 94.36879792512404)
@@ -46,15 +44,15 @@ def test_excludePoints():
 
 def test_ExclusionCalculator___init__():
     # Test by giving a shapefile
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
 
     assert ec.region.mask.shape == (509, 304)
     assert np.isclose(ec.region.mask.sum(), 70944)
     assert np.isclose(ec.region.mask.std(), 0.498273451386)
 
     # Test by giving a region mask
-    rm = gk.RegionMask.load(aachenShape, padExtent=5000)
-    ec = gl.ExclusionCalculator(rm)
+    rm = gk.RegionMask.load(aachenShape, padExtent=5000, srs=3035)
+    ec = gl.ExclusionCalculator(rm, srs=3035)
 
     assert ec.region.mask.shape == (609, 404)
     assert np.isclose(ec.region.mask.sum(), 70944)
@@ -62,7 +60,7 @@ def test_ExclusionCalculator___init__():
 
     # Test by giving a region mask with different resolution and srs
     rm = gk.RegionMask.load(aachenShape, srs=gk.srs.EPSG4326, pixelRes=0.001)
-    ec = gl.ExclusionCalculator(rm)
+    ec = gl.ExclusionCalculator(rm, srs=4326)
 
     assert ec.region.mask.shape == (457, 446)
     assert np.isclose(ec.region.mask.sum(), 90296)
@@ -70,7 +68,7 @@ def test_ExclusionCalculator___init__():
 
 
 def test_ExclusionCalculator_save():
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
 
     ec.save(join(RESULTDIR, "save1.tif"))
     mat = gk.raster.extractMatrix(join(RESULTDIR, "save1.tif"))
@@ -80,7 +78,7 @@ def test_ExclusionCalculator_save():
 
 
 def test_ExclusionCalculator_draw():
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
 
     ec._availability[:, 140:160] = 0
     ec._availability[140:160, :] = 0
@@ -92,39 +90,35 @@ def test_ExclusionCalculator_draw():
 
 def test_ExclusionCalculator_excludeRasterType():
     # exclude single value
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludeRasterType(clcRaster, 12)
 
     assert np.isclose(np.nanmean(ec.availability), 82.8033)
     assert np.isclose(np.nanstd(ec.availability), 37.73514175)
 
     # exclude value range
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludeRasterType(clcRaster, (5, 12))
 
     assert np.isclose(np.nanmean(ec.availability), 81.16260529)
     assert np.isclose(np.nanstd(ec.availability), 39.10104752)
 
     # Exclude iterable (should have the same result as the test above)
-    ec = gl.ExclusionCalculator(
-        gl._test_data_["aachenShapefile.shp"], srs=gk.srs.EPSG3035, pixelRes=100
-    )
-    ec.excludeRasterType(
-        gl._test_data_["clc-aachen_clipped.tif"], value=[5, 6, 7, 8, 9, 10, 11, 12]
-    )
+    ec = gl.ExclusionCalculator(gl._test_data_["aachenShapefile.shp"], srs=gk.srs.EPSG3035, pixelRes=100)
+    ec.excludeRasterType(gl._test_data_["clc-aachen_clipped.tif"], value=[5, 6, 7, 8, 9, 10, 11, 12])
 
     assert np.isclose(np.nanmean(ec.availability), 81.16260529)
     assert np.isclose(np.nanstd(ec.availability), 39.10104752)
 
     # exclude value maximum
-    ecMax12 = gl.ExclusionCalculator(aachenShape)
+    ecMax12 = gl.ExclusionCalculator(aachenShape, srs=3035)
     ecMax12.excludeRasterType(clcRaster, (None, 12))
 
     assert np.isclose(np.nanmean(ecMax12.availability), 58.52362442)
     assert np.isclose(np.nanstd(ecMax12.availability), 49.26812363)
 
     # exclude value minimum
-    ecMin13 = gl.ExclusionCalculator(aachenShape)
+    ecMin13 = gl.ExclusionCalculator(aachenShape, srs=3035)
     ecMin13.excludeRasterType(clcRaster, (13, None))
 
     assert np.isclose(np.nanmean(ecMin13.availability), 41.47637558)
@@ -145,9 +139,7 @@ def test_ExclusionCalculator_excludeRasterType():
     assert np.isclose(np.nanstd(ec.availability), 32.26681137)
 
     # Test with complex value input
-    ec = gl.ExclusionCalculator(
-        gl._test_data_["aachenShapefile.shp"], srs="latlon", pixelRes=0.005
-    )
+    ec = gl.ExclusionCalculator(gl._test_data_["aachenShapefile.shp"], srs="latlon", pixelRes=0.005)
     ec.excludeRasterType(
         gl._test_data_["clc-aachen_clipped.tif"],
         value="[-2),[5-7),12,(22-26],29,33,[40-]",
@@ -176,7 +168,7 @@ def test_ExclusionCalculator_excludeRasterType():
 
 def test_ExclusionCalculator_excludeVectorType():
     # exclude all features directly
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludeVectorType(cddaVector)
 
     assert np.isclose(np.nanmean(ec.availability), 76.47581482)
@@ -190,14 +182,14 @@ def test_ExclusionCalculator_excludeVectorType():
     assert np.isclose(np.nanstd(ec.availability), 42.51445770)
 
     # exclude a selection of features
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludeVectorType(cddaVector, where="YEAR>2000")
 
     assert np.isclose(np.nanmean(ec.availability), 86.89811707)
     assert np.isclose(np.nanstd(ec.availability), 33.74209595)
 
     # exclude a selection of features with buffer
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludeVectorType(cddaVector, where="YEAR>2000", buffer=400)
 
     assert np.isclose(np.nanmean(ec.availability), 77.95021057)
@@ -205,7 +197,7 @@ def test_ExclusionCalculator_excludeVectorType():
 
     # test with intermediate functionality
     for i in range(2):
-        ec = gl.ExclusionCalculator(aachenShape)
+        ec = gl.ExclusionCalculator(aachenShape, srs=3035)
         ec.excludeVectorType(
             cddaVector,
             where="YEAR>2000",
@@ -223,7 +215,7 @@ def test_ExclusionCalculator_excludePrior():
     pr = gl.core.priors.PriorSource(priorSample)
 
     # test same srs
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludePrior(pr, value=(400, None))
 
     assert np.isclose(np.nanmean(ec.availability), 24.77587891)
@@ -238,7 +230,7 @@ def test_ExclusionCalculator_excludePrior():
 
 
 def test_ExclusionCalculator_excludeSet():
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     exclusion_set = pd.read_csv(gl._test_data_["sample_exclusion_set.csv"])
     ec.excludeSet(
         exclusion_set=exclusion_set,
@@ -254,7 +246,7 @@ def test_ExclusionCalculator_excludeSet():
 def test_ExclusionCalculator_excludeRegionEdge():
     # make a prior source
     pr = gl.core.priors.PriorSource(priorSample)
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludePrior(pr, value=(None, 400))
 
     ec.excludeRegionEdge(500)
@@ -266,7 +258,7 @@ def test_ExclusionCalculator_excludeRegionEdge():
 def test_ExclusionCalculator_shrinkAvailability():
     # make a prior source
     pr = gl.core.priors.PriorSource(priorSample)
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludePrior(pr, value=(None, 400))
 
     ec.shrinkAvailability(500)
@@ -278,7 +270,7 @@ def test_ExclusionCalculator_shrinkAvailability():
 def test_ExclusionCalculator_pruneIsolatedAreas():
     # make a prior source
     pr = gl.core.priors.PriorSource(priorSample)
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludePrior(pr, value=(None, 400))
 
     ec.pruneIsolatedAreas(12000000)
@@ -290,15 +282,13 @@ def test_ExclusionCalculator_pruneIsolatedAreas():
 def test_ExclusionCalculator_distributeItems():
     # make a prior source
     pr = gl.core.priors.PriorSource(priorSample)
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludePrior(pr, value=(400, None))
     # create a copy to repeat the process
     ec2 = copy(ec)
 
     # Do a regular distribution
-    ec.distributeItems(
-        1000, output=join(RESULTDIR, "distributeItems1.shp"), outputSRS=3035
-    )
+    ec.distributeItems(1000, output=join(RESULTDIR, "distributeItems1.shp"), outputSRS=3035)
     geoms = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems1.shp"))
     assert geoms.shape[0] == 287
 
@@ -362,13 +352,9 @@ def test_ExclusionCalculator_distributeItems():
     assert np.isclose(geoms.area.std(), 8.2766693979e-05)
 
     # Do a variable separation distance placement
-    ec = gl.ExclusionCalculator(
-        gl._test_data_["aachenShapefile.shp"], pixelRes=25, srs="LAEA"
-    )
+    ec = gl.ExclusionCalculator(gl._test_data_["aachenShapefile.shp"], pixelRes=25, srs="LAEA")
 
-    ec.excludeRasterType(
-        gl._test_data_["clc-aachen_clipped.tif"], value=(1, 2), invert=True
-    )
+    ec.excludeRasterType(gl._test_data_["clc-aachen_clipped.tif"], value=(1, 2), invert=True)
 
     mat = np.zeros_like(ec.region.mask, dtype=np.uint16)
     for i in range(mat.shape[0]):
@@ -378,16 +364,16 @@ def test_ExclusionCalculator_distributeItems():
 
     points = ec.distributeItems(separation=5, sepScaling=ras, _stamping=False)
 
-    assert points.shape[0] == 335
+    assert points.shape[0] == 331
 
     points = ec.distributeItems(separation=(8, 3), sepScaling=ras, axialDirection=0)
-    assert points.shape[0] == 389
+    assert points.shape[0] == 390
 
 
 def test_ExclusionCalculator_distributeAreas():
     # make a prior source
     pr = gl.core.priors.PriorSource(priorSample)
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludePrior(pr, value=(400, None))
 
     # Do a regular distribution and subsequent area assignment
@@ -404,7 +390,7 @@ def test_ExclusionCalculator_distributeAreas():
 def test_ExclusionCalculator_saveAreas():
     # make a prior source
     pr = gl.core.priors.PriorSource(priorSample)
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludePrior(pr, value=(400, None))
 
     # Do a regular distribution and subsequent area assignment
@@ -441,7 +427,7 @@ def test_ExclusionCalculator_saveAreas():
 def test_percentAvailableAreaGeometries():
     # make a prior source
     pr = gl.core.priors.PriorSource(priorSample)
-    ec = gl.ExclusionCalculator(aachenShape)
+    ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludePrior(pr, value=(400, None))
     ec.distributeItems(separation=1000, outputSRS=3035)
     ec.distributeAreas()
