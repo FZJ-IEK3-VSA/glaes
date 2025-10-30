@@ -88,7 +88,6 @@ def test_ExclusionCalculator___init__():
     assert np.all(ec_true._availability[ec_true.region.mask == 0] == 0)
 
 
-
 def test_ExclusionCalculator_save():
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
 

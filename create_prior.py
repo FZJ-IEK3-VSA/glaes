@@ -1,14 +1,15 @@
-import geokit as gk
-import numpy as np
-from os.path import join, isdir, isfile, basename, splitext
-from os import mkdir
 import sys
-from multiprocessing import Pool
 import time
+from collections import OrderedDict, namedtuple
 from datetime import datetime as dt
 from glob import glob
-from collections import namedtuple, OrderedDict
 from json import dumps
+from multiprocessing import Pool
+from os import mkdir
+from os.path import basename, isdir, isfile, join, splitext
+
+import geokit as gk
+import numpy as np
 
 #################################################################
 ## DEFINE SOURCES

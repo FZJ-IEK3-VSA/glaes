@@ -1,6 +1,7 @@
 import hashlib
 import re
 import time
+import warnings
 from collections import namedtuple
 from os.path import basename, isfile
 from warnings import warn
@@ -8,12 +9,10 @@ from warnings import warn
 import geokit as gk
 import numpy as np
 import pandas as pd
-import hashlib
 from osgeo import gdal, ogr
-import warnings
 
-from glaes.core.util import GlaesError, glaes_logger
 from glaes.core.priors import Priors, PriorSource
+from glaes.core.util import GlaesError, glaes_logger
 
 Areas = namedtuple("Areas", "coordinates geoms")
 Areas = namedtuple("Areas", "coordinates geoms")
@@ -143,7 +142,7 @@ class ExclusionCalculator(object):
         verbose=True,
         **kwargs,
     ):
-        """Initialize the ExclusionCalculator 
+        """Initialize the ExclusionCalculator
 
         Parameters:
         -----------
