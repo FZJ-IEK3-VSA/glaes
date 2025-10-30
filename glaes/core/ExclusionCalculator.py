@@ -9,8 +9,8 @@ import pandas as pd
 import hashlib
 from osgeo import gdal
 
-from .util import GlaesError, glaes_logger
-from .priors import Priors, PriorSource
+from glaes.core.util import GlaesError, glaes_logger
+from glaes.core.priors import Priors, PriorSource
 
 Areas = namedtuple("Areas", "coordinates geoms")
 Areas = namedtuple("Areas", "coordinates geoms")
