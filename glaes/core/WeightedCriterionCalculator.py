@@ -223,13 +223,11 @@ class WeightedCriterionCalculator(object):
         s.noData = -1
 
         # Keep an exclusion matrix
-        if not exclusions is None:
+        if exclusions is not None:
             if not exclusions.dtype == np.bool:
                 raise GlaesError("Exclusion matrix must be a boolean type")
             if not exclusions.shape == s.region.mask.shape:
-                raise GlaesError(
-                    "Exclusion matrix shape must match the region's mask shape"
-                )
+                raise GlaesError("Exclusion matrix shape must match the region's mask shape")
             s.exclusions = exclusions
         else:
             s.exclusions = None
@@ -237,9 +235,7 @@ class WeightedCriterionCalculator(object):
     def save(s, output, **kwargs):
         s.region.createRaster(output=output, data=s.result, **kwargs)
 
-    def draw(
-        s, ax=None, dataScaling=None, geomSimplify=None, output=None, view="local"
-    ):
+    def draw(s, ax=None, dataScaling=None, geomSimplify=None, output=None, view="local"):
         # import some things
         from matplotlib.colors import LinearSegmentedColormap
 
@@ -286,14 +282,10 @@ class WeightedCriterionCalculator(object):
         else:
             raise GlaesError("view not understood")
 
-        h = gk.raster.drawImage(
-            result, bounds=s.region.extent, ax=ax, scaling=dataScaling, cmap=rbg, vmin=0
-        )
+        h = gk.raster.drawImage(result, bounds=s.region.extent, ax=ax, scaling=dataScaling, cmap=rbg, vmin=0)
 
         # Draw the region boundaries
-        s.region.drawGeometry(
-            ax=ax, simplification=geomSimplify, fc="None", ec="k", linewidth=3
-        )
+        s.region.drawGeometry(ax=ax, simplification=geomSimplify, fc="None", ec="k", linewidth=3)
 
         # Done!
         if doShow:
@@ -340,9 +332,7 @@ class WeightedCriterionCalculator(object):
         return s._result
 
     ## General excluding function
-    def addCriterion(
-        s, source, vs=None, name=None, weight=1, resampleAlg="cubic", **kwargs
-    ):
+    def addCriterion(s, source, vs=None, name=None, weight=1, resampleAlg="cubic", **kwargs):
         """Exclude areas as calcuclated by one of the indicator functions in glaes.indicators
 
         * if not 'value' input is given, the default buffer/threshold value is chosen (see the individual function's
@@ -366,17 +356,13 @@ class WeightedCriterionCalculator(object):
                 if isinstance(source, str):
                     name = basename(source)
                 else:
-                    raise GlaesError(
-                        "A 'name' input must be provided when source is not a prior or a path"
-                    )
+                    raise GlaesError("A 'name' input must be provided when source is not a prior or a path")
 
         # make sure known inputs are okay
         knownValues = [x[0] for x in vs]
         knownScores = [x[1] for x in vs]
 
-        if (
-            knownValues[0] > knownValues[-1]
-        ):  # if known values are given in DESCENDING order, flip both
+        if knownValues[0] > knownValues[-1]:  # if known values are given in DESCENDING order, flip both
             knownValues = knownValues[::-1]
             knownScores = knownScores[::-1]
 
@@ -414,15 +400,13 @@ class WeightedCriterionCalculator(object):
             result = combiner(s._unnormalizedWeights)
 
         # apply mask if one exists
-        if not s.exclusions is None:
+        if s.exclusions is not None:
             result *= s.exclusions
 
         # do combination
         s._result = result
 
-    def extractValues(
-        s, locations, view="local", srs=None, mode="linear-spline", **kwargs
-    ):
+    def extractValues(s, locations, view="local", srs=None, mode="linear-spline", **kwargs):
         # get result
         if view == "local":
             result = s.resultLocal
@@ -447,9 +431,7 @@ class WeightedCriterionCalculator(object):
             srs = gk.srs.loadSRS(srs)
 
         # extract values
-        vals = gk.raster.interpolateValues(
-            ds, locations, pointSRS=srs, mode=mode, **kwargs
-        )
+        vals = gk.raster.interpolateValues(ds, locations, pointSRS=srs, mode=mode, **kwargs)
 
         # done!
         return vals
