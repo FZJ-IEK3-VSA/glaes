@@ -1,13 +1,20 @@
-name: glaes
+name: glaes_env
 channels:
   - conda-forge
+  - nodefaults
 dependencies:
-  - conda-forge::pip
-  - conda-forge::matplotlib
-  - conda-forge::descartes
-  - conda-forge::pandas
-  - conda-forge::numpy<1.24
-  - conda-forge::scipy
-  - conda-forge::scikit-learn
-  - conda-forge::geokit>=1.4.0
-  - conda-forge::gdal=3.4.*
+  - python
+  - pip
+  - ipykernel
+  - matplotlib
+  - descartes
+  - pandas <=2.3.2
+  - numpy
+  - scipy <1.15
+  - scikit-learn
+  - geokit >=1.4.0
+  # - pytest
+  # - pytest-xdist
+  # - pytest-cov
+  # - ruff =0.13.1
+  # - nbval

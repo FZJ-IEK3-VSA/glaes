@@ -41,7 +41,7 @@ Objective:
   3. PV modules should not be within 1000 meters of a settlement area (because they are too shiny)
 
 ```python
-    ec = ExclusionCalculator(aachenRegion, srs=3035, pixelSize=100)
+    ec = ExclusionCalculator(aachenRegion, srs=3035, pixelRes=100)
     ec.excludePrior("agriculture_proximity", value=0)
     ec.excludePrior("settlement_proximity", value=(None,1000))
     ec.excludePrior("roads_main_proximity", value=(None,200))
