@@ -1,17 +1,17 @@
-
 import geokit as gk
 import numpy as np
 from os.path import join, isdir
-from os import mkdir
+import os
 from multiprocessing import Pool
 from datetime import datetime as dt
 from collections import namedtuple, OrderedDict
 from json import dumps
 from pathlib import Path
+import matplotlib.pyplot as plt
 
 
 
-## CREATE PRIORS ##
+## CREATE PRIORS OVERALL PLAN  ##
 # there are two types of priors using different methods. 
 # First: evaluate by Proximity
     # indicate pixels by their distance to the target area (pixels to close)
@@ -27,11 +27,15 @@ from pathlib import Path
     # for each threshold values <= that threshold are marked
     # elevation <= 10, <= 12 etc.
     
+# Third: now that both functions work for buffering tif file,
+#       the same function should be created for working with shape files as well
+    
 ####################    
 ####    TODO    ####
 ####################
 
-# NOTE: evaluate_tif_by_proximity works, but it is unclear whether the results are correct. Needs to be tested. Input and output are in the folder, region_df_clipped = gk.geom.polygonizeMatrix output once and check how it looks.
+# NOTE
+# evaluate_tif_by_proximity working but has to be cleaned up!
 # Next: Debug the other function "evaluate_tif_by_threshold"
 # If both functions work:
     #improve arguments tht are overhanded
@@ -43,10 +47,14 @@ from pathlib import Path
 #   1. define sources
 base_path = Path(__file__).resolve().parents[0]
 shape_file = str(base_path/"input/Natura2000_aachenClipped.shp") # has to be a string bacause pathlib paths produce problems for geookit
-tif_file_elevation = str(base_path/"input/clc-aachen_clipped.tif")
+tif_file_elevation = str(base_path/"input/roads_prior_clip.tif")
+output_dir = str(base_path/"output/intermediates/")
 
 #2. evaluation values
-# Indicates distances too close to exclusion criterion
+# Indicates distances too close to exclusion criterion:
+# These distances are used for buffering around the selected feature of interest/ values of interest.
+# values should match the input extent (if in 100 m resolution distances should not be less (e.g. 10, 20,30,etc.))
+# values refer to the unit used in the srs (meter or degree)
 EVALUATION_VALUES = { 
     "agriculture_proximity":
     # Indicates distances too close to aggriculture areas (m)
@@ -58,7 +66,10 @@ EVALUATION_VALUES = {
         400,
         500,
         600,
-        700,
+        1000,
+        2000,
+        3000,
+        4000,
     ],
     "dni_threshold":
     # Indicates distances too close to airports (m)
@@ -107,17 +118,23 @@ def evaluate_tif_by_proximity(regSource, ftrID, tail, tif_file_ryberg, output_di
 
     # 1. set the area
     # Make Region Mask
+    print("loading region of interest")
     reg = gk.RegionMask.load(region=regSource, where=ftrID, padExtent=max(distances)) 
     #regSource = shapefile path
     #where = attribute feature
     #padExtent = buffer
     
+    #Debugging 1
+    filename = os.path.join(output_dir, f"region_of_interest.tif") 
+    example_data = reg.mask.astype(int)  
+    gk.raster.createRaster(data=example_data, output=filename, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # 2. prepare the target tif file
     # NOTE The following function is probably not used everywhere?! 
     # Only for clc data ?
     # TODO simply overand a geometry or tif file?
     # Indicate values from regionmask which match given raster values and create a geomoetry from the result
+    print("setting region/feature of interest")
     matrix = reg.indicateValues(tif_file_ryberg, #Indicates those pixels in the RegionMask 
                                                  # which correspond to a particular value, or range of values, from a given raster datasource
                                 value=raster_target_value,  # values that are accepted 
@@ -125,6 +142,10 @@ def evaluate_tif_by_proximity(regSource, ftrID, tail, tif_file_ryberg, output_di
                                                  #on ylvalues which are > 0.5, means matrix, where values match raster values (=1) or match more than half (>0.5)
                                                  
     region_df_clipped = gk.geom.polygonizeMatrix(matrix, bounds=reg.extent.xyXY, srs=reg.srs) #convert the array to a geom with mask extent
+    
+    #Debugging 2
+    filename = os.path.join(output_dir, f"feature_of_interest.tif")
+    gk.raster.createRaster(data=matrix, output=filename, bounds=reg.extent.xyXY, srs=reg.srs)
 
 
 
@@ -234,7 +255,6 @@ def calculate_distances(region_df_clipped, dist):
         buffered_geom = region_df_clipped
 
     return buffered_geom
-
 def edgesByProximity(reg, region_df_clipped, distances):
     """ distances from a target area are beeing calculated. Each distance area gets a unique value. Output matrix
 
@@ -256,11 +276,13 @@ def edgesByProximity(reg, region_df_clipped, distances):
     if region_df_clipped is not None and len(region_df_clipped) != 0:
 
         # Do distance calculation
-        value = 0 #sets the value of the first threshold
+        #value = 0 #sets the value of the first threshold
         
-        for dist in distances:  
+        for dist in distances:
+            print(f"calculating proximity for {dist} around the feature of interest in the region of interest")  
             #loops over the distance list
-            
+            # instead of value = 0, value as distance
+            value = dist
             buffered = calculate_distances(region_df_clipped, dist) #buffers the geom by distance
             try:
                 tmp_buffered_vector = gk.vector.createVector(buffered)  # Make a temporary vector file
@@ -270,6 +292,18 @@ def edgesByProximity(reg, region_df_clipped, distances):
             
             # Map onto the RegionMask al cells with more than 0.5 fit
             buffered_region = reg.indicateFeatures(tmp_buffered_vector) > 0.5  
+
+            #Debugging 3
+            axh = reg.drawImage(
+                    buffered_region,
+                    figsize=(5, 6),
+                    cmap="Reds",
+                )
+            
+            output_dir = str(base_path/"output/intermediates/")
+            filename = os.path.join(output_dir, f"buffered_region_of_interest_{dist}.png")
+            plt.savefig(filename, dpi=300, bbox_inches="tight")
+            plt.show()
             
             # apply onto matrix
             #select pixels which are valid (254) and part of the buffered region
@@ -344,7 +378,7 @@ def writeEdgeFile(
     output = f"{name}.tif"
     #create dir if not exist
     if not isdir(output_dir):
-        mkdir(output_dir)
+        os.mkdir(output_dir)
         
     #Meta data mapping
     valueMap = OrderedDict()
@@ -361,9 +395,9 @@ def writeEdgeFile(
     meta["UNIT"] = unit
     meta["SOURCE"] = source
     meta["VALUE_MAP"] = dumps(valueMap)
-
-    print(output)
-
+    
+    print(f"saving proximity output {output}")
+    
     d = reg.createRaster(
         output=join(output_dir, output),
         #output=output_dir,
@@ -435,10 +469,10 @@ def geomExtractor(extent, source, where=None, simplify=None):
 ## TESTING
 evaluate_tif_by_proximity(          #NOTE this is the function currently working on
     regSource=shape_file,
-    ftrID= "SITENAME='Fagnes du Nord-Est'",
+    ftrID= "SITENAME='Kermeter'",
     tail="testing",
     tif_file_ryberg=tif_file_elevation,
-    raster_target_value=(29,36), #hope that makes snese
+    raster_target_value=[3], 
     output_dir = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/ethos-installation/ethos_suite_repositories/glaes/deletme_create_prior/output"
 )
 # evaluate_tif_by_threshold(            #NOTE function coming next
