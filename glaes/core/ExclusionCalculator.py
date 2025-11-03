@@ -769,6 +769,13 @@ class ExclusionCalculator(object):
             # sometimes, saving errors lead to None matrices being reloaded from disk, simply re-calculate
             print("Source matrix was saved to disk empty.")
             return False
+        
+        # make sure the extracted shape is the same as internal matrix, could be affected by extent rounding
+        if not self.region.mask.shape == source_mask.shape:
+            if verbose:
+                print(f"Matrix shape mismatch! Internal/new: {self.region.mask.shape}, external/old: {source_mask.shape}")
+            return False
+        
         source_mask[source_mask <= 100] = True
         source_mask[source_mask == ri.noData] = False
         # compare the two masks and check if they are alike for all cells
