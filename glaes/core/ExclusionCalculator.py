@@ -749,15 +749,15 @@ class ExclusionCalculator(object):
             if verbose:
                 print(f"pixelHeight mismatch! Internal/new: {self.region.pixelHeight}, external/old: {ri.pixelHeight}")
             return False
-        
+
         # make sure the extents are the same - marginal rounding errors (exact rounding seems to depend on the calculation platform)
         # are accepted as long as they are much smaller than the cells
         ri_extent = gk.Extent.fromRaster(source)
         if not (
-            np.isclose(ri_extent.xMin, self.region.extent.xMin, atol=1E-7)
-            and np.isclose(ri_extent.xMax, self.region.extent.xMax, atol=1E-7)
-            and np.isclose(ri_extent.yMin, self.region.extent.yMin, atol=1E-7)
-            and np.isclose(ri_extent.yMax, self.region.extent.yMax, atol=1E-7)
+            np.isclose(ri_extent.xMin, self.region.extent.xMin, atol=1e-7)
+            and np.isclose(ri_extent.xMax, self.region.extent.xMax, atol=1e-7)
+            and np.isclose(ri_extent.yMin, self.region.extent.yMin, atol=1e-7)
+            and np.isclose(ri_extent.yMax, self.region.extent.yMax, atol=1e-7)
         ):
             if verbose:
                 print(f"Extent mismatch! Internal/new: {self.region.extent}, external/old: {ri_extent}")
@@ -769,13 +769,15 @@ class ExclusionCalculator(object):
             # sometimes, saving errors lead to None matrices being reloaded from disk, simply re-calculate
             print("Source matrix was saved to disk empty.")
             return False
-        
+
         # make sure the extracted shape is the same as internal matrix, could be affected by extent rounding
         if not self.region.mask.shape == source_mask.shape:
             if verbose:
-                print(f"Matrix shape mismatch! Internal/new: {self.region.mask.shape}, external/old: {source_mask.shape}")
+                print(
+                    f"Matrix shape mismatch! Internal/new: {self.region.mask.shape}, external/old: {source_mask.shape}"
+                )
             return False
-        
+
         source_mask[source_mask <= 100] = True
         source_mask[source_mask == ri.noData] = False
         # compare the two masks and check if they are alike for all cells
