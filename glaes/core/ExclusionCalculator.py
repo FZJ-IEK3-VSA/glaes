@@ -749,13 +749,15 @@ class ExclusionCalculator(object):
             if verbose:
                 print(f"pixelHeight mismatch! Internal/new: {self.region.pixelHeight}, external/old: {ri.pixelHeight}")
             return False
-
+        
+        # make sure the extents are the same - marginal rounding errors (exact rounding seems to depend on the calculation platform)
+        # are accepted as long as they are much smaller than the cells
         ri_extent = gk.Extent.fromRaster(source)
-        if (
-            ri_extent.xMin != self.region.extent.xMin
-            or ri_extent.xMax != self.region.extent.xMax
-            or ri_extent.yMin != self.region.extent.yMin
-            or ri_extent.yMax != self.region.extent.yMax
+        if not (
+            np.isclose(ri_extent.xMin, self.region.extent.xMin, atol=1E-7)
+            and np.isclose(ri_extent.xMax, self.region.extent.xMax, atol=1E-7)
+            and np.isclose(ri_extent.yMin, self.region.extent.yMin, atol=1E-7)
+            and np.isclose(ri_extent.yMax, self.region.extent.yMax, atol=1E-7)
         ):
             if verbose:
                 print(f"Extent mismatch! Internal/new: {self.region.extent}, external/old: {ri_extent}")
