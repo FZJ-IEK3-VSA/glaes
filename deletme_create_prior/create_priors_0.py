@@ -34,16 +34,15 @@ from pathlib import Path
 ####    TODO    ####
 ####################
 
-# NOTE
+# 1. write doc strings and clean up the functions
+# 2. delete create prior examples or do a new one
 
-# First: from those three or four proximity/threshold accepting either tifs of shapes in input, 
-#           create one threshold and one proximity function. Accepting shape and or tif files as input
 
-#Second: clean up the function. Create a dict for the thresholds, meta data etc. that is importet for the 
-#            specific "name" 
 
-# Third: now that both functions work for buffering tif file,
-#       the same function should be created for working with shape files as well
+
+
+
+
 
 ########################################################################################
 
@@ -86,35 +85,52 @@ EVALUATIONS = {
 
 #3. evaluation function
 def evaluate_area_by_proximity(Area, target_tif, ftrID=None, output_dir=None, raster_target_value=None, evaluation_name= None):
-    """creates a prior dataset from a tif file. Loads the evaluation values 
-    and classifies cells around the target area by proximity.
+    """
+    Evaluates proximity within a given area by buffering raster values of interest.
+    The buffering thresholds and metadata are defined in the global EVALUATIONS dictionary.
+
+    This function extracts all pixels in "target_tif" that match "raster_target_value",
+    generates buffer zones according to the threshold values defined for "evaluation_name",
+    and clips the result to the input "Area".
 
     Args:
-        Area (str): Region mask path. Sets the outline
-        ftrID (str, int; optional): The feature's ID within the dataset
-            * Feature attribute name do not need quotes
-            * String values should be wrapped in 'single quotes'
-            * e.g. where = "ISO='DEU' AND POP>1000"
-        target_tif(str): string to the raster file which is used for "indicate_values" = Indicates those pixels in the RegionMask which correspond to a particular
-        value, or range of values, from a given raster datasource
-        raster_target_value : tuple, defines values of raster that will be selected for proximity calculation
+        Area (shp | tif | str): 
+            The area boundary used for clipping the analysis. Can be a raster, a shapefile, 
+            or a file path pointing to such a dataset.
+
+        target_tif (tif | str):
+            Raster file containing values to buffer around. Usually represents
+            infrastructure, land use features, or environmental constraints.
+
+        ftrID (int | str | None):
+            Feature ID used to select a specific polygon from "Area" if it is a vector dataset.
+            Ignored if "Area" is a raster.
+
+        output_dir (str):
+            Path where the output files will be created.
+
+        raster_target_value (int | float):
+            Pixel value in "target_tif" that will be used as the center for buffering.
+
+        evaluation_name (str):
+            Key referring to the corresponding metadata entry in the EVALUATIONS dictionary. 
+            Determines thresholds, unit, and description for the evaluation process.
         
     """
-
-
+    # gets data from the EVALUATIONS DICT
     eval_def = EVALUATIONS[evaluation_name]
     unit = eval_def["unit"]
     description = eval_def["description"]
     source = eval_def["source"]
     thresholds = eval_def["thresholds"]
 
-
+    # sets output dir
     output_dir = os.path.join(output_dir, evaluation_name)  #output path is beeing set
     os.makedirs(output_dir, exist_ok=True)
 
 
 
-    # 1. set the area
+    # 1. load the area
     suffix = os.path.splitext(Area)[1].lower()
 
     if suffix == ".shp":
@@ -141,16 +157,12 @@ def evaluate_area_by_proximity(Area, target_tif, ftrID=None, output_dir=None, ra
     else:
         raise TypeError("Area must be a string ending with .tiff/.tif/.shp.")
   
-    #Debugging 1
+    # Debugging 1
     filename = os.path.join(output_dir, f"region_of_interest.tif") 
     example_data = reg.mask.astype(int)  
     gk.raster.createRaster(data=example_data, output=filename, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # 2. prepare the target tif file
-    # NOTE The following function is probably not used everywhere?! 
-    # Only for clc data ?
-    # TODO simply overand a geometry or tif file?
-    # Indicate values from regionmask which match given raster values and create a geomoetry from the result
     print("setting region/feature of interest")
     matrix = reg.indicateValues(target_tif, #Indicates those pixels in the RegionMask 
                                                  # which correspond to a particular value, or range of values, from a given raster datasource
@@ -181,13 +193,15 @@ def evaluate_area_by_threshold(Area, #area to analyze
                               output_dir=None,
                               evaluation_name= None,
                               ):
-
+    
+    # gets data from the EVALUATIONS DICT
     eval_def = EVALUATIONS[evaluation_name]
     unit = eval_def["unit"]
     description = eval_def["description"]
     source = eval_def["source"]
     thresholds = eval_def["thresholds"]
-        
+    
+    # output dir     
     output_dir = os.path.join(output_dir, evaluation_name)  #output path is beeing set
     os.makedirs(output_dir, exist_ok=True)
 
@@ -219,10 +233,10 @@ def evaluate_area_by_threshold(Area, #area to analyze
     else:
         raise TypeError("Area must be a string ending with .tiff/.tif/.shp.")
 
-
+    # 2. Calculate the threshold
     result = edgesByThreshold(reg, tif_file, thresholds, output_dir)
 
-    # make result
+    # 3. make result
     writeEdgeFile(
         result,
         reg,
