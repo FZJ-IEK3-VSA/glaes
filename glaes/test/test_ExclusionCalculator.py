@@ -1,6 +1,9 @@
 import statistics
+import pytest
+import warnings
 from copy import copy
 from os.path import dirname, isfile, join
+from osgeo import ogr
 
 import geokit as gk
 import matplotlib.pyplot as plt
@@ -87,6 +90,50 @@ def test_ExclusionCalculator___init__():
     # 0 outer region
     assert np.all(ec_true._availability[ec_true.region.mask == 0] == 0)
 
+    # Test: initialValue as raster file (covers elif isinstance(initialValue, str))
+    ec_raster = gl.ExclusionCalculator(geom, initialValue=priorSample)
+    availability = ec_raster._availability
+    # Inside region: 100 (free) oder 0 (blocked)
+    assert np.all((ec_true._availability[ec_true.region.mask == 1] == 100) |
+                (ec_true._availability[ec_true.region.mask == 1] == 0))
+
+    # Outside region: 0
+    assert np.all(ec_true._availability[ec_true.region.mask == 0] == 0)
+
+    # Test: initialValue invalid type (covers else)
+    with pytest.raises(ValueError):
+        gl.ExclusionCalculator(geom, initialValue=42.5)  # invalid type
+
+    # Test invalid region type -> line 212
+    with pytest.raises(TypeError):
+        gl.ExclusionCalculator(42)
+
+    # Test region string with multiple features -> line 218
+    ec_multi = gl.ExclusionCalculator(cddaVector, srs=3035)
+    assert ec_multi.region is not None
+    assert isinstance(ec_multi.region, ogr.Geometry)
+
+    # Test deprecated LAEA string -> lines 226-232
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        
+        # We need a string that matches the regex ^([A-Z][0-9]+)+$
+        deprecated_srs = "A1B2"
+        
+        # Dummy region geometry
+        geom = gk.vector.extractFeatures(aachenShape)["geom"].iloc[0]
+        
+        ec = gl.ExclusionCalculator(geom, srs=deprecated_srs)
+        
+        # Check that a DeprecationWarning was issued
+        assert any(issubclass(warn.category, DeprecationWarning) for warn in w)
+        
+        # Check that srs was replaced by the result of centeredLAEA
+        assert ec.srs != deprecated_srs
+        # Check that srs is a gk.srs object
+        assert hasattr(ec.srs, "getCenter")
+        # Check the availability of attributes
+        assert hasattr(ec, "_availability")
 
 def test_ExclusionCalculator_save():
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
