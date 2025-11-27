@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64.0.0", "wheel", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "glaes"
+version = "1.4.0"
+description = "Geospatial Land Availability for Energy Systems "
+readme = "README.md"
+authors = [
+    { name = "Severyn Ryberg" },
+    { name = "Christoph Winkler", email = "c.winkler@fz-juelich.de" },
+    { name = "Julian Belina", email = "j.belina@fz-juelich.de" },
+]
+maintainers = [{ name = "Julian Belina", email = "j.belina@fz-juelich.de" }]
+license = "MIT"
+license-files = ["LICENSE.txt"]
+
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+[tool.setuptools.packages.find]
+where = ["."]
+
+#Configureation options
+# https://docs.pytest.org/en/7.1.x/reference/reference.html#configuration-options
+[tool.pytest.ini_options]
+testpaths = ["glaes/test"]
+console_output_style = "progress"
+
+
+[project.urls]
+homepage = "https://github.com/FZJ-IEK3-VSA/glaes"
+repository = "https://github.com/FZJ-IEK3-VSA/glaes"
