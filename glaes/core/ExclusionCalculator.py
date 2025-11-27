@@ -15,7 +15,7 @@ from glaes.core.priors import Priors, PriorSource
 from glaes.core.util import GlaesError, glaes_logger
 
 Areas = namedtuple("Areas", "coordinates geoms")
-Areas = namedtuple("Areas", "coordinates geoms")
+#Areas = namedtuple("Areas", "coordinates geoms") # double
 
 ###############################
 # Make an Exclusion Calculator
