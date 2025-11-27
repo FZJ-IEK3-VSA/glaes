@@ -109,9 +109,12 @@ def test_ExclusionCalculator___init__():
         gl.ExclusionCalculator(42)
 
     # Test region string with multiple features -> line 218
-    ec_multi = gl.ExclusionCalculator(cddaVector, srs=3035)
+    ec_multi = gl.ExclusionCalculator(aachenShape, srs=3035)
     assert ec_multi.region is not None
     assert isinstance(ec_multi.region, ogr.Geometry)
+    assert ec_multi.region.mask.shape == (509, 304)
+    assert np.isclose(ec_multi.region.mask.sum(), 70944)
+    assert np.isclose(ec_multi.region.mask.std(), 0.498273451386)
 
     # Test deprecated LAEA string -> lines 226-232
     with warnings.catch_warnings(record=True) as w:
