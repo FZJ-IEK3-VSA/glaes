@@ -109,30 +109,20 @@ def test_ExclusionCalculator___init__():
         gl.ExclusionCalculator(42)
 
     # Test region string with multiple features -> line 218
-    ec_multi = gl.ExclusionCalculator(pointData, srs=3035)
+    ec_multi = gl.ExclusionCalculator(cddaVector, srs=3035)
     assert ec_multi.region is not None
 
     # Test deprecated LAEA string -> lines 226-232
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        
-        # We need a string that matches the regex ^([A-Z][0-9]+)+$
-        deprecated_srs = "A1B2"
-        
-        # Dummy region geometry
-        geom = gk.vector.extractFeatures(aachenShape)["geom"].iloc[0]
-        
-        ec = gl.ExclusionCalculator(geom, srs=deprecated_srs)
-        
-        # Check that a DeprecationWarning was issued
-        assert any(issubclass(warn.category, DeprecationWarning) for warn in w)
-        
-        # Check that srs was replaced by the result of centeredLAEA
-        assert ec.srs != deprecated_srs
-        # Check that srs is a gk.srs object
-        assert hasattr(ec.srs, "getCenter")
-        # Check the availability of attributes
-        assert hasattr(ec, "_availability")
+    # We need a string that matches the regex ^([A-Z][0-9]+)+$
+    deprecated_srs = "A1B2"
+
+    # Dummy region geometry
+    geom = gk.vector.extractFeatures(aachenShape)["geom"].iloc[0]
+
+    # Expect the custom DeprecationError from ExclusionCalculator
+    with pytest.raises(gl.ExclusionCalculator.DeprecationError):
+        gl.ExclusionCalculator(geom, srs=deprecated_srs)
+
 
 def test_ExclusionCalculator_save():
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
