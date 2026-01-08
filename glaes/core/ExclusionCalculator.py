@@ -737,29 +737,31 @@ class ExclusionCalculator(object):
         """
         if not isfile(source) or not gk.util.isRaster(source):
             if verbose:
-                print("Is not a raster!")
+                print("External/new source is not a raster!")
             return False
 
         ri = gk.raster.rasterInfo(source)
         if not np.isclose(ri.pixelWidth, self.region.pixelWidth):
             if verbose:
-                print("pixelWidth mismatch!")
+                print(f"pixelWidth mismatch! Internal/new: {self.region.pixelWidth}, external/old: {ri.pixelWidth}")
             return False
 
         if not np.isclose(ri.pixelHeight, self.region.pixelHeight):
             if verbose:
-                print("pixelHeight mismatch!")
+                print(f"pixelHeight mismatch! Internal/new: {self.region.pixelHeight}, external/old: {ri.pixelHeight}")
             return False
 
+        # make sure the extents are the same - marginal rounding errors (exact rounding seems to depend on the calculation platform)
+        # are accepted as long as they are much smaller than the cells
         ri_extent = gk.Extent.fromRaster(source)
-        if (
-            ri_extent.xMin != self.region.extent.xMin
-            or ri_extent.xMax != self.region.extent.xMax
-            or ri_extent.yMin != self.region.extent.yMin
-            or ri_extent.yMax != self.region.extent.yMax
+        if not (
+            np.isclose(ri_extent.xMin, self.region.extent.xMin, atol=1e-7)
+            and np.isclose(ri_extent.xMax, self.region.extent.xMax, atol=1e-7)
+            and np.isclose(ri_extent.yMin, self.region.extent.yMin, atol=1e-7)
+            and np.isclose(ri_extent.yMax, self.region.extent.yMax, atol=1e-7)
         ):
             if verbose:
-                print("Extent mismatch!")
+                print(f"Extent mismatch! Internal/new: {self.region.extent}, external/old: {ri_extent}")
             return False
 
         # create a mask for source raster based on noData value (set noData to False, all valid values 0-100 to True)
@@ -768,6 +770,15 @@ class ExclusionCalculator(object):
             # sometimes, saving errors lead to None matrices being reloaded from disk, simply re-calculate
             print("Source matrix was saved to disk empty.")
             return False
+
+        # make sure the extracted shape is the same as internal matrix, could be affected by extent rounding
+        if not self.region.mask.shape == source_mask.shape:
+            if verbose:
+                print(
+                    f"Matrix shape mismatch! Internal/new: {self.region.mask.shape}, external/old: {source_mask.shape}"
+                )
+            return False
+
         source_mask[source_mask <= 100] = True
         source_mask[source_mask == ri.noData] = False
         # compare the two masks and check if they are alike for all cells
