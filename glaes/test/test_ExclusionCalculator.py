@@ -133,6 +133,12 @@ def test_ExclusionCalculator_save():
     assert np.isclose(np.nansum(mat), 28461360)
     assert np.isclose(np.nanstd(mat), 77.2323849648)
 
+    ec.save(join(RESULTDIR, "save2.tif"), threshold=101)
+    mat2 = gk.raster.extractMatrix(join(RESULTDIR, "save2.tif"))
+    assert np.all((mat2 == 0) | (mat2 == 255))
+    assert np.sum(mat2 == 0) == 70944
+    assert np.sum(mat2 == 255) == 83792
+    assert mat2.size == 154736
 
 def test_ExclusionCalculator_draw():
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
@@ -140,9 +146,120 @@ def test_ExclusionCalculator_draw():
     ec._availability[:, 140:160] = 0
     ec._availability[140:160, :] = 0
 
-    ec.draw()
+    # Default path (srs=None)
+    ax = ec.draw()
     plt.savefig(join(RESULTDIR, "DrawnImage.png"), dpi=200)
     plt.close()
+    
+    assert ax is not None
+  
+    data = ec.availability
+    included_pixels = np.sum(data == 100)
+    excluded_pixels = np.sum(data == 0)
+    total_pixels = data.size
+    assert ax is not None
+    assert included_pixels > 0
+    assert excluded_pixels > 0
+    assert included_pixels + excluded_pixels <= total_pixels
+    
+    # Reprojection path (srs != None)
+    ax2 = ec.draw(srs=4326)
+    plt.savefig(join(RESULTDIR, "DrawnImage_reprojected.png"), dpi=200)
+    plt.close()
+    
+    assert ax2 is not None
+    assert np.sum(data == 100) == included_pixels
+    assert np.sum(data == 0) == excluded_pixels
+
+    # Optional path to draw points - ItemCoords != None
+    points = gk.vector.extractFeatures(pointData)
+    ec._itemCoords_ax2 = np.column_stack([
+        points["geom"].apply(lambda g: g.GetX()),
+        points["geom"].apply(lambda g: g.GetY())
+    ])
+    
+    assert ec._itemCoords_ax2.shape[0] > 0
+    assert ec._itemCoords_ax2.shape[0] == 13
+    
+    expected_item_coords_ax2 = np.array([
+    [ 6.10047773, 50.77498828],
+    [ 6.20190797, 50.79566823],
+    [ 6.22652696, 50.75135404],
+    [ 6.18122802, 50.70310082],
+    [ 6.25606975, 50.6597714 ],
+    [ 6.32401817, 50.61447245],
+    [ 6.26788687, 50.56424971],
+    [ 6.33091149, 50.53667644],
+    [ 6.18615182, 50.92270223],
+    [ 6.13592907, 50.8281653 ],
+    [ 6.07585873, 50.64893904],
+    [ 6.11229484, 50.56818875],
+    [ 6.03745311, 50.58591442],
+    ])
+            
+        # --- ItemCoords Assertions ---
+    assert ec._itemCoords_ax2.shape[0] == expected_item_coords_ax2.shape[0]
+
+    # Reihenfolge egal → sortieren
+    coords_sorted_ax2 = ec._itemCoords_ax2[
+        np.lexsort((ec._itemCoords_ax2[:, 1], ec._itemCoords_ax2[:, 0]))
+    ]
+    expected_sorted_ax2 = expected_item_coords_ax2[
+        np.lexsort((expected_item_coords_ax2[:, 1], expected_item_coords_ax2[:, 0]))
+    ]
+
+    assert np.allclose(coords_sorted_ax2, expected_sorted_ax2, atol=1e-6)
+
+    # Transform points of ax2 to SRS of region mask ax  
+    
+    # SRS der Punkte bestimmen
+    ec._itemCoords_ax = ec._itemCoords_ax2.copy()
+    geom0 = points["geom"][0]
+    points_srs = geom0.GetSpatialReference()
+
+    # Transformieren, falls SRS unterschiedlich zur Region
+    if not points_srs.IsSame(ec.region.srs):
+        transformed = gk.srs.xyTransform(ec._itemCoords_ax, fromSRS=points_srs, toSRS=ec.region.srs, outputFormat="xy")
+        coords_transformed = np.column_stack([transformed.x, transformed.y])
+    else:
+        coords_transformed = ec._itemCoords_ax
+
+    # In ExclusionCalculator setzen
+    ec._itemCoords_ax = coords_transformed
+    
+    expected_item_coords_ax = np.array([
+    [4046081.39997427, 3081036.82064411],
+    [4053343.31957107, 3082958.62327666],
+    [4054824.15900997, 3077944.81519057],
+    [4051354.25192266, 3072748.98649371],
+    [4056388.96781736, 3067661.39482344],
+    [4060935.78890940, 3062384.44229358],
+    [4056686.33913081, 3057004.81334172],
+    [4060993.20038120, 3053715.40309562],
+    [4052965.82402074, 3097131.93040140],
+    [4048888.18627609, 3086812.84255619],
+    [4043601.81316684, 3067124.84256652],
+    [4045701.83233293, 3058015.66135483],
+    [4040513.76367714, 3060269.00306189],
+    ])
+        
+        # --- ItemCoords Assertions ---
+    assert ec._itemCoords_ax.shape[0] == expected_item_coords_ax.shape[0]
+
+    # Reihenfolge egal → sortieren
+    coords_sorted_ax = ec._itemCoords_ax[
+        np.lexsort((ec._itemCoords_ax[:, 1], ec._itemCoords_ax[:, 0]))
+    ]
+    expected_sorted_ax = expected_item_coords_ax[
+        np.lexsort((expected_item_coords_ax[:, 1], expected_item_coords_ax[:, 0]))
+    ]
+
+    assert np.allclose(coords_sorted_ax, expected_sorted_ax, atol=1e-6)
+    
+    
+    # Optional path to draw areas - 
+    ec._areas = gk.vector.extractFeatures(cddaVector)
+    assert len(ec._areas) > 0
 
 
 def test_ExclusionCalculator_excludeRasterType():
