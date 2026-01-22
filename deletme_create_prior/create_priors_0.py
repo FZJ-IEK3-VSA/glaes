@@ -8,18 +8,17 @@ from collections import namedtuple, OrderedDict
 from json import dumps
 from pathlib import Path
 import matplotlib.pyplot as plt
-from pathlib import Path
 
 
 
-## CREATE PRIORS OVERALL PLAN  ##
+## CREATE PRIORS  ##
 # there are two types of priors using different methods. 
 # First: evaluate by Proximity
     # indicate pixels by their distance to the target area (pixels to close)
-    # gets a geom object. The geom object is mostly created from a matrix but can also be from: geomExtractor()
+    # gets a geom object
     # proximity: list of buffer distances
     # for each distance a buffer around the target is created and marked. 
-    # mark the distance from a natural habitat with 100m, 200m, 300m, etc.
+    # e.g. mark the distance from a natural habitat with 100m, 200m, 300m, etc.
     
 # Second: evaluate by threshold
     # indicate values of a file  above a certain threshold
@@ -33,20 +32,20 @@ from pathlib import Path
 ####################    
 ####    TODO    ####
 ####################
+# output dir aus funktionen nehmen, wenn kein debugging mehr stattfindet
+# buffer und value korrigieren
 
-# 1. write doc strings and clean up the functions
-# 2. delete create prior examples or do a new one
-
-
-
-
+# create an working priors example
+# priors.py - what happens there ? _> moce the create priors funtons to priors.py
+# # fit the function in the exclusion calculator which uses the priors
+# tests
 
 
 
 
 ########################################################################################
 
-#   1. define sources
+#   1. define input files
 base_path = Path(__file__).resolve().parents[0]
 shape_file_in = str(base_path/"/input/aachenShapefile.shp") # has to be a string bacause pathlib paths produce problems for geookit
 shape_file_clip = str(base_path/"input/Natura2000_aachenClipped.shp") # has to be a string bacause pathlib paths produce problems for geookit
@@ -56,11 +55,23 @@ tif_file_elevation = str(base_path/"input/roads_prior_clip.tif")
 
 #2. evaluation values
 # Indicates distances too close to exclusion criterion:
-# These distances are used for buffering around the selected feature of interest/ values of interest.
+# These distances are used for 
+#   a. buffering around the selected feature of interest/ values of interest.
+#   b. thresholds for cell / area identification
 # values should match the input extent (if in 100 m resolution distances should not be less (e.g. 10, 20,30,etc.))
 # values refer to the unit used in the srs (meter or degree)
 
 EVALUATIONS = {
+    # proximity
+    "agriculture_proximity": {
+        "unit": "m",
+        "description": "Indicates distances too close to agriculture areas (m)",
+        "source": "",
+        "thresholds": [
+            0, 100, 200, 300, 400, 500
+        ], # example values
+    },
+    # threshold
     "dni_threshold": {
         "unit": "kWh/m2/day",
         "description": "Indicates pixels in which the average daily direct-normal irradiance (DNI) is less-than or equal-to X kWh/m2/day",
@@ -68,15 +79,6 @@ EVALUATIONS = {
         "thresholds": [
             0, 5, 10, 20, 50, 100, 200, 300, 400,
             ],  # example values
-    },
-
-    "agriculture_proximity": {
-        "unit": "m",
-        "description": "Indicates distances too close to agriculture areas (m)",
-        "source": "",
-        "thresholds": [
-            0, 100, 200, 300, 400, 500
-        ],
     },
 }
 
@@ -86,31 +88,27 @@ EVALUATIONS = {
 #3. evaluation function
 def evaluate_area_by_proximity(Area, target_tif, ftrID=None, output_dir=None, raster_target_value=None, evaluation_name= None):
     """
-    Evaluates proximity within a given area by buffering raster values of interest.
-    The buffering thresholds and metadata are defined in the global EVALUATIONS dictionary.
-
-    This function extracts all pixels in "target_tif" that match "raster_target_value",
-    generates buffer zones according to the threshold values defined for "evaluation_name",
-    and clips the result to the input "Area".
+    This function extracts all pixels in “target_tif” that match “raster_target_value,”
+    generates buffer zones according to the values defined for “evaluation_name,” within "Area".
+    
 
     Args:
-        Area (shp | tif | str): 
-            The area boundary used for clipping the analysis. Can be a raster, a shapefile, 
-            or a file path pointing to such a dataset.
+        Area (shp path | tif path ): 
+            The area boundary used for clipping the analysis. Can be a path to raster or a shapefile
+
+        ftrID ( str | optional an SQL-style filtering string):
+            Feature ID used to select a specific polygon from "Area" if it is a vector dataset
+            Ignored if "Area" is a raster
 
         target_tif (tif | str):
             Raster file containing values to buffer around. Usually represents
-            infrastructure, land use features, or environmental constraints.
-
-        ftrID (int | str | None):
-            Feature ID used to select a specific polygon from "Area" if it is a vector dataset.
-            Ignored if "Area" is a raster.
+            infrastructure, land use features, or environmental constraints
 
         output_dir (str):
-            Path where the output files will be created.
+            Path where the output files will be stored
 
-        raster_target_value (int | float):
-            Pixel value in "target_tif" that will be used as the center for buffering.
+        raster_target_value (list[int | float]):
+            Pixel value in "target_tif" that will be used as the target for buffering
 
         evaluation_name (str):
             Key referring to the corresponding metadata entry in the EVALUATIONS dictionary. 
@@ -128,9 +126,7 @@ def evaluate_area_by_proximity(Area, target_tif, ftrID=None, output_dir=None, ra
     output_dir = os.path.join(output_dir, evaluation_name)  #output path is beeing set
     os.makedirs(output_dir, exist_ok=True)
 
-
-
-    # 1. load the area
+    # 1. load the target area
     suffix = os.path.splitext(Area)[1].lower()
 
     if suffix == ".shp":
@@ -158,28 +154,25 @@ def evaluate_area_by_proximity(Area, target_tif, ftrID=None, output_dir=None, ra
         raise TypeError("Area must be a string ending with .tiff/.tif/.shp.")
   
     # Debugging 1
-    filename = os.path.join(output_dir, f"region_of_interest.tif") 
-    example_data = reg.mask.astype(int)  
-    gk.raster.createRaster(data=example_data, output=filename, bounds=reg.extent.xyXY, srs=reg.srs)
+    #filename = os.path.join(output_dir, f"region_of_interest.tif") 
+    #example_data = reg.mask.astype(int)  
+    #gk.raster.createRaster(data=example_data, output=filename, bounds=reg.extent.xyXY, srs=reg.srs)
 
-    # 2. prepare the target tif file
+    # 2. prepare the target for proximity analysis  (target tif file)
     print("setting region/feature of interest")
     matrix = reg.indicateValues(target_tif, #Indicates those pixels in the RegionMask 
                                                  # which correspond to a particular value, or range of values, from a given raster datasource
                                 value=raster_target_value,  # values that are accepted 
-                                applyMask=False) > 0.5 # region mask will not be applied
-                                                 #on ylvalues which are > 0.5, means matrix, where values match raster values (=1) or match more than half (>0.5)
-                                                 
+                                applyMask=False) > 0.5 # > 0.5 means matrix, where values match raster values (=1) or match more than half (>0.5)
+    # to polygon                                             
     target_area = gk.geom.polygonizeMatrix(matrix, bounds=reg.extent.xyXY, srs=reg.srs) #convert the array to a geom with mask extent
     
     #Debugging 2
-    filename = os.path.join(output_dir, f"feature_of_interest_proximity.tif")
-    gk.raster.createRaster(data=matrix, output=filename, bounds=reg.extent.xyXY, srs=reg.srs)
-
-
+    #filename = os.path.join(output_dir, f"feature_of_interest_proximity.tif")
+    #gk.raster.createRaster(data=matrix, output=filename, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # 3. create proximity matrix
-    # region mask, gk_geom (like a polygon), distances from evaluation_values
+    # region mask, gk_geom, distances from evaluation_values, utput dir 
     result = edgesByProximity(reg, target_area, thresholds, output_dir)  
 
     # 4. make result
@@ -193,6 +186,32 @@ def evaluate_area_by_threshold(Area, #area to analyze
                               output_dir=None,
                               evaluation_name= None,
                               ):
+    """This function marks cells which are below a certain threshold. Base for the threshold values is the "tif_file"
+    within the "Area".
+
+    Args:
+        Area (shp path | tif path ): 
+            The area boundary used for clipping the analysis. Can be a path to raster or a shapefile
+
+        ftrID ( str | optional an SQL-style filtering string):
+            Feature ID used to select a specific polygon from "Area" if it is a vector dataset
+            Ignored if "Area" is a raster
+
+        target_tif (tif | str):
+            Raster file containing values to which the trechhold is applied. Usually represents
+            infrastructure, land use features, or environmental constraints
+
+        raster_target_value (list[int | float]):
+            Pixel value in "target_tif" that will be used as the target for threshold application
+
+        output_dir (str):
+            Path where the output files will be stored
+
+        evaluation_name (str):
+            Key referring to the corresponding metadata entry in the EVALUATIONS dictionary. 
+            Determines thresholds, unit, and description for the evaluation process.
+
+    """
     
     # gets data from the EVALUATIONS DICT
     eval_def = EVALUATIONS[evaluation_name]
@@ -252,6 +271,7 @@ def evaluate_area_by_threshold(Area, #area to analyze
 
 
 ########################################################################################
+
 ## UTILITY FUNCTIONS
 def calculate_distances(region_df_clipped, dist):
     """
@@ -281,34 +301,32 @@ def calculate_distances(region_df_clipped, dist):
 
     return buffered_geom
 
-def  edgesByProximity(reg, target_area, thresholds, output_dir):
-    """ distances from a target area are beeing calculated. Each distance area gets a unique value. Output matrix
+def edgesByProximity(reg, target_area, thresholds, output_dir):
+    """ 
+    within the regionmask ("Area") the target_area (ftrID from raster) is buffered with the threhold values (set in the EVALUATIONS dict). 
+    Each distance/ buffer zone area gets a unique value. Output is a matrix
 
     Args:
         reg (Regionmask): Regionmask with spatial extent for further processing
-        target_area (pandas df with geometry column): 
+        target_area (geom): 
         thresholds (List[float or int]): distance dict (List[float or int]): List of increasing distance values from Evaluation_values dict that are used for buffering
-
 
     Returns:
         np.ndarray: A labeled matrix where each cell indicates its proximity zone (0 = closest)
     """
 
-    # make initial matrix
+    # make initial matrix with the extent of reg ("Area")
     proximity_matrix = (np.ones(reg.mask.shape, dtype=np.uint8) * 255)  # Set all values to no data (255)
-    proximity_matrix[reg.mask] = 254  # Set all values in the region to untouched (254)
+    proximity_matrix[reg.mask] = 254  # Set all values in the target region to untouched (254)
 
-    # Only do growing if a geometry is available
+    # Only do buffering if a geometry is available
     if target_area is not None and len(target_area) != 0:
 
         # Do distance calculation
-        #value = 0 #sets the value of the first threshold
-        
         for dist in thresholds:
             print(f"calculating proximity for {dist} around the feature of interest in the region of interest")  
             #loops over the distance list
-            # instead of value = 0, value as distance
-            value = dist
+            value = dist 
             buffered = calculate_distances(target_area, dist) #buffers the geom by distance
             try:
                 tmp_buffered_vector = gk.vector.createVector(buffered)  # Make a temporary vector file
@@ -320,26 +338,22 @@ def  edgesByProximity(reg, target_area, thresholds, output_dir):
             buffered_region = reg.indicateFeatures(tmp_buffered_vector) > 0.5  
 
             #Debugging 3
-            axh = reg.drawImage(
-                    buffered_region,
-                    figsize=(5, 6),
-                    cmap="Reds",
-                )
-            
-            output_dir_plots = os.path.join(output_dir, "intermediates")
-            os.makedirs(output_dir_plots, exist_ok=True)
-            filename = os.path.join(output_dir_plots, f"buffered_region_of_interest_{dist}_SHAPE.png")
-            plt.savefig(filename, dpi=300, bbox_inches="tight")
-            plt.show()
+            # axh = reg.drawImage(
+            #         buffered_region,
+            #         figsize=(5, 6),
+            #         cmap="Reds",
+            #     )
+            # output_dir_plots = os.path.join(output_dir, "intermediates")
+            # os.makedirs(output_dir_plots, exist_ok=True)
+            # filename = os.path.join(output_dir_plots, f"buffered_region_of_interest_{dist}_SHAPE.png")
+            # plt.savefig(filename, dpi=300, bbox_inches="tight")
+            # plt.show()
             
             # apply onto matrix
             #select pixels which are valid (254) and part of the buffered region
             selected_matrix = np.logical_and(proximity_matrix == 254, buffered_region)  
             #selected cells are assigned to a value 
             proximity_matrix[selected_matrix] = value
-            
-            #label for the next threshold
-            value += 1
             
     return proximity_matrix # Return the final labeled matrix
 
@@ -349,8 +363,8 @@ def edgesByThreshold(reg, source, thresholds, output_dir):
 
     Args:
         reg (Regionmask): Regionmask with spatial extent for further processing
-        source (str): Path to a rasterfile
-        thresholds (List[float or int]): List of increasing threshold values from Evaluation_values dict (should be categories/values of the source file)
+        source (tif file): Path to a rasterfile
+        thresholds (List[float or int]): List of increasing threshold values from Evaluation_values dict 
     
     Returns: 
         np.ndarray: A labeled matrix with classes per threshold.
@@ -401,21 +415,21 @@ def writeEdgeFile(
     result, reg, ftrID, output_dir, evaluation_name, unit, description, source, values,
 ):
     """
-    Writes a classified result matrix to a GeoTIFF file with metadata and value labeling.
+    Writes a  result matrix to a GeoTIFF file with metadata and value labeling
 
     Args:
-        result (np.ndarray): A 2D classified matrix (e.g., from thresholding or proximity analysis).
-        reg (RegionMask): A RegionMask object used to define spatial extent and raster creation.
-        ftrID (int or str): current feature, used in the output file name.
-        output_dir (str): path where output raster will be saved.
+        result (np.ndarray): A 2D  matrix (e.g., from thresholding or proximity analysis)
+        reg (RegionMask): A RegionMask object used to define spatial extent and raster creation
+        ftrID (int or str): current feature, used in the output file name
+        output_dir (str): path where output raster will be saved
         name (str): Base name for the output 
-        unit (str): Unit of the classified values (e.g., meters, degrees).
-        description (str): explanation of the dataset.
-        source (str): Source dataset or method used to generate the result.
-        values (List[float]): List of thresholds or distance values used in classification.
+        unit (str): Unit of the  values (e.g., meters, degrees)
+        description (str): explanation of the dataset
+        source (str): Source dataset or method used to generate the result
+        values (List[float]): List of thresholds or distance values used in classification
 
     Returns:
-        None: The function writes the raster file to disk; it does not return a value.
+        None: The function writes the raster file to disk; it does not return a value
     """
     # make output
 
@@ -423,7 +437,7 @@ def writeEdgeFile(
     os.makedirs(output_dir, exist_ok=True)
         
     #Meta data mapping
-    valueMap = OrderedDict()
+    valueMap = OrderedDict()        #proximity values and their meaning is written to the meta
     for i in range(len(values)):
         valueMap["%d" % i] = "<=%.2f" % values[i]
     valueMap["254"] = "untouched"
@@ -451,6 +465,7 @@ def writeEdgeFile(
     )
 
 ########################################################################################
+
 ## TESTING
 #with shape
 evaluate_area_by_proximity(          

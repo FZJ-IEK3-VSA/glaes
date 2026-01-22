@@ -142,6 +142,7 @@ class PriorSource(object):
 
         s.__doc__ = doc
 
+    # when exclude priors is run, it checks rather the values are part of the prior
     def containsValue(s, val, verbose=False):
         """Checks if a given value is withing the known values in the Prior source
 
@@ -159,6 +160,7 @@ class PriorSource(object):
                 )
             return False
 
+    # when exclude priors is run, it checks rather the values is close to a proximity/theshold value of the prior
     def valueOnEdge(s, val, verbose=False):
         """Checks is a given value is exactly on one of the precomputed edge values
 

@@ -1648,6 +1648,7 @@ class ExclusionCalculator(object):
         """
 
         # make sure we have a Prior object
+        # prior is loaded
         if isinstance(prior, str):
             prior = Priors[prior]
 
@@ -1661,7 +1662,7 @@ class ExclusionCalculator(object):
             except KeyError:
                 raise GlaesError("Could not find a default exclusion set for %s" % prior.displayName)
 
-        # Check the value input
+        # Check the value entered. Is it close to the previously defined proximation thresholds?
         if isinstance(value, tuple):
             # Check the boundaries
             if value[0] is not None:
@@ -1682,7 +1683,7 @@ class ExclusionCalculator(object):
                     UserWarning,
                 )
 
-        # Project to 'index space'
+        # fits value to prior proximity values
         try:
             v1, v2 = value
             if v1 is not None:
