@@ -1,7 +1,9 @@
 on:
   workflow_dispatch:
   pull_request:
-    branches: ["master", "134-determine-dependency-ranges"]
+    branches: ["master"]
+  push:
+    branches: ["134-determine-dependency-ranges"]
 
 defaults:
   run:
