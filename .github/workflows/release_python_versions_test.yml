@@ -1,0 +1,20 @@
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: ["master", "134-determine-dependency-ranges"]
+
+jobs:
+  TestPushCondaForgeDev:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner_tag: ["self-hosted"]
+        python_version: ["3.13", "3.12", "3.11", "3.10"]
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/_run_single_conda_forge_test.yml@main
+    with:
+      runner_tag: ${{ matrix.runner_tag }}
+      requirements_file_name: requirements-dev.yml
+      ipynb_example_folder: "Examples"
+      library_name: "python"
+      library_version: ${{ matrix.python_version }}
+      dependency_position_env_file: "0"
