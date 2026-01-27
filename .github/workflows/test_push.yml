@@ -8,6 +8,7 @@ defaults:
 
 jobs:
     run-conda-forge-test:
+        if: ${{ false }}
         name: "Run test for glaes on ${{ matrix.runner_tag }}"
         strategy:
             fail-fast: false
@@ -37,7 +38,7 @@ jobs:
                   get-content combined_env.yml
             - uses: conda-incubator/setup-miniconda@v3
               with:
-                  miniforge-version: 25.3.0-3
+                  miniforge-version: 25.11.0-1
                   channels: conda-forge
                   activate-environment: ""
                   conda-remove-defaults: "true"

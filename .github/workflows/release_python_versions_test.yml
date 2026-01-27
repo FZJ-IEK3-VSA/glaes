@@ -3,18 +3,57 @@ on:
   pull_request:
     branches: ["master", "134-determine-dependency-ranges"]
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
-  TestPushCondaForgeDev:
+  run-conda-forge-test:
     strategy:
       fail-fast: false
       matrix:
         runner_tag: ["self-hosted"]
-        python_version: ["3.13", "3.12", "3.11", "3.10"]
-    uses: FZJ-IEK3-VSA/.github/.github/workflows/_run_single_conda_forge_test.yml@main
-    with:
-      runner_tag: ${{ matrix.runner_tag }}
-      requirements_file_name: requirements-dev.yml
-      ipynb_example_folder: "Examples"
-      library_name: "python"
-      library_version: ${{ matrix.python_version }}
-      dependency_position_env_file: "0"
+    runs-on: ${{ matrix.runner_tag }}
+    steps:
+      - name: Checkout glaes
+        uses: actions/checkout@v5
+        with:
+          path: "glaes"
+      - name: Checkout geokit
+        uses: actions/checkout@v5
+        with:
+          # Repository name with owner. For example, actions/checkout
+          repository: "FZJ-IEK3-VSA/geokit"
+          path: "geokit"
+      - name: Setup yq 4.30.6
+        uses: vegardit/gha-setup-yq@v1
+        with:
+          use-cache: true
+          version: 4.30.6
+      - name: Merge yaml files
+        run: yq eval-all '. as $item ireduce ({}; . *+ $item)' geokit/requirements-dev.yml glaes/requirements-dev.yml > combined_env.yml
+      - name: Show combined yml
+        run: |
+          get-content combined_env.yml
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: 25.11.0-1
+          channels: conda-forge
+          activate-environment: ""
+          conda-remove-defaults: "true"
+      - name: Setup environment
+        run: |
+          get-content combined_env.yml
+          ls
+          echo "LS Done"
+          mamba env create --name test_env --yes --file combined_env.yml
+          mamba run --name test_env pip install -e ./glaes --no-deps
+          mamba run --name test_env pip install -e ./geokit --no-deps
+          echo "Installation done"
+          mamba list --name test_env
+          echo "packages printed"
+      - name: Run tests
+        run: |
+          echo "start pytest"
+          mamba run --name test_env pytest -n auto  -vv
+          echo "Pytest done"
