@@ -129,9 +129,10 @@ class ExclusionCalculator(object):
         "woodland_deciduous_proximity": (None, 300),
         "woodland_mixed_proximity": (None, 300),
     }
-    
+
     class DeprecationError(Exception):
         """Raised when a deprecated feature is used in an invalid way."""
+
         pass
 
     def __init__(
@@ -228,11 +229,11 @@ class ExclusionCalculator(object):
             if m is not None:
                 # we do have a match, it actually is the special LAEA str format ## warning zu deprecation error! sting pattern is deprecated.
                 raise ExclusionCalculator.DeprecationError(
-                            "Str pattern '^([A-Z][0-9]+)+$' for srs is deprecated. "
-                            "Use 'LAEA' for region-centered SRS or a preprocessed LAEA SRS "
-                            "instance as argument when a specific lon/lat center is required."
-                        )
-        
+                    "Str pattern '^([A-Z][0-9]+)+$' for srs is deprecated. "
+                    "Use 'LAEA' for region-centered SRS or a preprocessed LAEA SRS "
+                    "instance as argument when a specific lon/lat center is required."
+                )
+
         # convert SRS input for geom regions to a proper SRS instance if needed
         if isinstance(region, ogr.Geometry):
             # no need to transform region geom as it is done in SRS.loadSRS()/RegionMask.load()

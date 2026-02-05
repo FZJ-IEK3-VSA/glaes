@@ -94,8 +94,10 @@ def test_ExclusionCalculator___init__():
     ec_raster = gl.ExclusionCalculator(geom, initialValue=priorSample)
     availability = ec_raster._availability
     # Inside region: 100 (free) or 0 (blocked)
-    assert np.all((ec_true._availability[ec_true.region.mask == 1] == 100) |
-                (ec_true._availability[ec_true.region.mask == 1] == 0))
+    assert np.all(
+        (ec_true._availability[ec_true.region.mask == 1] == 100)
+        | (ec_true._availability[ec_true.region.mask == 1] == 0)
+    )
 
     # Outside region: 0
     assert np.all(ec_true._availability[ec_true.region.mask == 0] == 0)
@@ -140,6 +142,7 @@ def test_ExclusionCalculator_save():
     assert np.sum(mat2 == 255) == 83792
     assert mat2.size == 154736
 
+
 def test_ExclusionCalculator_draw():
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
 
@@ -150,23 +153,23 @@ def test_ExclusionCalculator_draw():
     ax = ec.draw()
     plt.savefig(join(RESULTDIR, "DrawnImage.png"), dpi=200)
     plt.close()
-    
+
     assert ax is not None
-  
+
     data = ec.availability
     included_pixels = np.sum(data == 100)
     excluded_pixels = np.sum(data == 0)
     total_pixels = data.size
-   
+
     assert included_pixels > 0
     assert excluded_pixels > 0
     assert included_pixels + excluded_pixels <= total_pixels
-    
+
     # Reprojection path (srs != None)
     ax2 = ec.draw(srs=4326)
     plt.savefig(join(RESULTDIR, "DrawnImage_reprojected.png"), dpi=200)
     plt.close()
-    
+
     assert ax2 is not None
     assert np.sum(data == 100) == included_pixels
     assert np.sum(data == 0) == excluded_pixels
@@ -175,10 +178,7 @@ def test_ExclusionCalculator_draw():
     points = gk.vector.extractFeatures(pointData)
 
     # Points are provided in pointData (EPSG:4326)
-    item_coords = np.column_stack([
-        points["geom"].apply(lambda g: g.GetX()),
-        points["geom"].apply(lambda g: g.GetY())
-    ])
+    item_coords = np.column_stack([points["geom"].apply(lambda g: g.GetX()), points["geom"].apply(lambda g: g.GetY())])
 
     # IMPORTANT: draw() reads exactly this attribute
     ec._itemCoords = item_coords
@@ -205,7 +205,7 @@ def test_ExclusionCalculator_draw():
     assert ax_areas is not None
 
     # Cover non-metric area units in legend (degree and feet)
-      # Extract geometry from the original shape
+    # Extract geometry from the original shape
     geom = gk.vector.extractFeatures(aachenShape)["geom"].iloc[0]
 
     # Degree-based region (EPSG:4326)
@@ -221,6 +221,7 @@ def test_ExclusionCalculator_draw():
     ax_ft = ec_ft.draw()
     plt.close()
     assert ax_ft is not None
+
 
 def test_ExclusionCalculator_excludeRasterType():
     # exclude single value
