@@ -61,7 +61,7 @@ def test_ExclusionCalculator___init__():
     assert ec.region.mask.shape == (509, 304)
     assert np.isclose(ec.region.mask.sum(), 70944)
     assert np.isclose(ec.region.mask.std(), 0.498273451386)
-    
+
     # Test by giving a region mask
     rm = gk.RegionMask.load(aachenShape, padExtent=5000, srs=3035)
     ec = gl.ExclusionCalculator(rm, srs=3035)
