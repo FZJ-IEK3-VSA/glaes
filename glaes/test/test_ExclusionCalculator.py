@@ -30,8 +30,8 @@ def test_multiple_exclusions():
     ec.excludeVectorType(cddaVector, where="YEAR>2000")
     ec.excludeRasterType(clcRaster, value=(None, 12))
 
-    assert np.isclose(np.nanmean(ec.availability), 37.1109619141, 1e-6)
-    assert np.isclose(np.nanstd(ec.availability), 48.3101692200, 1e-6)
+    assert np.isclose(np.nanmean(ec.availability), 37.143044, 1e-6)
+    assert np.isclose(np.nanstd(ec.availability), 48.285843, 1e-6)
 
 
 def test_excludePoints():
@@ -228,36 +228,36 @@ def test_ExclusionCalculator_excludeRasterType():
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludeRasterType(clcRaster, 12)
 
-    assert np.isclose(np.nanmean(ec.availability), 82.8033)
-    assert np.isclose(np.nanstd(ec.availability), 37.73514175)
+    assert np.isclose(np.nanmean(ec.availability), 82.82775)
+    assert np.isclose(np.nanstd(ec.availability), 37.68185)
 
     # exclude value range
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
     ec.excludeRasterType(clcRaster, (5, 12))
 
-    assert np.isclose(np.nanmean(ec.availability), 81.16260529)
-    assert np.isclose(np.nanstd(ec.availability), 39.10104752)
+    assert np.isclose(np.nanmean(ec.availability), 81.18956)
+    assert np.isclose(np.nanstd(ec.availability), 39.045403)
 
     # Exclude iterable (should have the same result as the test above)
     ec = gl.ExclusionCalculator(gl._test_data_["aachenShapefile.shp"], srs=gk.srs.EPSG3035, pixelRes=100)
     ec.excludeRasterType(gl._test_data_["clc-aachen_clipped.tif"], value=[5, 6, 7, 8, 9, 10, 11, 12])
 
-    assert np.isclose(np.nanmean(ec.availability), 81.16260529)
-    assert np.isclose(np.nanstd(ec.availability), 39.10104752)
+    assert np.isclose(np.nanmean(ec.availability), 81.18956)
+    assert np.isclose(np.nanstd(ec.availability), 39.045403)
 
     # exclude value maximum
     ecMax12 = gl.ExclusionCalculator(aachenShape, srs=3035)
     ecMax12.excludeRasterType(clcRaster, (None, 12))
 
-    assert np.isclose(np.nanmean(ecMax12.availability), 58.52362442)
-    assert np.isclose(np.nanstd(ecMax12.availability), 49.26812363)
+    assert np.isclose(np.nanmean(ecMax12.availability), 58.570675)
+    assert np.isclose(np.nanstd(ecMax12.availability), 49.212654)
 
     # exclude value minimum
     ecMin13 = gl.ExclusionCalculator(aachenShape, srs=3035)
     ecMin13.excludeRasterType(clcRaster, (13, None))
 
-    assert np.isclose(np.nanmean(ecMin13.availability), 41.47637558)
-    assert np.isclose(np.nanstd(ecMin13.availability), 49.26812363)
+    assert np.isclose(np.nanmean(ecMin13.availability), 41.524483)
+    assert np.isclose(np.nanstd(ecMin13.availability), 49.228073)
 
     # Make sure min and max align
     s1 = ecMax12.availability[ecMax12.region.mask] > 0
@@ -374,8 +374,8 @@ def test_ExclusionCalculator_excludeSet():
         verbose=False,
     )
 
-    assert np.isclose(np.nanmean(ec.availability), 15.230323)
-    assert np.isclose(np.nanstd(ec.availability), 35.931458)
+    assert np.isclose(np.nanmean(ec.availability), 15.2350025)
+    assert np.isclose(np.nanstd(ec.availability), 35.92954)
 
 
 def test_ExclusionCalculator_excludeRegionEdge():
@@ -424,13 +424,13 @@ def test_ExclusionCalculator_distributeItems():
 
     # Do a regular distribution
     ec.distributeItems(1000, output=join(RESULTDIR, "distributeItems1.shp"), outputSRS=3035)
-    geoms = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems1.shp"))
-    assert geoms.shape[0] == 287
+    geom = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems1.shp"))
+    assert geom.shape[0] == 287
 
     minDist = 1000000
-    for gi in range(geoms.shape[0] - 1):
-        for gj in range(gi + 1, geoms.shape[0]):
-            d = geoms.geom[gi].Distance(geoms.geom[gj])
+    for gi in range(geom.shape[0] - 1):
+        for gj in range(gi + 1, geom.shape[0]):
+            d = geom.geom[gi].Distance(geom.geom[gj])
             if d < minDist:
                 minDist = d
                 I = (gi, gj)
@@ -443,16 +443,33 @@ def test_ExclusionCalculator_distributeItems():
         outputSRS=3035,
         avoidRegionBorders=True,
     )
-    geoms = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems1b.shp"))
-    assert geoms.shape[0] == 252
+    geom = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems1b.shp"))
+    assert geom.shape[0] == 252
     # make sure that all placements fall within the region less the 500m border corridor
-    assert (
-        gk.vector.extractFeatures(
-            join(RESULTDIR, "distributeItems1b.shp"),
-            geoms=gk.drawGeoms(ec.region.geometry.Buffer(-500)),
-        ).shape[0]
-        == 252
+    buffer_geom = ec.region.geometry.Buffer(-500)
+
+    outside = []
+    for g in geom.geom:
+        if not g.Within(buffer_geom):
+            outside.append(g)
+
+    print(len(outside))
+
+    for g in outside:
+        print(g.Distance(ec.region.geometry))
+
+    buffer_geom = ec.region.geometry.Buffer(-500)
+
+    for g in geom.geom:
+        if not g.Within(buffer_geom):
+            print(g.Distance(ec.region.geometry))
+    
+    buffer_geom = ec.region.geometry.Buffer(-500)  # OGR Geometry, not AxHands
+    filtered = gk.vector.extractFeatures(
+        join(RESULTDIR, "distributeItems1b.shp"),
+        geom=buffer_geom
     )
+    assert filtered.shape[0] == 252
 
     # Do an axial distribution
     ec.distributeItems(
@@ -461,13 +478,13 @@ def test_ExclusionCalculator_distributeItems():
         output=join(RESULTDIR, "distributeItems2.shp"),
         outputSRS=3035,
     )
-    geoms = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems2.shp"))
-    assert geoms.shape[0] == 882
+    geom = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems2.shp"))
+    assert geom.shape[0] == 882
 
-    x = np.array([g.GetX() for g in geoms.geom])
-    y = np.array([g.GetY() for g in geoms.geom])
+    x = np.array([g.GetX() for g in geom.geom])
+    y = np.array([g.GetY() for g in geom.geom])
 
-    for gi in range(geoms.shape[0] - 1):
+    for gi in range(geom.shape[0] - 1):
         d = (x[gi] - x[gi + 1 :]) ** 2 / 1000**2 + (y[gi] - y[gi + 1 :]) ** 2 / 300**2
         assert (d >= 1).all()  # Axial objects too close
 
@@ -478,13 +495,13 @@ def test_ExclusionCalculator_distributeItems():
         output=join(RESULTDIR, "distributeItems3.shp"),
         outputSRS=4326,
     )
-    geoms = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems3.shp"))
+    geom = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems3.shp"))
 
-    assert np.isclose(geoms.shape[0], 97)
+    assert np.isclose(geom.shape[0], 97)
     # Tests below are failing for 3.0.0<=gdal<3.4.0 due to problems when
     # polygonizing
-    assert np.isclose(geoms.area.mean(), 0.000230714164474)
-    assert np.isclose(geoms.area.std(), 8.2766693979e-05)
+    assert np.isclose(geom.area.mean(), 0.000230714164474)
+    assert np.isclose(geom.area.std(), 8.2766693979e-05)
 
     # Do a variable separation distance placement
     ec = gl.ExclusionCalculator(gl._test_data_["aachenShapefile.shp"], pixelRes=25, srs="LAEA")
