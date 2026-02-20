@@ -368,6 +368,7 @@ def test_ExclusionCalculator_distributeItems():
 
     points = ec.distributeItems(separation=(8, 3), sepScaling=ras, axialDirection=0)
     assert points.shape[0] == 390
+    print("done")
 
 
 def test_ExclusionCalculator_distributeAreas():
@@ -432,3 +433,7 @@ def test_percentAvailableAreaGeometries():
     ec.distributeItems(separation=1000, outputSRS=3035)
     ec.distributeAreas()
     assert ec.percentAvailableAreaGeometries == 24.740465043104006
+
+
+if __name__ == "__main__":
+    test_ExclusionCalculator_distributeItems()
