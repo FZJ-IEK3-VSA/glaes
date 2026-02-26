@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "glaes"
-version = "1.4.0"
+version = "1.5.0"
 description = "Geospatial Land Availability for Energy Systems "
 readme = "README.md"
 authors = [
@@ -34,6 +34,12 @@ where = ["."]
 [tool.pytest.ini_options]
 testpaths = ["glaes/test"]
 console_output_style = "progress"
+filterwarnings = [
+    "ignore::pyparsing.exceptions.PyparsingDeprecationWarning:matplotlib._fontconfig_pattern",
+    "ignore::pyparsing.exceptions.PyparsingDeprecationWarning:matplotlib._mathtext",
+    "ignore::pyparsing.exceptions.PyparsingDeprecationWarning:pyparsing.util",
+    "ignore:This process.*is multi-threaded.*fork:DeprecationWarning:multiprocessing.popen_fork",
+]
 
 
 [project.urls]

@@ -3,6 +3,7 @@ from copy import copy
 from os.path import dirname, isfile, join
 
 import geokit as gk
+import geokit.core.vector
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -309,14 +310,15 @@ def test_ExclusionCalculator_distributeItems():
         avoidRegionBorders=True,
     )
     geoms = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems1b.shp"))
+
     assert geoms.shape[0] == 252
     # make sure that all placements fall within the region less the 500m border corridor
     assert (
-        gk.vector.extractFeatures(
+        geokit.core.vector.extractFeatures(
             join(RESULTDIR, "distributeItems1b.shp"),
-            geoms=gk.drawGeoms(ec.region.geometry.Buffer(-500)),
+            geom=ec.region.geometry.Buffer(-500),
         ).shape[0]
-        == 252
+        == 240
     )
 
     # Do an axial distribution

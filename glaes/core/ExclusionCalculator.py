@@ -1,6 +1,7 @@
 import hashlib
 import re
 import time
+import warnings
 from collections import namedtuple
 from os.path import basename, isfile
 from warnings import warn
@@ -8,9 +9,7 @@ from warnings import warn
 import geokit as gk
 import numpy as np
 import pandas as pd
-import hashlib
 from osgeo import gdal, ogr
-import warnings
 
 from .priors import Priors, PriorSource
 from .util import GlaesError, glaes_logger
@@ -425,7 +424,7 @@ class ExclusionCalculator(object):
 
             axh1 = s.region.drawImage(
                 s.availability,
-                ax=ax,
+                ax_hands=ax,
                 drawSelf=False,
                 scaling=dataScalingFactor,
                 **kwargs,
@@ -439,7 +438,7 @@ class ExclusionCalculator(object):
             no_data = 255
             mat[~s.region.mask] = no_data
             availability_raster = s.region.createRaster(data=mat, noData=no_data)
-            axh1 = gk.drawRaster(availability_raster, ax=ax, srs=srs, cutlineFillValue=no_data, **kwargs)
+            axh1 = gk.drawRaster(availability_raster, ax_hands=ax, srs=srs, cutlineFillValue=no_data, **kwargs)
 
         # # Draw the mask to blank out the out of region areas
         # w2a = LinearSegmentedColormap.from_list('white_to_alpha',[(1,1,1,1),(1,1,1,0)])
