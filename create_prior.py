@@ -1490,7 +1490,7 @@ def evaluate_RESERVE(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_WILDERNESS(regSource, ftrID, tail):
+def evaluate_WILDERNESS(regSource, ftrID, tail, multiProcess: bool = False):
     name = "protected_wilderness_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from a protected wilderness"
@@ -1509,6 +1509,7 @@ def evaluate_WILDERNESS(regSource, ftrID, tail):
 
     matrix = None
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     for f in reg.extent.filterSources(join(wdpaSource[0], wdpaSource[1])):
         tmp = (
             reg.indicateFeatures(
@@ -1516,6 +1517,7 @@ def evaluate_WILDERNESS(regSource, ftrID, tail):
                 where=r"DESIG_ENG LIKE '%wilderness%' OR IUCN_CAT = 'Ib'",
                 resolutionDiv=5,
                 applyMask=False,
+                multiProcess=multiProcessAdjusted,
             )
             > 0.5
         )
@@ -1561,7 +1563,7 @@ def evaluate_BIOSPHERE(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_HABITAT(regSource, ftrID, tail):
+def evaluate_HABITAT(regSource, ftrID, tail, multiProcess: bool = False):
     name = "protected_habitat_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from a protected habitat"
@@ -1580,6 +1582,7 @@ def evaluate_HABITAT(regSource, ftrID, tail):
 
     matrix = None
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     for f in reg.extent.filterSources(join(wdpaSource[0], wdpaSource[1])):
         tmp = (
             reg.indicateFeatures(
@@ -1587,6 +1590,7 @@ def evaluate_HABITAT(regSource, ftrID, tail):
                 where=r"DESIG_ENG LIKE '%habitat%' OR IUCN_CAT = 'IV'",
                 resolutionDiv=5,
                 applyMask=False,
+                multiProcess=multiProcessAdjusted,
             )
             > 0.5
         )
@@ -2029,11 +2033,12 @@ def evaluate_SLOPE_NORTH(regSource, ftrID, tail):
 
 ##################################################################
 ## UTILITY FUNCTIONS
-def edgesByProximity(reg, geom, distances):
+def edgesByProximity(reg, geom, distances, multiProcess: bool = False):
     # make initial matrix
     mat = np.ones(reg.mask.shape, dtype=np.uint8) * 255  # Set all values to no data (255)
     mat[reg.mask] = 254  # Set all values in the region to untouched (254)
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Only do growing if a geometry is available
     if not geom is None and len(geom) != 0:
         # make grow func
@@ -2058,7 +2063,9 @@ def edgesByProximity(reg, geom, distances):
                 print(len(grown), [g.GetGeometryName() for g in grown])
                 raise e
 
-            indicated = reg.indicateFeatures(tmpSource) > 0.5  # Map onto the RegionMask
+            indicated = (
+                reg.indicateFeatures(tmpSource, multiProcess=multiProcessAdjusted) > 0.5
+            )  # Map onto the RegionMask
 
             # apply onto matrix
             sel = np.logical_and(mat == 254, indicated)  # write onto pixels which are indicated and available

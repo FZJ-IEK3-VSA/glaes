@@ -1196,9 +1196,19 @@ class ExclusionCalculator(object):
                 # create vector, indicate features and overwrite indications
                 vec = gk.core.util.quickVector(geoms)
                 if invert:
-                    indications = s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8) * 100
+                    indications = (
+                        s.region.indicateFeatures(vec, applyMask=False, multiProcess=multiProcessAdjusted).astype(
+                            np.uint8
+                        )
+                        * 100
+                    )
                 else:
-                    indications = 100 - (s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8) * 100)
+                    indications = 100 - (
+                        s.region.indicateFeatures(vec, applyMask=False, multiProcess=multiProcessAdjusted).astype(
+                            np.uint8
+                        )
+                        * 100
+                    )
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
             if intermediate is not None:
@@ -1252,6 +1262,7 @@ class ExclusionCalculator(object):
         regionPad=None,
         useRegionmask=True,
         default=False,
+        multiProcess: bool = False,
         **kwargs,
     ):
         """Exclude areas based off the features in a vector datasource
@@ -1413,7 +1424,7 @@ class ExclusionCalculator(object):
                 )
             else:
                 # calculate the actual exclusions
-
+                multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
                 indications = (
                     s.region.indicateFeatures(
                         source,
@@ -1424,6 +1435,7 @@ class ExclusionCalculator(object):
                         applyMask=False,
                         forceMaskShape=True,
                         regionPad=regionPad,
+                        multiProcess=multiProcessAdjusted,
                         **kwargs,
                     )
                     * 100
@@ -1888,7 +1900,7 @@ class ExclusionCalculator(object):
         if verbose:
             glaes_logger.info("Done!")
 
-    def shrinkAvailability(s, dist, threshold=50):
+    def shrinkAvailability(s, dist, threshold=50, multiProcess: bool = False):
         """Shrinks the current availability by a given distance in the given SRS"""
         geom = gk.geom.polygonizeMask(
             s._availability >= threshold,
@@ -1897,10 +1909,11 @@ class ExclusionCalculator(object):
             flat=False,
         )
         geom = [g.Buffer(-dist) for g in geom]
-        newAvail = (s.region.indicateGeoms(geom) * 100).astype(np.uint8)
+        multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
+        newAvail = (s.region.indicateGeoms(geom, multiProcess=multiProcessAdjusted) * 100).astype(np.uint8)
         s._availability = newAvail
 
-    def pruneIsolatedAreas(s, minSize, threshold=50):
+    def pruneIsolatedAreas(s, minSize, threshold=50, multiProcess: bool = False):
         """Removes contiguous areas which are smaller than 'minSize'
 
         * minSize is given in units of the calculator's srs
@@ -1918,9 +1931,13 @@ class ExclusionCalculator(object):
             s._availability *= 0
         else:
             vec = gk.core.util.quickVector(geoms)
+            multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
 
             # Replace current availability matrix
-            s._availability = s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8) * 100
+            s._availability = (
+                s.region.indicateFeatures(vec, applyMask=False, multiProcess=multiProcessAdjusted).astype(np.uint8)
+                * 100
+            )
 
         s._availability_per_criterion = s._availability
 
@@ -1941,6 +1958,7 @@ class ExclusionCalculator(object):
         _voronoiBoundaryPadding=5,
         _stamping=True,
         avoidRegionBorders=False,
+        multiProcess: bool = False,
     ):
         """Distribute the maximal number of minimally separated items within the available areas
 
@@ -2008,10 +2026,12 @@ class ExclusionCalculator(object):
                 )
                 raise ValueError(message)
             # calculate the exclusion indications based on region shape and negative buffer
+            multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
             indications = (
                 s.region.indicateFeatures(
                     gk.vector.createVector(s.region.geometry),
                     buffer=-distance,
+                    multiProcess=multiProcessAdjusted,
                 )
                 * 100
             ).astype(np.uint8)
