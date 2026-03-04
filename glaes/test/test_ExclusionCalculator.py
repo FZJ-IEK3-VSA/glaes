@@ -370,7 +370,6 @@ def test_ExclusionCalculator_distributeItems():
 
     points = ec.distributeItems(separation=(8, 3), sepScaling=ras, axialDirection=0)
     assert points.shape[0] == 390
-    print("done")
 
 
 def test_ExclusionCalculator_distributeAreas():

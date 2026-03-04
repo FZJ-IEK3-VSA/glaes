@@ -12,7 +12,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                runner_tag: ["ubuntu-latest"]
+                runner_tag: ["self-hosted"]
         runs-on: ${{ matrix.runner_tag }}
         steps:
             - name: Checkout glaes
@@ -20,7 +20,7 @@ jobs:
               with:
                   path: "glaes"
             - name: Checkout geokit
-              uses: actions/checkout@v5
+              uses: actions/checkout@v6
               with:
                   # Repository name with owner. For example, actions/checkout
                   repository: "FZJ-IEK3-VSA/geokit"
