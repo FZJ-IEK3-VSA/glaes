@@ -4,12 +4,15 @@ import time
 import warnings
 from collections import namedtuple
 from os.path import basename, isfile
+from sys import platform
 from warnings import warn
 
 import geokit as gk
 import numpy as np
 import pandas as pd
 from osgeo import gdal, ogr
+
+from glaes.core.util import checkMultiProcessingAvailability
 
 from .priors import Priors, PriorSource
 from .util import GlaesError, glaes_logger
@@ -979,6 +982,7 @@ class ExclusionCalculator(object):
         minSize=None,
         threshold=50,
         default=False,
+        multiProcess=False,
         **kwargs,
     ):
         """Exclude areas based off the values in a raster datasource
@@ -1152,8 +1156,9 @@ class ExclusionCalculator(object):
 
                 source = s.region.warp(source, returnMatrix=False, **prewarpArgs)
 
-            # calculate the actual exclusions
+                # calculate the actual exclusions
 
+            multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
             indications = (
                 s.region.indicateValues(
                     source,
@@ -1162,6 +1167,7 @@ class ExclusionCalculator(object):
                     resolutionDiv=resolutionDiv,
                     forceMaskShape=True,
                     applyMask=False,
+                    multiProcess=multiProcessAdjusted,
                     **kwargs,
                 )
                 * 100

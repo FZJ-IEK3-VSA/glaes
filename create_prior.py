@@ -1,14 +1,20 @@
-import geokit as gk
-import numpy as np
-from os.path import join, isdir, isfile, basename, splitext
-from os import mkdir
+import multiprocessing.shared_memory
 import sys
-from multiprocessing import Pool
 import time
+from collections import OrderedDict, namedtuple
 from datetime import datetime as dt
 from glob import glob
-from collections import namedtuple, OrderedDict
 from json import dumps
+from multiprocessing import Pool
+from os import mkdir
+from os.path import basename, isdir, isfile, join, splitext
+from sys import platform
+from warnings import warn
+
+import geokit as gk
+import numpy as np
+
+from glaes.core.util import checkMultiProcessingAvailability
 
 #################################################################
 ## DEFINE SOURCES
@@ -868,7 +874,7 @@ EVALUATION_VALUES = {
 
 #######################################################
 ## EVALUATION FUNCTIONS
-def evaluate_OCEAN(regSource, ftrID, tail):
+def evaluate_OCEAN(regSource, ftrID, tail, multiProcess=False):
     name = "ocean_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from an ocean"
@@ -882,8 +888,9 @@ def evaluate_OCEAN(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=44, applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=44, applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -893,7 +900,7 @@ def evaluate_OCEAN(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_WETLAND(regSource, ftrID, tail):
+def evaluate_WETLAND(regSource, ftrID, tail, multiProcess: bool = False):
     name = "wetland_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from a wetland area"
@@ -907,8 +914,9 @@ def evaluate_WETLAND(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=(35, 39), applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=(35, 39), applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -918,7 +926,7 @@ def evaluate_WETLAND(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_INDUSTRIAL(regSource, ftrID, tail):
+def evaluate_INDUSTRIAL(regSource, ftrID, tail, multiProcess: bool = False):
     name = "industrial_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from an industrial area"
@@ -932,8 +940,9 @@ def evaluate_INDUSTRIAL(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=3, applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=3, applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -943,7 +952,7 @@ def evaluate_INDUSTRIAL(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_MINING(regSource, ftrID, tail):
+def evaluate_MINING(regSource, ftrID, tail, multiProcess: bool = False):
     name = "mining_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from a mining area"
@@ -957,8 +966,9 @@ def evaluate_MINING(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=7, applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=7, applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -968,7 +978,7 @@ def evaluate_MINING(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_AGRICULTURE(regSource, ftrID, tail):
+def evaluate_AGRICULTURE(regSource, ftrID, tail, multiProcess: bool = False):
     name = "agriculture_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from an agriculture area"
@@ -982,8 +992,9 @@ def evaluate_AGRICULTURE(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=(12, 22), applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=(12, 22), applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -993,7 +1004,7 @@ def evaluate_AGRICULTURE(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_AG_ARABLE(regSource, ftrID, tail):
+def evaluate_AG_ARABLE(regSource, ftrID, tail, multiProcess: bool = False):
     name = "agriculture_arable_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from an arable agriculture area"
@@ -1007,8 +1018,9 @@ def evaluate_AG_ARABLE(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=(12, 14), applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=(12, 14), applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -1018,7 +1030,7 @@ def evaluate_AG_ARABLE(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_AG_PERMANENT(regSource, ftrID, tail):
+def evaluate_AG_PERMANENT(regSource, ftrID, tail, multiProcess: bool = False):
     name = "agriculture_permanent_crop_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from a permanent-crop agriculture area"
@@ -1032,8 +1044,9 @@ def evaluate_AG_PERMANENT(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=(15, 17), applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=(15, 17), applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -1043,7 +1056,7 @@ def evaluate_AG_PERMANENT(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_AG_PASTURE(regSource, ftrID, tail):
+def evaluate_AG_PASTURE(regSource, ftrID, tail, multiProcess: bool = False):
     name = "agriculture_pasture_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from a pastural agriculture area"
@@ -1057,8 +1070,9 @@ def evaluate_AG_PASTURE(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=18, applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=18, applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -1068,7 +1082,7 @@ def evaluate_AG_PASTURE(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_AG_HETEROGENEOUS(regSource, ftrID, tail):
+def evaluate_AG_HETEROGENEOUS(regSource, ftrID, tail, multiProcess: bool = False):
     name = "agriculture_heterogeneous_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from a heterogeneous agriculture area"
@@ -1082,8 +1096,9 @@ def evaluate_AG_HETEROGENEOUS(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=(19, 22), applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=(19, 22), applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -1093,7 +1108,7 @@ def evaluate_AG_HETEROGENEOUS(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_WOODLANDS_MIXED(regSource, ftrID, tail):
+def evaluate_WOODLANDS_MIXED(regSource, ftrID, tail, multiProcess: bool = False):
     name = "woodland_mixed_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from a mixed-tree woodland area"
@@ -1107,8 +1122,9 @@ def evaluate_WOODLANDS_MIXED(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=23, applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=23, applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -1118,7 +1134,7 @@ def evaluate_WOODLANDS_MIXED(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_WOODLANDS_CONIFEROUS(regSource, ftrID, tail):
+def evaluate_WOODLANDS_CONIFEROUS(regSource, ftrID, tail, multiProcess: bool = False):
     name = "woodland_coniferous_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from a predominantly coniferous (needle leaved) woodland area"
@@ -1132,8 +1148,9 @@ def evaluate_WOODLANDS_CONIFEROUS(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=24, applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=24, applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -1143,7 +1160,7 @@ def evaluate_WOODLANDS_CONIFEROUS(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_WOODLANDS_DECIDUOUS(regSource, ftrID, tail):
+def evaluate_WOODLANDS_DECIDUOUS(regSource, ftrID, tail, multiProcess: bool = False):
     name = "woodland_deciduous_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from a predominantly deciduous (broad leaved) woodland area"
@@ -1157,8 +1174,9 @@ def evaluate_WOODLANDS_DECIDUOUS(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(clcSource, value=25, applyMask=False) > 0.5
+    matrix = reg.indicateValues(clcSource, value=25, applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -1297,7 +1315,7 @@ def evaluate_RAILWAY(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_WATERBODY(regSource, ftrID, tail):
+def evaluate_WATERBODY(regSource, ftrID, tail, multiProcess: bool = False):
     name = "waterbody_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from permanent water bodies"
@@ -1311,8 +1329,14 @@ def evaluate_WATERBODY(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiprocessingAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-    matrix = reg.indicateValues(waterbodySource, value=1, applyMask=False, resolutionDiv=5) > 0.5
+    matrix = (
+        reg.indicateValues(
+            waterbodySource, value=1, applyMask=False, resolutionDiv=5, multiProcess=multiprocessingAdjusted
+        )
+        > 0.5
+    )
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -1608,7 +1632,7 @@ def evaluate_BIRDS(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_URBAN(regSource, ftrID, tail):
+def evaluate_URBAN(regSource, ftrID, tail, multiProcess: bool = False):
     name = "settlement_urban_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from dense-urban and city settlements"
@@ -1622,8 +1646,12 @@ def evaluate_URBAN(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Create a geometry list from the osm files
-    indicated = reg.indicateValues(urbanClustersSource, value=(5000, 2e7), applyMask=False) > 0.5
+    indicated = (
+        reg.indicateValues(urbanClustersSource, value=(5000, 2e7), applyMask=False, multiProcess=multiProcessAdjusted)
+        > 0.5
+    )
     geom = gk.geom.convertMask(indicated, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
@@ -1633,7 +1661,7 @@ def evaluate_URBAN(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_SETTLEMENT(regSource, ftrID, tail):
+def evaluate_SETTLEMENT(regSource, ftrID, tail, multiProcess: bool = False):
     name = "settlement_proximity"
     unit = "meters"
     description = "Indicates pixels which are less-than or equal-to X meters from any settlement area"
@@ -1647,9 +1675,10 @@ def evaluate_SETTLEMENT(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances))
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Create a geometry list from the osm files
     # eurostatUrban = reg.indicateValues(urbanClustersSource, value=(5000, 2e7), applyMask=False) > 0.5
-    clcUrban = reg.indicateValues(clcSource, value=(1, 2), applyMask=False) > 0.5
+    clcUrban = reg.indicateValues(clcSource, value=(1, 2), applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
 
     geom = gk.geom.convertMask(clcUrban, bounds=reg.extent.xyXY, srs=reg.srs)
 
@@ -1660,7 +1689,7 @@ def evaluate_SETTLEMENT(regSource, ftrID, tail):
     writeEdgeFile(result, reg, ftrID, output_dir, name, tail, unit, description, source, distances)
 
 
-def evaluate_AIRPORT(regSource, ftrID, tail):
+def evaluate_AIRPORT(regSource, ftrID, tail, multiProcess: bool = False):
     ######################
     ## Evaluate airports
     name = "airport_proximity"
@@ -1676,8 +1705,9 @@ def evaluate_AIRPORT(regSource, ftrID, tail):
     # Make Region Mask
     reg = gk.RegionMask.load(regSource, select=ftrID, padExtent=max(distances) * 1.25)
 
+    multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     ### Get airport regions
-    airportMask = reg.indicateValues(clcSource, value=6, applyMask=False) > 0.5
+    airportMask = reg.indicateValues(clcSource, value=6, applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
     airportGeoms = gk.geom.convertMask(airportMask, bounds=reg.extent.xyXY, srs=reg.srs)
     if airportGeoms is None:
         airportGeoms = []
@@ -2039,15 +2069,16 @@ def edgesByProximity(reg, geom, distances):
     return mat
 
 
-def edgesByThreshold(reg, source, thresholds):
+def edgesByThreshold(reg, source, thresholds, multiProcess: bool = False):
     # make initial matrix
     mat = np.ones(reg.mask.shape, dtype=np.uint8) * 255  # Set all values to no data (255)
     mat[reg.mask] = 254  # Set all values in the region to untouched (254)
 
+    multiprocessingAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Only do growing if a geometry is available
     value = 0
     for thresh in thresholds:
-        indicated = reg.indicateValues(source, value=(None, thresh)) > 0.5
+        indicated = reg.indicateValues(source, value=(None, thresh), multiProcess=multiprocessingAdjusted) > 0.5
 
         # apply onto matrix
         sel = np.logical_and(mat == 254, indicated)  # write onto pixels which are indicated and available
