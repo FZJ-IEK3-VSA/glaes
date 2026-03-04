@@ -12,9 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         runner_tag: [
-            "ubuntu-latest",
-            "windows-latest",
-            "macos-latest"
+            "self-hosted",
           ]
         python_version: ["3.10"]
 
