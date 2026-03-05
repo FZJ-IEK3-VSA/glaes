@@ -11,8 +11,8 @@ class GlaesError(Exception):
     pass
 
 
-class GlaesMultiProcessingWarning(Warning):
-    multi_processing_warning_message = (
+class GeokitMultiProcessingWarning(Warning):
+    multiProcessingWarningMessage = (
         "Multiprocessing has been set to 'False' because it is not available for Windows or Mac."
         " To deactivate this warning, please set the multiProcess variable to False. On Windows and "
         "Mac, new processes must be spawned, which requires the serialisation of the method to be "
@@ -41,15 +41,13 @@ def checkMultiProcessingAvailability(multiProcess: bool) -> bool:
         multiProcessCorrected = multiProcess
     elif platform == "darwin" and multiProcess is True:
         multiProcessCorrected = False
-        warn(message=GlaesMultiProcessingWarning.multi_processing_warning_message, category=GlaesMultiProcessingWarning)
+        warn(message=GeokitMultiProcessingWarning.multiProcessingWarningMessage, category=GeokitMultiProcessingWarning)
     elif platform == "win32" and multiProcess is True:
         multiProcessCorrected = False
-        warn(message=GlaesMultiProcessingWarning.multi_processing_warning_message, category=GlaesMultiProcessingWarning)
-    elif platform == "darwin" and multiProcess is False:
-        multiProcessCorrected = multiProcess
-    elif platform == "win32" and multiProcess is False:
+        warn(message=GeokitMultiProcessingWarning.multiProcessingWarningMessage, category=GeokitMultiProcessingWarning)
+    elif multiProcess is False:
         multiProcessCorrected = multiProcess
     else:
         multiProcessCorrected = False
-        warn(message=GlaesMultiProcessingWarning.multi_processing_warning_message, category=GlaesMultiProcessingWarning)
+        warn(message=GeokitMultiProcessingWarning.multiProcessingWarningMessage, category=GeokitMultiProcessingWarning)
     return multiProcessCorrected
