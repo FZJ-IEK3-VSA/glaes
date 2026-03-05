@@ -12,18 +12,18 @@ jobs:
       fail-fast: false
       matrix:
         runner_tag: [
-            "self-hosted",
+            "self-hosted","windows-latest"
           ]
         python_version: ["3.10"]
 
     runs-on: ${{ matrix.runner_tag }}
     steps:
       - name: Checkout glaes
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           path: "glaes"
       - name: Checkout geokit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           # Repository name with owner. For example, actions/checkout
           repository: "FZJ-IEK3-VSA/geokit"
