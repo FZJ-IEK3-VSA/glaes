@@ -313,7 +313,6 @@ def test_ExclusionCalculator_distributeItems():
     geoms = gk.vector.extractFeatures(join(RESULTDIR, "distributeItems1b.shp"))
 
     assert geoms.shape[0] == 252
-    # make sure that all placements fall within the region less the 500m border corridor
     assert (
         geokit.core.vector.extractFeatures(
             join(RESULTDIR, "distributeItems1b.shp"),

@@ -5,7 +5,7 @@ env/*
 */.ipynb_checkpoints/*
 __pycache__/
 analysis/regions/*
-
+.env
 # file types to ignore
 #*.ipynb
 *.aux.xml
