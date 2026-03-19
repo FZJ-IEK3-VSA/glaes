@@ -1,16 +1,18 @@
 import hashlib
 import re
 import time
+import warnings
 from collections import namedtuple
 from os.path import basename, isfile
+from sys import platform
 from warnings import warn
 
 import geokit as gk
 import numpy as np
 import pandas as pd
-import hashlib
 from osgeo import gdal, ogr
-import warnings
+
+from glaes.core.util import checkMultiProcessingAvailability
 
 from .priors import Priors, PriorSource
 from .util import GlaesError, glaes_logger
@@ -425,7 +427,7 @@ class ExclusionCalculator(object):
 
             axh1 = s.region.drawImage(
                 s.availability,
-                ax=ax,
+                ax_hands=ax,
                 drawSelf=False,
                 scaling=dataScalingFactor,
                 **kwargs,
@@ -439,7 +441,7 @@ class ExclusionCalculator(object):
             no_data = 255
             mat[~s.region.mask] = no_data
             availability_raster = s.region.createRaster(data=mat, noData=no_data)
-            axh1 = gk.drawRaster(availability_raster, ax=ax, srs=srs, cutlineFillValue=no_data, **kwargs)
+            axh1 = gk.drawRaster(availability_raster, ax_hands=ax, srs=srs, cutlineFillValue=no_data, **kwargs)
 
         # # Draw the mask to blank out the out of region areas
         # w2a = LinearSegmentedColormap.from_list('white_to_alpha',[(1,1,1,1),(1,1,1,0)])
@@ -736,29 +738,31 @@ class ExclusionCalculator(object):
         """
         if not isfile(source) or not gk.util.isRaster(source):
             if verbose:
-                print("Is not a raster!")
+                print("External/new source is not a raster!")
             return False
 
         ri = gk.raster.rasterInfo(source)
         if not np.isclose(ri.pixelWidth, self.region.pixelWidth):
             if verbose:
-                print("pixelWidth mismatch!")
+                print(f"pixelWidth mismatch! Internal/new: {self.region.pixelWidth}, external/old: {ri.pixelWidth}")
             return False
 
         if not np.isclose(ri.pixelHeight, self.region.pixelHeight):
             if verbose:
-                print("pixelHeight mismatch!")
+                print(f"pixelHeight mismatch! Internal/new: {self.region.pixelHeight}, external/old: {ri.pixelHeight}")
             return False
 
+        # make sure the extents are the same - marginal rounding errors (exact rounding seems to depend on the calculation platform)
+        # are accepted as long as they are much smaller than the cells
         ri_extent = gk.Extent.fromRaster(source)
-        if (
-            ri_extent.xMin != self.region.extent.xMin
-            or ri_extent.xMax != self.region.extent.xMax
-            or ri_extent.yMin != self.region.extent.yMin
-            or ri_extent.yMax != self.region.extent.yMax
+        if not (
+            np.isclose(ri_extent.xMin, self.region.extent.xMin, atol=1e-7)
+            and np.isclose(ri_extent.xMax, self.region.extent.xMax, atol=1e-7)
+            and np.isclose(ri_extent.yMin, self.region.extent.yMin, atol=1e-7)
+            and np.isclose(ri_extent.yMax, self.region.extent.yMax, atol=1e-7)
         ):
             if verbose:
-                print("Extent mismatch!")
+                print(f"Extent mismatch! Internal/new: {self.region.extent}, external/old: {ri_extent}")
             return False
 
         # create a mask for source raster based on noData value (set noData to False, all valid values 0-100 to True)
@@ -767,6 +771,15 @@ class ExclusionCalculator(object):
             # sometimes, saving errors lead to None matrices being reloaded from disk, simply re-calculate
             print("Source matrix was saved to disk empty.")
             return False
+
+        # make sure the extracted shape is the same as internal matrix, could be affected by extent rounding
+        if not self.region.mask.shape == source_mask.shape:
+            if verbose:
+                print(
+                    f"Matrix shape mismatch! Internal/new: {self.region.mask.shape}, external/old: {source_mask.shape}"
+                )
+            return False
+
         source_mask[source_mask <= 100] = True
         source_mask[source_mask == ri.noData] = False
         # compare the two masks and check if they are alike for all cells
@@ -969,6 +982,7 @@ class ExclusionCalculator(object):
         minSize=None,
         threshold=50,
         default=False,
+        multiProcess=False,
         **kwargs,
     ):
         """Exclude areas based off the values in a raster datasource
@@ -1142,8 +1156,9 @@ class ExclusionCalculator(object):
 
                 source = s.region.warp(source, returnMatrix=False, **prewarpArgs)
 
-            # calculate the actual exclusions
+                # calculate the actual exclusions
 
+            multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
             indications = (
                 s.region.indicateValues(
                     source,
@@ -1152,6 +1167,7 @@ class ExclusionCalculator(object):
                     resolutionDiv=resolutionDiv,
                     forceMaskShape=True,
                     applyMask=False,
+                    multiProcess=multiProcessAdjusted,
                     **kwargs,
                 )
                 * 100
@@ -1180,9 +1196,19 @@ class ExclusionCalculator(object):
                 # create vector, indicate features and overwrite indications
                 vec = gk.core.util.quickVector(geoms)
                 if invert:
-                    indications = s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8) * 100
+                    indications = (
+                        s.region.indicateFeatures(vec, applyMask=False, multiProcess=multiProcessAdjusted).astype(
+                            np.uint8
+                        )
+                        * 100
+                    )
                 else:
-                    indications = 100 - (s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8) * 100)
+                    indications = 100 - (
+                        s.region.indicateFeatures(vec, applyMask=False, multiProcess=multiProcessAdjusted).astype(
+                            np.uint8
+                        )
+                        * 100
+                    )
 
             # check if intermediate file usage is selected and create intermediate raster file with exlcusion arguments as metadata
             if intermediate is not None:
@@ -1236,6 +1262,7 @@ class ExclusionCalculator(object):
         regionPad=None,
         useRegionmask=True,
         default=False,
+        multiProcess: bool = False,
         **kwargs,
     ):
         """Exclude areas based off the features in a vector datasource
@@ -1397,7 +1424,7 @@ class ExclusionCalculator(object):
                 )
             else:
                 # calculate the actual exclusions
-
+                multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
                 indications = (
                     s.region.indicateFeatures(
                         source,
@@ -1408,6 +1435,7 @@ class ExclusionCalculator(object):
                         applyMask=False,
                         forceMaskShape=True,
                         regionPad=regionPad,
+                        multiProcess=multiProcessAdjusted,
                         **kwargs,
                     )
                     * 100
@@ -1872,7 +1900,7 @@ class ExclusionCalculator(object):
         if verbose:
             glaes_logger.info("Done!")
 
-    def shrinkAvailability(s, dist, threshold=50):
+    def shrinkAvailability(s, dist, threshold=50, multiProcess: bool = False):
         """Shrinks the current availability by a given distance in the given SRS"""
         geom = gk.geom.polygonizeMask(
             s._availability >= threshold,
@@ -1881,10 +1909,11 @@ class ExclusionCalculator(object):
             flat=False,
         )
         geom = [g.Buffer(-dist) for g in geom]
-        newAvail = (s.region.indicateGeoms(geom) * 100).astype(np.uint8)
+        multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
+        newAvail = (s.region.indicateGeoms(geom, multiProcess=multiProcessAdjusted) * 100).astype(np.uint8)
         s._availability = newAvail
 
-    def pruneIsolatedAreas(s, minSize, threshold=50):
+    def pruneIsolatedAreas(s, minSize, threshold=50, multiProcess: bool = False):
         """Removes contiguous areas which are smaller than 'minSize'
 
         * minSize is given in units of the calculator's srs
@@ -1902,9 +1931,13 @@ class ExclusionCalculator(object):
             s._availability *= 0
         else:
             vec = gk.core.util.quickVector(geoms)
+            multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
 
             # Replace current availability matrix
-            s._availability = s.region.indicateFeatures(vec, applyMask=False).astype(np.uint8) * 100
+            s._availability = (
+                s.region.indicateFeatures(vec, applyMask=False, multiProcess=multiProcessAdjusted).astype(np.uint8)
+                * 100
+            )
 
         s._availability_per_criterion = s._availability
 
@@ -1925,6 +1958,7 @@ class ExclusionCalculator(object):
         _voronoiBoundaryPadding=5,
         _stamping=True,
         avoidRegionBorders=False,
+        multiProcess: bool = False,
     ):
         """Distribute the maximal number of minimally separated items within the available areas
 
@@ -1992,10 +2026,12 @@ class ExclusionCalculator(object):
                 )
                 raise ValueError(message)
             # calculate the exclusion indications based on region shape and negative buffer
+            multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
             indications = (
                 s.region.indicateFeatures(
                     gk.vector.createVector(s.region.geometry),
                     buffer=-distance,
+                    multiProcess=multiProcessAdjusted,
                 )
                 * 100
             ).astype(np.uint8)
