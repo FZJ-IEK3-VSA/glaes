@@ -1,5 +1,6 @@
 <a href="https://www.fz-juelich.de/en/iek/iek-3"><img src="https://raw.githubusercontent.com/OfficialCodexplosive/README_Assets/862a93188b61ab4dd0eebde3ab5daad636e129d5/FJZ_IEK-3_logo.svg" alt="FZJ Logo" width="300px"></a>
 
+
 # Geospatial Land Availability for Energy Systems (GLAES)
 
 GLAES is a framework for conducting land eligibility analyses and is designed to easily incorporate disparate geospatial information from a variety of sources into a unified solution.
@@ -58,6 +59,10 @@ Objective:
 ---
 
 ## Installation
+
+## Note 
+
+GLAES is currently only tested against Linux machines. Although it is possible to install GLAES on Windows and macOS machines, the calculations may produce different results.
 
 ### Recommended installation
 

@@ -1,0 +1,53 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "glaes/test",
+                "-v"
+            ],
+            "console": "integratedTerminal",
+            "subProcess": false,
+            "env": {
+                "MPLBACKEND": "Agg"
+            },
+            "windows": {
+                "python": "${workspaceFolder}/conda_python.cmd"
+            },
+            "linux": {
+                "python": "${workspaceFolder}/conda_python.sh"
+            },
+            "osx": {
+                "python": "${workspaceFolder}/conda_python.sh"
+            }
+        },
+        {
+            "name": "Debug Current Test File",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}",
+                "-v"
+            ],
+            "console": "integratedTerminal",
+            "subProcess": false,
+            "env": {
+                "MPLBACKEND": "Agg"
+            },
+            "windows": {
+                "python": "${workspaceFolder}/conda_python.cmd"
+            },
+            "linux": {
+                "python": "${workspaceFolder}/conda_python.sh"
+            },
+            "osx": {
+                "python": "${workspaceFolder}/conda_python.sh"
+            }
+        }
+    ]
+}
