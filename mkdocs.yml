@@ -1,0 +1,126 @@
+site_name: GLAES Documentation
+site_url: https://glaes.readthedocs.io/en/latest/
+repo_url: https://github.com/FZJ-IEK3-VSA/glaes
+repo_name: FZJ-IEK3-VSA/glaes
+edit_uri: edit/master/docs/
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  favicon: assets/favicon.svg
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.path
+    - navigation.tracking
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.action.edit
+    - content.action.view
+    - content.tooltips
+    - search.suggest
+    - search.highlight
+    - search.share
+    - toc.follow
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home:
+    - index.md
+    - Installation: installation.md
+    - Getting Started: getting-started.md
+  - Examples:
+    - Basic Workflow: notebooks/00_basic_workflow.ipynb
+    - Placement Algorithm: notebooks/01_Placement_algorithm.ipynb
+  - API Reference: api/
+  - About:
+    - Further Reading: further-reading.md
+    - Legal Notice: legal-notice.md
+
+exclude_docs: |
+  gen_ref_pages.py
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            show_source: true
+            show_root_heading: true
+            members_order: source
+            docstring_style: auto
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            separate_signature: true
+            show_signature_annotations: true
+  - mkdocs-jupyter:
+      execute: false
+      include_source: true
+      allow_errors: true
+      include_requirejs: true
+      toc_depth: 3
+  - gen-files:
+      scripts:
+        - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.mark
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - tables
+  - def_list
+  - footnotes
+  - abbr
+  - toc:
+      permalink: true
+      toc_depth: 2
+
+extra:
+  generator: false
+
+extra_css:
+  - stylesheets/extra.css
