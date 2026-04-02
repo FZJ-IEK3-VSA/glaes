@@ -115,11 +115,14 @@ def test_ExclusionCalculator___init__():
     ec_multi = gl.ExclusionCalculator(cddaVector, srs=3035)
     assert ec_multi.region is not None
     
-    # NOTE / TODO: Deprecated LAEA string format currently raises ValueError
-    # due to inconsistent regex/group parsing. This test ensures the
-    # deprecation warning is still emitted before failure.
 
-    deprecated_srs = "A10B20"
+    #The intended input is a string like "N51E10", 
+    #encoding lat/lon as letter+number pairs (e.g. N51 = 51° North, E10 = 10° East).
+    #The code tries to parse this and create a centered LAEA spatial reference system via gk.srs.centeredLAEA().
+    
+    # This test ensures the deprecation warning
+
+    deprecated_srs = "E51N10"
     geom = gk.vector.extractFeatures(aachenShape)["geom"].iloc[0]
 
     with warnings.catch_warnings(record=True) as w:
