@@ -1,4 +1,9 @@
-<a href="https://www.fz-juelich.de/en/iek/iek-3"><img src="https://raw.githubusercontent.com/OfficialCodexplosive/README_Assets/862a93188b61ab4dd0eebde3ab5daad636e129d5/FJZ_IEK-3_logo.svg" alt="FZJ Logo" width="300px"></a>
+<a href="https://www.fz-juelich.de/en/ice/ice-2">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/FZJ-IEK3-VSA/README_assets/blob/v.1.0.0/ICE2_Logos/JSA-Header-dark.svg?raw=True">
+    <img src="https://github.com/FZJ-IEK3-VSA/README_assets/blob/v.1.0.0/ICE2_Logos/JSA-Header.svg?raw=True" alt="Logo für Forschungszentrum Juelich - Juelich System Analysis" width="300px">
+  </picture>
+</a>
 
 # Geospatial Land Availability for Energy Systems (GLAES)
 
@@ -63,7 +68,7 @@ Objective:
 
 The recommended way to install GLAES is to use the conda-package manager. This will ensure that all dependancies are installed correctly and that the package is compatible with your system.
 
-Using the conda package manager of your choice (we recommend [mambaforge](https://github.com/conda-forge/miniforge)), you can install GLAES with the following command:
+Using the conda package manager of your choice (we recommend [miniforge](https://github.com/conda-forge/miniforge)), you can install GLAES with the following command:
 
 ```bash
 conda install -c conda-forge glaes
@@ -74,57 +79,44 @@ If you are installing GLAES into an environment using an environment.yml file, m
 ```yaml
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - conda-forge::glaes
 ```
 
 However, we **highly recommend** that you install the package into a new, empty environment, as the dependancies of GLAES may conflict with other packages you have installed. We currently working on a new release which will be compatible with later versions of GDAL (>3.0).
 
-### Alternative installation
+### Development Installation
 
-The primary dependancies of GLAES are:
 
-1. gdal>2.0.0,<3.0.0
-2. <a href="https://github.com/FZJ-IEK3-VSA/geokit">GeoKit</a> >= 1.2.4
+GLAES is closely linked to GeoKit. If you intend to develop glaes its also recommended to install GeoKit in development mode into the same environment.
 
-If you can install these modules on you own, then the glaes module should be easily installable with:
 
-```
-pip install git+https://github.com/FZJ-IEK3-VSA/glaes.git#egg=glaes
-```
-
-If, on the otherhand, you prefer an automated installation using Anaconda, then you should be able to follow these steps:
-
-1. First clone a local copy of the repository to your computer, and move into the created directory
+1. First clone a local copy of both repositories to your computer
 
 ```
 git clone https://github.com/FZJ-IEK3-VSA/glaes.git
-cd glaes
+git clone https://github.com/FZJ-IEK3-VSA/geokit.git
 ```
 
-1. (Alternative) If you want to use the 'dev' branch (or another branch) then use:
+2. Copy all dependencies of both requirements-dev files into a new requirements-combined.yml.
+
+4. Create the new environment with all conda forge dependencies:
 
 ```
-git checkout dev
+conda env create --file requirements-combined.yml -n glaes_dev_env
 ```
 
-2. GLAES should be installable to a new environment with:
+5. Actiavte the environment
 
 ```
-conda env create --file requirements.yml
+conda activate glaes_dev_env
 ```
 
-2. (Alternative) Or into an existing environment with:
+6.  Install the local libraries
 
 ```
-conda env update --file requirements.yml -n <ENVIRONMENT-NAME>
-```
-
-2. (Alternative) If you want to install GLAES in editable mode, and also with jupyter notebook and with testing functionalities use:
-
-```
-conda env create --file requirements-dev.yml
+pip install GLAES -e  ./glaes -no-deps
+pip install geokit -e ./geokit --no-deps
 ```
 
 ---
@@ -177,17 +169,25 @@ If you decide to use GLAES anywhere in a published work, please kindly cite us u
 
 MIT License
 
-Copyright (c) 2017-2022 David Severin Ryberg (FZJ IEK-3), Jochen Linßen (FZJ IEK-3), Martin Robinius (FZJ IEK-3), Detlef Stolten (FZJ IEK-3)
+Copyright (c) 2017-2028 David Severin Ryberg (FZJ IEK-3), Jochen Linßen (FZJ IEK-3), Martin Robinius (FZJ IEK-3), Detlef Stolten (FZJ IEK-3)
 
 You should have received a copy of the MIT License along with this program.  
 If not, see <https://opensource.org/licenses/MIT>
 
-## About Us
-<p align="center"><a href="https://www.fz-juelich.de/en/iek/iek-3"><img src="https://github.com/OfficialCodexplosive/README_Assets/blob/master/iek3-wide.png" alt="Institut TSA"></a></p>
-We are the <a href="https://www.fz-juelich.de/en/iek/iek-3">Institute of Energy and Climate Research - Techno-economic Systems Analysis (IEK-3)</a> belonging to the <a href="https://www.fz-juelich.de/en">Forschungszentrum Jülich</a>. Our interdisciplinary department's research is focusing on energy-related process and systems analyses. Data searches and system simulations are used to determine energy and mass balances, as well as to evaluate performance, emissions and costs of energy systems. The results are used for performing comparative assessment studies between the various systems. Our current priorities include the development of energy strategies, in accordance with the German Federal Government’s greenhouse gas reduction targets, by designing new infrastructures for sustainable and secure energy supply chains and by conducting cost analysis studies for integrating new technologies into future energy market frameworks.
+## About Us 
+
+We are the <a href="https://www.fz-juelich.de/en/ice/ice-2">Institute of Climate and Energy Systems – Jülich Systems Analysis (ICE-2)</a> at the <a href="https://www.fz-juelich.de/en"> Forschungszentrum Jülich</a>.
+Our work focuses on independent, interdisciplinary research in energy, bioeconomy, infrastructure, and sustainability. We support a just, greenhouse gas–neutral transformation through open models and policy-relevant science.
+
 
 ## Acknowledgment
 
 This work was supported by the Helmholtz Association under the Joint Initiative ["Energy System 2050 – A Contribution of the Research Field Energy"](https://www.helmholtz.de/en/research/energy/energy_system_2050/).
 
-<a href="https://www.helmholtz.de/en/"><img src="https://www.helmholtz.de/fileadmin/user_upload/05_aktuelles/Marke_Design/logos/HG_LOGO_S_ENG_RGB.jpg" alt="Helmholtz Logo" width="200px" style="float:right"></a>
+<a href="https://www.helmholtz.de/en/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/FZJ-IEK3-VSA/README_assets/v.1.0.0/Helmholtz_Logos/Helmholtz-Logo-White-RGB.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/FZJ-IEK3-VSA/README_assets/v.1.0.0/Helmholtz_Logos/Helmholtz-Logo-Dark-Blue-RGB.svg">
+    <img src="https://raw.githubusercontent.com/FZJ-IEK3-VSA/README_assets/v.1.0.0/Helmholtz_Logos/Helmholtz-Logo-Dark-Blue-RGB.svg" alt="Helmholtz Logo" width="200px" style="float:right">
+  </picture>
+</a>

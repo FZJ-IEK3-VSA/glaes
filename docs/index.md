@@ -1,10 +1,9 @@
-<div class="landing-logos">
-  <div class="jsa-logo">
-    <a href="https://www.fz-juelich.de/en/iek/iek-3">
-      <img src="https://raw.githubusercontent.com/FZJ-IEK3-VSA/README_assets/v.1.0.0/ICE2_Logos/JSA-Header.svg" alt="Jülich System Analysis">
-    </a>
-  </div>
-</div>
+<a href="https://www.fz-juelich.de/en/ice/ice-2">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/FZJ-IEK3-VSA/README_assets/blob/v.1.0.0/ICE2_Logos/JSA-Header-dark.svg?raw=True">
+    <img src="https://github.com/FZJ-IEK3-VSA/README_assets/blob/v.1.0.0/ICE2_Logos/JSA-Header.svg?raw=True" alt="Logo für Forschungszentrum Juelich - Juelich System Analysis" width="300px">
+  </picture>
+</a>
 
 # Introduction
 

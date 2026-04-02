@@ -12,7 +12,7 @@ dependencies:
   - numpy
   - scipy <1.15
   - scikit-learn
-  - geokit >=1.4.0
+  - geokit >=1.7.0
   # - pytest
   # - pytest-xdist
   # - pytest-cov
