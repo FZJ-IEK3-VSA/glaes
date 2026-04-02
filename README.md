@@ -5,6 +5,7 @@
   </picture>
 </a>
 
+
 # Geospatial Land Availability for Energy Systems (GLAES)
 
 GLAES is a framework for conducting land eligibility analyses and is designed to easily incorporate disparate geospatial information from a variety of sources into a unified solution.
@@ -63,6 +64,10 @@ Objective:
 ---
 
 ## Installation
+
+## Note 
+
+GLAES is currently only tested against Linux machines. Although it is possible to install GLAES on Windows and macOS machines, the calculations may produce different results.
 
 ### Recommended installation
 
