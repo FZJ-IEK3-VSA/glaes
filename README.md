@@ -9,10 +9,10 @@
 
 GLAES is a framework for conducting land eligibility analyses and is designed to easily incorporate disparate geospatial information from a variety of sources into a unified solution.
 Currently, the main purpose of GLAES is performing land eligibility (LE) analyses which, in short, are used to determine which areas within a region are deemed 'eligible' for some purpose (such as placing a wind turbine).
-Although initially intended to operate in the context of distributed renewable energy systems, such as onshore wind and open-field solar parks, the work flow of GLAES is applicable to any context where a constrained indication of land is desired.
+Although initially intended to operate in the context of distributed renewable energy systems, such as onshore wind and open-field solar parks, the workflow of GLAES is applicable to any context where a constrained indication of land is desired.
 Except in the context of Europe, GLAES only provides a framework for conducting these types of analyses, and so the underlying data sources which are used will need to be provided.
 Fortunately, GLAES is built on top of the Geospatial Data Abstraction Library (<a href="https://www.gdal.org">GDAL</a>) and so is capable of incorporating information from any geospatial dataset which GDAL can interpret; including common GIS formats such as .shp and .tif files.
-In this way, GLAES affords a high degree of flexibility such that very specific considerations, while still maintaining a consistent application method between studies.
+In this way, GLAES affords a high degree of flexibility for very specific considerations, while still maintaining a consistent application method between studies.
 
 [![DOI](https://zenodo.org/badge/114907468.svg)](https://zenodo.org/badge/latestdoi/114907468)
 
@@ -22,14 +22,14 @@ In this way, GLAES affords a high degree of flexibility such that very specific 
 - Applicable in any geographic region and at any resolution
 - Can flexibly incorporate most geospatial datasets: including the common .shp and .tif formats
 - Simple visualization and storage of results as common image or raster dataset
-- Simple integration of results into other analysis (via numpy array)
+- Simple integration of results into other analyses (via numpy array)
 
 ## European Priors
 
 A number of precomputed (Prior) datasets which constitute the most commonly considered criteria used for LE analyses have been constructed for the European context.
 These datasets are formatted to be used directly with the GLAES framework and, in doing so, drastically reduce the time requirements, data management, and overall complexity of conducting these analyses.
 The Priors also have the added benefit of providing a common data source to all LE researchers, which further promotes consistency between independent LE evaluations.
-Most important, usage of these datasets is just as easy as applying exclusions from other geospatial datasources.
+Most importantly, usage of these datasets is just as easy as applying exclusions from other geospatial datasources.
 Although the Prior datasets are not included when cloning this repository, they can be downloaded from [Mendeley Data](https://data.mendeley.com/datasets/trvfb3nwt2) and installed by unzipping (or placing if downloaded one-by-one) the files in the repo directory `glaes/data/priors`.
 
 ---
@@ -42,7 +42,7 @@ Objective:
 
 - Determine land eligibility for photovoltaic (PV) modules in the <a href="https://en.wikipedia.org/wiki/Aachen_(district)">Aachen administration region</a> considering that...
   1. PV modules should not cover agricultural areas (because people need to eat)
-  2. PV modules should not be within 200 meters of a major road way (because they may get dirty)
+  2. PV modules should not be within 200 meters of a major roadway (because they may get dirty)
   3. PV modules should not be within 1000 meters of a settlement area (because they are too shiny)
 
 ```python
@@ -66,7 +66,7 @@ Objective:
 
 ### Recommended installation
 
-The recommended way to install GLAES is to use the conda-package manager. This will ensure that all dependancies are installed correctly and that the package is compatible with your system.
+The recommended way to install GLAES is to use the conda package manager. This will ensure that all dependencies are installed correctly and that the package is compatible with your system.
 
 Using the conda package manager of your choice (we recommend [miniforge](https://github.com/conda-forge/miniforge)), you can install GLAES with the following command:
 
@@ -83,40 +83,39 @@ dependencies:
   - conda-forge::glaes
 ```
 
-However, we **highly recommend** that you install the package into a new, empty environment, as the dependancies of GLAES may conflict with other packages you have installed. We currently working on a new release which will be compatible with later versions of GDAL (>3.0).
+However, we **highly recommend** that you install the package into a new, empty environment, as the dependencies of GLAES may conflict with other packages you have installed. We are currently working on a new release which will be compatible with later versions of GDAL (>3.0).
 
 ### Development Installation
 
 
-GLAES is closely linked to GeoKit. If you intend to develop glaes its also recommended to install GeoKit in development mode into the same environment.
+GLAES is closely linked to GeoKit. If you intend to develop GLAES, it is also recommended to install GeoKit in development mode into the same environment.
 
-
-1. First clone a local copy of both repositories to your computer
+1. First clone a local copy of both repositories to your computer:
 
 ```
 git clone https://github.com/FZJ-IEK3-VSA/glaes.git
 git clone https://github.com/FZJ-IEK3-VSA/geokit.git
 ```
 
-2. Copy all dependencies of both requirements-dev files into a new requirements-combined.yml.
+2. Copy all dependencies of both `requirements-dev.yml` files into a new `requirements-combined.yml`.
 
-4. Create the new environment with all conda forge dependencies:
+3. Create the new environment with all conda-forge dependencies:
 
 ```
 conda env create --file requirements-combined.yml -n glaes_dev_env
 ```
 
-5. Actiavte the environment
+4. Activate the environment:
 
 ```
 conda activate glaes_dev_env
 ```
 
-6.  Install the local libraries
+5. Install the local libraries:
 
 ```
-pip install GLAES -e  ./glaes -no-deps
-pip install geokit -e ./geokit --no-deps
+pip install -e ./geokit --no-deps
+pip install -e ./glaes --no-deps
 ```
 
 ---
@@ -145,7 +144,7 @@ Examples of Land Eligibility evaluation and applications:
   
 ## Citation
 
-If you decide to use GLAES anywhere in a published work, please kindly cite us using the following
+If you decide to use GLAES anywhere in a published work, please kindly cite us using the following.
 
 ```bibtex
 @article{Ryberg2018,
