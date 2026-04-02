@@ -441,7 +441,7 @@ class ExclusionCalculator(object):
             no_data = 255
             mat[~s.region.mask] = no_data
             availability_raster = s.region.createRaster(data=mat, noData=no_data)
-            axh1 = gk.drawRaster(availability_raster, ax=ax, srs=srs, cutlineFillValue=no_data, **kwargs)
+            axh1 = gk.drawRaster(availability_raster, ax=ax, srs=srs, cutline=no_data, **kwargs)
 
         # # Draw the mask to blank out the out of region areas
         # w2a = LinearSegmentedColormap.from_list('white_to_alpha',[(1,1,1,1),(1,1,1,0)])
