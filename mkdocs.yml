@@ -58,8 +58,12 @@ nav:
     - Further Reading: further-reading.md
     - Legal Notice: legal-notice.md
 
+hooks:
+  - docs/copy_examples.py
+
 exclude_docs: |
   gen_ref_pages.py
+  copy_examples.py
 
 plugins:
   - search

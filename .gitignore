@@ -23,3 +23,6 @@ testing/results/eligibility_plots
 
 # mkdocs build output
 site/
+
+# notebooks copied from Examples/ during docs build
+docs/notebooks/
