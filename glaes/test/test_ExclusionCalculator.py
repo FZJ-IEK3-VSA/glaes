@@ -6,7 +6,6 @@ from os.path import dirname, isfile, join
 from warnings import warn
 
 import geokit as gk
-import geokit.core.vector
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -457,7 +456,7 @@ def test_ExclusionCalculator_distributeItems():
 
     assert geoms.shape[0] == 252
     assert (
-        geokit.core.vector.extractFeatures(
+        gk.vector.extractFeatures(
             join(RESULTDIR, "distributeItems1b.shp"),
             geom=ec.region.geometry.Buffer(-500),
         ).shape[0]
