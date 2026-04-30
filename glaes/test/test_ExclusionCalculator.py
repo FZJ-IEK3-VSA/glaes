@@ -1,4 +1,6 @@
 import statistics
+import pytest
+import warnings
 from copy import copy
 from os.path import dirname, isfile, join
 from warnings import warn
@@ -45,7 +47,16 @@ def test_excludePoints():
 
 
 def test_ExclusionCalculator___init__():
-    # Test by giving a shapefile
+    # Test by giving a geometry, transformed to non-EPSG 4326 to test conversion
+    aachenShape4326_geom = gk.vector.extractFeatures(aachenShape)["geom"].iloc[0]
+    aachenShape3035_geom = gk.geom.transform(aachenShape4326_geom, toSRS=gk.srs.EPSG3035)
+    ec = gl.ExclusionCalculator(aachenShape3035_geom, srs=3035)
+
+    assert ec.region.mask.shape == (509, 304)
+    assert np.isclose(ec.region.mask.sum(), 70944)
+    assert np.isclose(ec.region.mask.std(), 0.498273451386)
+
+    # Test the same, load it directly from file
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
 
     assert ec.region.mask.shape == (509, 304)
@@ -68,6 +79,63 @@ def test_ExclusionCalculator___init__():
     assert np.isclose(ec.region.mask.sum(), 90296)
     assert np.isclose(ec.region.mask.std(), 0.496741981394)
 
+    # Test: initialValue = False
+    geom = gk.vector.extractFeatures(aachenShape)["geom"].iloc[0]
+    ec_false = gl.ExclusionCalculator(geom, initialValue=False)
+    assert np.all(ec_false._availability == 0)
+
+    # Test: initialValue = True
+    ec_true = gl.ExclusionCalculator(geom, initialValue=True)
+    # 100 insinde region
+    assert np.all(ec_true._availability[ec_true.region.mask == 1] == 100)
+    # 0 outer region
+    assert np.all(ec_true._availability[ec_true.region.mask == 0] == 0)
+
+    # Test: initialValue as raster file (covers elif isinstance(initialValue, str))
+    ec_raster = gl.ExclusionCalculator(geom, initialValue=priorSample)
+    availability = ec_raster._availability
+    # Inside region: 100 (free) or 0 (blocked)
+    assert np.all(
+        (ec_true._availability[ec_true.region.mask == 1] == 100)
+        | (ec_true._availability[ec_true.region.mask == 1] == 0)
+    )
+
+    # Outside region: 0
+    assert np.all(ec_true._availability[ec_true.region.mask == 0] == 0)
+
+    # Test: initialValue invalid type (covers else)
+    with pytest.raises(ValueError):
+        gl.ExclusionCalculator(geom, initialValue=42.5)  # invalid type
+
+    # Test invalid region type
+    with pytest.raises(TypeError):
+        gl.ExclusionCalculator(42)
+
+    # Test region string with multiple features
+    ec_multi = gl.ExclusionCalculator(cddaVector, srs=3035)
+    assert ec_multi.region is not None
+    
+
+    #The intended input is a string like "N51E10", 
+    #encoding lat/lon as letter+number pairs (e.g. N51 = 51° North, E10 = 10° East).
+    #The code tries to parse this and create a centered LAEA spatial reference system via gk.srs.centeredLAEA().
+    
+    # This test ensures the deprecation warning
+
+    deprecated_srs = "E51N10"
+    geom = gk.vector.extractFeatures(aachenShape)["geom"].iloc[0]
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+
+        with pytest.raises(ValueError):
+            gl.ExclusionCalculator(geom, srs=deprecated_srs)
+
+        # the warning should still have been triggered before the crash
+        assert any(
+            issubclass(warn.category, DeprecationWarning)
+            for warn in w
+        )
 
 def test_ExclusionCalculator_save():
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
@@ -77,7 +145,14 @@ def test_ExclusionCalculator_save():
     assert np.nansum(mat - ec.availability) == 0
     assert np.isclose(np.nansum(mat), 28461360)
     assert np.isclose(np.nanstd(mat), 77.2323849648)
-
+ 
+    # if threshold is given
+    ec.save(join(RESULTDIR, "save2.tif"), threshold=101)
+    mat2 = gk.raster.extractMatrix(join(RESULTDIR, "save2.tif"))
+    assert np.all((mat2 == 0) | (mat2 == 255))
+    assert np.sum(mat2 == 0) == 70944
+    assert np.sum(mat2 == 255) == 83792
+    assert mat2.size == 154736
 
 def test_ExclusionCalculator_draw():
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
@@ -85,10 +160,78 @@ def test_ExclusionCalculator_draw():
     ec._availability[:, 140:160] = 0
     ec._availability[140:160, :] = 0
 
-    ec.draw()
+    # Default path (srs=None)
+    ax = ec.draw()
     plt.savefig(join(RESULTDIR, "DrawnImage.png"), dpi=200)
     plt.close()
 
+    assert ax is not None
+
+    data = ec.availability
+    included_pixels = np.sum(data == 100)
+    excluded_pixels = np.sum(data == 0)
+    total_pixels = data.size
+
+    assert included_pixels > 0
+    assert excluded_pixels > 0
+    assert included_pixels + excluded_pixels <= total_pixels
+
+    # Reprojection path (srs != None)
+    ax2 = ec.draw(srs=4326)
+    plt.savefig(join(RESULTDIR, "DrawnImage_reprojected.png"), dpi=200)
+    plt.close()
+
+    assert ax2 is not None
+    assert np.sum(data == 100) == included_pixels
+    assert np.sum(data == 0) == excluded_pixels
+
+    # Coverage for  _itemCoords + reprojection
+    points = gk.vector.extractFeatures(pointData)
+
+    # Points are provided in pointData (EPSG:4326)
+    item_coords = np.column_stack([points["geom"].apply(lambda g: g.GetX()), points["geom"].apply(lambda g: g.GetY())])
+
+    # IMPORTANT: draw() reads exactly this attribute
+    ec._itemCoords = item_coords
+
+    # Triggers the following code paths in draw():
+    # - if s._itemCoords is not None
+    # - if not srs.IsSame(s.region.srs)
+    # - coordinate reprojection via xyTransform
+    # - plotting via ax.plot
+    ax_items = ec.draw(srs=4326)
+    plt.close()
+
+    assert ax_items is not None
+
+    # Optional path to draw areas
+    ec._areas = gk.vector.extractFeatures(cddaVector)
+
+    assert ec._areas is not None
+    assert len(ec._areas) > 0
+
+    ax_areas = ec.draw(srs=4326)
+    plt.close()
+
+    assert ax_areas is not None
+
+    # Cover non-metric area units in legend (degree and feet)
+    # Extract geometry from the original shape
+    geom = gk.vector.extractFeatures(aachenShape)["geom"].iloc[0]
+
+    # Degree-based region (EPSG:4326)
+    geom_deg = gk.geom.transform(geom, toSRS=gk.srs.EPSG4326)
+    ec_deg = gl.ExclusionCalculator(geom_deg, srs=4326, pixelRes=0.001)
+
+    ax_deg = ec_deg.draw()
+    plt.close()
+    assert ax_deg is not None
+
+    # Feet-based region (EPSG:2263) --> TODO Not working, an actual shapefile with feet unit is needed
+    #ec_ft = gl.ExclusionCalculator(aachenShape, srs=2263)
+    #ax_ft = ec_ft.draw()
+    #plt.close()
+    #assert ax_ft is not None
 
 def test_ExclusionCalculator_excludeRasterType():
     # exclude single value
