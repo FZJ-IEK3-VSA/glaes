@@ -479,27 +479,27 @@ evaluate_area_by_proximity(
 
 
 #with tif
-evaluate_area_by_proximity(          
-    Area=tif_file_clip,
-    evaluation_name= "agriculture_proximity",
-    target_tif=tif_file_elevation,
-    raster_target_value=[3], 
-    output_dir = str(base_path/"output/proximity/with_tif/")
-)
+# evaluate_area_by_proximity(          
+#     Area=tif_file_clip,
+#     evaluation_name= "agriculture_proximity",
+#     target_tif=tif_file_elevation,
+#     raster_target_value=[3], 
+#     output_dir = str(base_path/"output/proximity/with_tif/")
+# )
 
-#wtih shape
-evaluate_area_by_threshold(           
-    Area=shape_file_clip,
-    evaluation_name="dni_threshold",
-    ftrID= "SITENAME='Fagnes du Nord-Est'",
-    tif_file=tif_file_elevation,
-    output_dir = str(base_path/"output/threshold/with_shape/")
-)
+# #wtih shape
+# evaluate_area_by_threshold(           
+#     Area=shape_file_clip,
+#     evaluation_name="dni_threshold",
+#     ftrID= "SITENAME='Fagnes du Nord-Est'",
+#     tif_file=tif_file_elevation,
+#     output_dir = str(base_path/"output/threshold/with_shape/")
+# )
 
-# with tif
-evaluate_area_by_threshold(           
-    Area=tif_file_clip,
-    evaluation_name="dni_threshold",
-    tif_file=tif_file_elevation,
-    output_dir = str(base_path/"output/threshold/with_tif/")
-)
+# # with tif
+# evaluate_area_by_threshold(           
+#     Area=tif_file_clip,
+#     evaluation_name="dni_threshold",
+#     tif_file=tif_file_elevation,
+#     output_dir = str(base_path/"output/threshold/with_tif/")
+# )
