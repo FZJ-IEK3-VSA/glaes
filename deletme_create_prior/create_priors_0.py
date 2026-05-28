@@ -129,14 +129,7 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
         #where = attribute feature
         #padExtent = buffer
 
-        # region mask Info
-        srs_info = reg.srs.GetAttrValue("AUTHORITY", 1)
-        print("Region masks srs:")
-        print(f"region mask srs: EPSG:{srs_info}")
-        print("Region masks extent:")
-        print("reg extent:", reg.extent)
-        print("Region masks shape:")
-        print("reg shape:", reg.mask.shape)
+
  
 
     elif suffix in (".tif", ".tiff"):
@@ -170,9 +163,14 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
     else:
         raise TypeError("Area path must be a string ending with .tiff/.tif/.shp.")
 
-
-
-
+    # region mask Info
+    srs_info = reg.srs.GetAttrValue("AUTHORITY", 1)
+    print("Region masks srs:")
+    print(f"region mask srs: EPSG:{srs_info}")
+    print("Region masks extent:")
+    print("reg extent:", reg.extent)
+    print("Region masks shape:")
+    print("reg shape:", reg.mask.shape)
 
 
 
@@ -269,6 +267,18 @@ def evaluate_area_by_threshold(Area, #area to analyze
     output_dir = os.path.join(output_dir, evaluation_name)  #output path is beeing set
     os.makedirs(output_dir, exist_ok=True)
 
+    # get target raster information
+    info = gk.raster.rasterInfo(target_tif)
+
+    srs_raster = info.srs
+    pixel_res = abs(info.pixelWidth)
+
+    print("Target Raster SRS:")
+    print(srs_raster.GetAttrValue("AUTHORITY", 1))
+    print("Target Raster Pixel Size:")
+    print(info.pixelWidth)
+    print(info.pixelHeight)
+
 
     # 1. set the area
     suffix = os.path.splitext(Area)[1].lower()
@@ -297,10 +307,47 @@ def evaluate_area_by_threshold(Area, #area to analyze
     else:
         raise TypeError("Area must be a string ending with .tiff/.tif/.shp.")
 
+    # region mask Info
+    srs_info = reg.srs.GetAttrValue("AUTHORITY", 1)
+    print("Region masks srs:")
+    print(f"region mask srs: EPSG:{srs_info}")
+    print("Region masks extent:")
+    print("reg extent:", reg.extent)
+    print("Region masks shape:")
+    print("reg shape:", reg.mask.shape)
+
+
+
     # 2. Calculate the threshold
     result = edgesByThreshold(reg, tif_file, thresholds, output_dir)
 
-    # 3. make result
+    # 3. safety check -> is there an overlap between areas
+    # Raster-Infos
+    info = gk.raster.rasterInfo(target_tif)
+
+    print("=== TARGET RASTER ===")
+    print("EPSG:", info.srs.GetAttrValue("AUTHORITY", 1))
+    print("bounds:", info.bounds)
+    print("pixel size:", info.pixelWidth, info.pixelHeight)
+
+    print("\n=== REGION MASK ===")
+    print("EPSG:", reg.srs.GetAttrValue("AUTHORITY", 1))
+    print("extent:", reg.extent)
+    print("shape:", reg.mask.shape)    
+
+    r = info.bounds
+    e = reg.extent
+
+    overlap = not (
+        e.xMax < r[0] or
+        e.xMin > r[2] or
+        e.yMax < r[1] or
+        e.yMin > r[3]
+    )
+
+    print("Overlap:", overlap)
+
+    # 4. make result
     writeEdgeFile(
         result,
         reg,
@@ -540,9 +587,9 @@ EVALUATIONS = {
 
 ## TESTING
 
-Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenShapefile.shp"
-Area_path_tif = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif"
-target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif"
+# Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenShapefile.shp"
+# Area_path_tif = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif"
+# target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif"
 
 #with shape
 # evaluate_area_by_proximity(          
@@ -567,19 +614,19 @@ target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/del
 
 
 # #wtih shape
-# evaluate_area_by_threshold(           
-#     Area=Area_path,
-#     evaluation_name="dni_threshold",
-#     where=None,
-#     tif_file=target_tif,
-#     output_dir = str(base_path/"output/threshold/with_shape/")
-# )
-
-# # with tif
 evaluate_area_by_threshold(           
-    Area=Area_path_tif,
+    Area=Area_path,
     evaluation_name="dni_threshold",
     where=None,
     tif_file=target_tif,
-    output_dir = str(base_path/"output/threshold/with_tif/")
+    output_dir = str(base_path/"output/threshold/with_shape/")
 )
+
+# # with tif
+# evaluate_area_by_threshold(           
+#     Area=Area_path_tif,
+#     evaluation_name="dni_threshold",
+#     where=None,
+#     tif_file=target_tif,
+#     output_dir = str(base_path/"output/threshold/with_tif/")
+# )
