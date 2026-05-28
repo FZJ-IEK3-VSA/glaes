@@ -1194,7 +1194,7 @@ class ExclusionCalculator(object):
                 # filter geom list for areas greater than minSize
                 geoms = list(filter(lambda x: x.Area() >= minSize, geoms))
                 # create vector, indicate features and overwrite indications
-                vec = gk.core.util.quickVector(geoms)
+                vec = gk.util.quickVector(geoms)
                 if invert:
                     indications = (
                         s.region.indicateFeatures(vec, applyMask=False, multiProcess=multiProcessAdjusted).astype(
@@ -1930,7 +1930,7 @@ class ExclusionCalculator(object):
         if not geoms:
             s._availability *= 0
         else:
-            vec = gk.core.util.quickVector(geoms)
+            vec = gk.util.quickVector(geoms)
             multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
 
             # Replace current availability matrix
