@@ -1,3 +1,12 @@
+import os
+
+CONDA_ENV = "/fast/home/l-madeisky/.conda/envs/preprocessing_data"
+
+os.environ["CONDA_PREFIX"] = CONDA_ENV
+os.environ["PROJ_LIB"] = f"{CONDA_ENV}/share/proj"
+os.environ["GDAL_DATA"] = f"{CONDA_ENV}/share/gdal"
+
+
 import geokit as gk
 import numpy as np
 import os
@@ -11,94 +20,52 @@ import matplotlib.pyplot as plt
 
 
 
-## CREATE PRIORS  ##
+                            ## CREATE PRIORS  ##
+
 # there are two types of priors using different methods. 
-# First: evaluate by Proximity
+#                           evaluate by Proximity                               #
+#################################################################################
     # indicate pixels by their distance to the target area (pixels to close)
     # gets a geom object
     # proximity: list of buffer distances
     # for each distance a buffer around the target is created and marked. 
     # e.g. mark the distance from a natural habitat with 100m, 200m, 300m, etc.
-    
-# Second: evaluate by threshold
+
+
+#                     Second: evaluate by threshold                             #
+#################################################################################    
+
     # indicate values of a file  above a certain threshold
     # gets a tif file file path
     # thresholds: cut offs.
     # for each threshold values <= that threshold are marked
     # elevation <= 10, <= 12 etc.
-    
-
-    
-####################    
-####    TODO    ####
-####################
-# output dir aus funktionen nehmen, wenn kein debugging mehr stattfindet
-# buffer und value korrigieren
-
-# create an working priors example
-# priors.py - what happens there ? _> moce the create priors funtons to priors.py
-# # fit the function in the exclusion calculator which uses the priors
-# tests
-
-
-
 
 ########################################################################################
 
-#   1. define input files
-base_path = Path(__file__).resolve().parents[0]
-shape_file_in = str(base_path/"/input/aachenShapefile.shp") # has to be a string bacause pathlib paths produce problems for geookit
-shape_file_clip = str(base_path/"input/Natura2000_aachenClipped.shp") # has to be a string bacause pathlib paths produce problems for geookit
-tif_file_clip = str(base_path/"input/Natura2000_raster_Fagnes.tif")
-tif_file_elevation = str(base_path/"input/roads_prior_clip.tif")
 
+# due to issues with numpy version
+if not hasattr(np, "bool"):
+    np.bool = bool
 
-#2. evaluation values
-# Indicates distances too close to exclusion criterion:
-# These distances are used for 
-#   a. buffering around the selected feature of interest/ values of interest.
-#   b. thresholds for cell / area identification
-# values should match the input extent (if in 100 m resolution distances should not be less (e.g. 10, 20,30,etc.))
-# values refer to the unit used in the srs (meter or degree)
-
-EVALUATIONS = {
-    # proximity
-    "agriculture_proximity": {
-        "unit": "m",
-        "description": "Indicates distances too close to agriculture areas (m)",
-        "source": "",
-        "thresholds": [
-            0, 100, 200, 300, 400, 500
-        ], # example values
-    },
-    # threshold
-    "dni_threshold": {
-        "unit": "kWh/m2/day",
-        "description": "Indicates pixels in which the average daily direct-normal irradiance (DNI) is less-than or equal-to X kWh/m2/day",
-        "source": "",
-        "thresholds": [
-            0, 5, 10, 20, 50, 100, 200, 300, 400,
-            ],  # example values
-    },
-}
 
 
 
 
 #3. evaluation function
-def evaluate_area_by_proximity(Area, target_tif, ftrID=None, output_dir=None, raster_target_value=None, evaluation_name= None):
+def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=None, raster_target_value=None, evaluation_name= None):
     """
     This function extracts all pixels in “target_tif” that match “raster_target_value,”
     generates buffer zones according to the values defined for “evaluation_name,” within "Area".
     
 
     Args:
-        Area (shp path | tif path ): 
+        Area_path (shp path | tif path ): 
             The area boundary used for clipping the analysis. Can be a path to raster or a shapefile
 
-        ftrID ( str | optional an SQL-style filtering string):
-            Feature ID used to select a specific polygon from "Area" if it is a vector dataset
-            Ignored if "Area" is a raster
+        where ( str | optional an SQL-style filtering string):
+            Feature ID used to select a specific polygon from "Area_path" if it is a vector dataset
+            Ignored if "Area_path" is a raster
 
         target_tif (tif | str):
             Raster file containing values to buffer around. Usually represents
@@ -122,41 +89,93 @@ def evaluate_area_by_proximity(Area, target_tif, ftrID=None, output_dir=None, ra
     source = eval_def["source"]
     thresholds = eval_def["thresholds"]
 
+
+
     # sets output dir
     output_dir = os.path.join(output_dir, evaluation_name)  #output path is beeing set
     os.makedirs(output_dir, exist_ok=True)
 
+    # get target raster information
+    info = gk.raster.rasterInfo(target_tif)
+
+    srs_raster = info.srs
+    pixel_res = abs(info.pixelWidth)
+
+    print("Target Raster SRS:")
+    print(srs_raster.GetAttrValue("AUTHORITY", 1))
+    print("Target Raster Pixel Size:")
+    print(info.pixelWidth)
+    print(info.pixelHeight)
+
+
+
+
     # 1. load the target area
-    suffix = os.path.splitext(Area)[1].lower()
+    suffix = os.path.splitext(Area_path)[1].lower()
 
     if suffix == ".shp":
         # Make Region Mask
         print("loading area shape file")
-        reg = gk.RegionMask.load(region=Area, where=ftrID, padExtent=max(thresholds)) 
+        reg = gk.RegionMask.fromVector(Area_path, 
+                                 srs=srs_raster, #srs from target raster
+                                 pixelRes=pixel_res,
+                                 where=None,
+                                 Limitone=False, 
+                                 padExtent=max(thresholds)
+                                 ) 
+
+        print(f"Target Raster SRS {srs_raster} and pixe size {pixel_res} is set for area shapes region mask")
         #Area = shapefile path
         #where = attribute feature
         #padExtent = buffer
-        
+
+        # region mask Info
+        srs_info = reg.srs.GetAttrValue("AUTHORITY", 1)
+        print("Region masks srs:")
+        print(f"region mask srs: EPSG:{srs_info}")
+        print("Region masks extent:")
+        print("reg extent:", reg.extent)
+        print("Region masks shape:")
+        print("reg shape:", reg.mask.shape)
+ 
+
     elif suffix in (".tif", ".tiff"):
         print("loading area tif file")
-        # load raster
-        raster_1 = gk.raster.loadRaster(Area)
+
+        raster_1 = gk.raster.loadRaster(Area_path)
+        # Raster-Informationen laden
+        info = gk.raster.rasterInfo(Area_path)
+
+        # EPSG-Code
+        #print(info.srs.GetAttrValue("AUTHORITY", 1))
+        # Pixelgröße
+        #print(info.pixelWidth)
+        #print(info.pixelHeight)
+
         raster_matrix = gk.raster.extractMatrix(raster_1)
         # boolean raster
         ras_boolean = gk.raster.createRasterLike(source=raster_1, data=raster_matrix == 1, noData=0)
-        
+
         # create vector from raster and then egionmask from vector
         vector_1 = gk.raster.polygonizeRaster(ras_boolean)
         vector_2 = gk.vector.createVector(vector_1)
-        reg = gk.RegionMask.fromVector(vector_2, limitOne=False, padExtent=max(thresholds))
+        reg = gk.RegionMask.fromVector(vector_2, 
+                                    srs=srs_raster, 
+                                    pixelRes=pixel_res,
+                                    padExtent=max(thresholds), 
+                                    Limitone=False,
+                                    )
+        print(f"Target Raster SRS {srs_raster} and pixe size {pixel_res} is set for area tif region mask")
 
     else:
-        raise TypeError("Area must be a string ending with .tiff/.tif/.shp.")
-  
-    # Debugging 1
-    #filename = os.path.join(output_dir, f"region_of_interest.tif") 
-    #example_data = reg.mask.astype(int)  
-    #gk.raster.createRaster(data=example_data, output=filename, bounds=reg.extent.xyXY, srs=reg.srs)
+        raise TypeError("Area path must be a string ending with .tiff/.tif/.shp.")
+
+
+
+
+
+
+
 
     # 2. prepare the target for proximity analysis  (target tif file)
     print("setting region/feature of interest")
@@ -167,17 +186,43 @@ def evaluate_area_by_proximity(Area, target_tif, ftrID=None, output_dir=None, ra
     # to polygon                                             
     target_area = gk.geom.polygonizeMatrix(matrix, bounds=reg.extent.xyXY, srs=reg.srs) #convert the array to a geom with mask extent
     
-    #Debugging 2
-    #filename = os.path.join(output_dir, f"feature_of_interest_proximity.tif")
-    #gk.raster.createRaster(data=matrix, output=filename, bounds=reg.extent.xyXY, srs=reg.srs)
 
-    # 3. create proximity matrix
+    
+    # 3. safety check -> is there an overlap between areas
+    # Raster-Infos
+    info = gk.raster.rasterInfo(target_tif)
+
+    print("=== TARGET RASTER ===")
+    print("EPSG:", info.srs.GetAttrValue("AUTHORITY", 1))
+    print("bounds:", info.bounds)
+    print("pixel size:", info.pixelWidth, info.pixelHeight)
+
+    print("\n=== REGION MASK ===")
+    print("EPSG:", reg.srs.GetAttrValue("AUTHORITY", 1))
+    print("extent:", reg.extent)
+    print("shape:", reg.mask.shape)    
+
+    r = info.bounds
+    e = reg.extent
+
+    overlap = not (
+        e.xMax < r[0] or
+        e.xMin > r[2] or
+        e.yMax < r[1] or
+        e.yMin > r[3]
+    )
+
+    print("Overlap:", overlap)
+
+
+
+    # 4. create proximity matrix
     # region mask, gk_geom, distances from evaluation_values, utput dir 
     result = edgesByProximity(reg, target_area, thresholds, output_dir)  
 
-    # 4. make result
+    # 5. make result
     writeEdgeFile(
-        result, reg, ftrID, output_dir, evaluation_name, unit, description, source, thresholds
+        result, reg, output_dir, evaluation_name, unit, description, source, thresholds
     )
     
 def evaluate_area_by_threshold(Area, #area to analyze
@@ -259,7 +304,6 @@ def evaluate_area_by_threshold(Area, #area to analyze
     writeEdgeFile(
         result,
         reg,
-        ftrID,
         output_dir,
         evaluation_name,
         unit,
@@ -336,18 +380,6 @@ def edgesByProximity(reg, target_area, thresholds, output_dir):
             
             # Map onto the RegionMask al cells with more than 0.5 fit
             buffered_region = reg.indicateFeatures(tmp_buffered_vector) > 0.5  
-
-            #Debugging 3
-            # axh = reg.drawImage(
-            #         buffered_region,
-            #         figsize=(5, 6),
-            #         cmap="Reds",
-            #     )
-            # output_dir_plots = os.path.join(output_dir, "intermediates")
-            # os.makedirs(output_dir_plots, exist_ok=True)
-            # filename = os.path.join(output_dir_plots, f"buffered_region_of_interest_{dist}_SHAPE.png")
-            # plt.savefig(filename, dpi=300, bbox_inches="tight")
-            # plt.show()
             
             # apply onto matrix
             #select pixels which are valid (254) and part of the buffered region
@@ -412,7 +444,7 @@ def edgesByThreshold(reg, source, thresholds, output_dir):
     return threshold_matrix # Return the final labeled matrix
 
 def writeEdgeFile(
-    result, reg, ftrID, output_dir, evaluation_name, unit, description, source, values,
+    result, reg, output_dir, evaluation_name, unit, description, source, values,
 ):
     """
     Writes a  result matrix to a GeoTIFF file with metadata and value labeling
@@ -420,7 +452,6 @@ def writeEdgeFile(
     Args:
         result (np.ndarray): A 2D  matrix (e.g., from thresholding or proximity analysis)
         reg (RegionMask): A RegionMask object used to define spatial extent and raster creation
-        ftrID (int or str): current feature, used in the output file name
         output_dir (str): path where output raster will be saved
         name (str): Base name for the output 
         unit (str): Unit of the  values (e.g., meters, degrees)
@@ -466,26 +497,73 @@ def writeEdgeFile(
 
 ########################################################################################
 
+
+#   1. define input files
+base_path = Path(__file__).resolve().parents[0]
+
+Area_path = str(base_path/"/input/aachenShapefile.shp")
+Area_path_tif = str(base_path/"/input/aachen_srs_3035.tif")
+target_tif =str(base_path/"/input/roads_prior_clip.tif")
+
+
+
+#2. evaluation values
+# Indicates distances too close to exclusion criterion:
+# These distances are used for 
+#   a. buffering around the selected feature of interest/ values of interest.
+#   b. thresholds for cell / area identification
+# values should match the input extent (if in 100 m resolution distances should not be less (e.g. 10, 20,30,etc.))
+# values refer to the unit used in the srs (meter or degree)
+
+EVALUATIONS = {
+    # proximity
+    "agriculture_proximity": {
+        "unit": "m",
+        "description": "Indicates distances too close to agriculture areas (m)",
+        "source": "",
+        "thresholds": [
+            0, 100, 
+            #200, 300, 400, 500
+        ], # example values
+    },
+    # threshold
+    "dni_threshold": {
+        "unit": "kWh/m2/day",
+        "description": "Indicates pixels in which the average daily direct-normal irradiance (DNI) is less-than or equal-to X kWh/m2/day",
+        "source": "",
+        "thresholds": [
+            0, 5, 10, 20, 50, 100, 200, 300, 400,
+            ],  # example values
+    },
+}
+
 ## TESTING
+
+Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenShapefile.shp"
+Area_path_tif = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif"
+target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif"
+
 #with shape
-evaluate_area_by_proximity(          
-    Area=shape_file_clip,
-    evaluation_name= "agriculture_proximity",
-    ftrID= "SITENAME='Fagnes du Nord-Est'",
-    target_tif=tif_file_elevation,
-    raster_target_value=[3], 
-    output_dir = str(base_path/"output/proximity/with_shape/")
-)
+# evaluate_area_by_proximity(          
+#     Area_path=Area_path,
+#     evaluation_name= "agriculture_proximity",
+#     where=None,
+#     target_tif=target_tif,
+#     raster_target_value=[3], 
+#     output_dir = str(base_path/"output/proximity/with_shape/")
+# )
 
 
 #with tif
-# evaluate_area_by_proximity(          
-#     Area=tif_file_clip,
-#     evaluation_name= "agriculture_proximity",
-#     target_tif=tif_file_elevation,
-#     raster_target_value=[3], 
-#     output_dir = str(base_path/"output/proximity/with_tif/")
-# )
+evaluate_area_by_proximity(          
+    Area_path=Area_path_tif,
+    evaluation_name= "agriculture_proximity",
+    where=None,
+    target_tif=target_tif,
+    raster_target_value=[3], 
+    output_dir = str(base_path/"output/proximity/with_tif/")
+)
+
 
 # #wtih shape
 # evaluate_area_by_threshold(           
