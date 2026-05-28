@@ -4,12 +4,13 @@ from collections import OrderedDict
 from difflib import SequenceMatcher as SM
 from glob import glob
 from os.path import basename, dirname, join, splitext
+from sys import platform
 from warnings import warn
 
 import geokit as gk
 import numpy as np
 
-from glaes.core.util import GlaesError
+from glaes.core.util import GlaesError, checkMultiProcessingAvailability
 
 # Sort out the data paths
 defaultPriorDir = join(dirname(dirname(__file__)), "data", "priors") #TODO #Issue 70 #refers to empty directory
@@ -375,13 +376,17 @@ class PriorSet(object):
             except PriorSource._LoadFail:
                 warn("Could not parse file: %s" % (basename(f)), UserWarning)
 
-    def regionIsOkay(s, region):
+    def regionIsOkay(s, region, multiProcess=False):
         """Checks if a given region is valid within the Prior Datasets
 
         * Not really intended for external use and will probably fail
         """
         # Check if region is okay
-        goodPixels = region.indicateValues(join(s.path, "goodArea.tif"), value=1).sum()
+
+        multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess)
+        goodPixels = region.indicateValues(
+            join(s.path, "goodArea.tif"), value=1, multiProcess=multiProcessAdjusted
+        ).sum()
 
         goodRatio = goodPixels / region.mask.sum()
         if goodRatio > 0.9999:

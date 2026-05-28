@@ -5,7 +5,7 @@ env/*
 */.ipynb_checkpoints/*
 __pycache__/
 analysis/regions/*
-
+.env
 # file types to ignore
 #*.ipynb
 *.aux.xml
@@ -20,3 +20,9 @@ testing/results/*.cpg
 testing/results/*.csv
 testing/results/eligibility_plots
 .vscode/settings.json
+
+# mkdocs build output
+site/
+
+# notebooks copied from Examples/ during docs build
+docs/notebooks/
