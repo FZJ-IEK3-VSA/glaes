@@ -227,7 +227,7 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
     
 def evaluate_area_by_threshold(Area, #area to analyze
                               tif_file, #tif file to analyze
-                              ftrID=None, #set the polygon or cell values that define th area
+                              where=None, #set the polygon or cell values that define th area
                               output_dir=None,
                               evaluation_name= None,
                               ):
@@ -238,7 +238,7 @@ def evaluate_area_by_threshold(Area, #area to analyze
         Area (shp path | tif path ): 
             The area boundary used for clipping the analysis. Can be a path to raster or a shapefile
 
-        ftrID ( str | optional an SQL-style filtering string):
+        where ( str | optional an SQL-style filtering string):
             Feature ID used to select a specific polygon from "Area" if it is a vector dataset
             Ignored if "Area" is a raster
 
@@ -276,7 +276,7 @@ def evaluate_area_by_threshold(Area, #area to analyze
     if suffix == ".shp":
         # Make Region Mask
         print("loading area shape file")
-        reg = gk.RegionMask.load(region=Area, where=ftrID, padExtent=500) 
+        reg = gk.RegionMask.load(region=Area, where=where, padExtent=500) 
         #Area = shapefile path
         #where = attribute feature
         #padExtent = buffer
@@ -501,9 +501,10 @@ def writeEdgeFile(
 #   1. define input files
 base_path = Path(__file__).resolve().parents[0]
 
-Area_path = str(base_path/"/input/aachenShapefile.shp")
-Area_path_tif = str(base_path/"/input/aachen_srs_3035.tif")
-target_tif =str(base_path/"/input/roads_prior_clip.tif")
+Area_path = str(base_path/"input/aachenShapefile.shp")
+Area_path_tif = str(base_path/"input/aachen_srs_3035.tif")
+target_tif =str(base_path/"input/roads_prior_clip.tif")
+
 
 
 
@@ -555,29 +556,30 @@ target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/del
 
 
 #with tif
-evaluate_area_by_proximity(          
-    Area_path=Area_path_tif,
-    evaluation_name= "agriculture_proximity",
-    where=None,
-    target_tif=target_tif,
-    raster_target_value=[3], 
-    output_dir = str(base_path/"output/proximity/with_tif/")
-)
+# evaluate_area_by_proximity(          
+#     Area_path=Area_path_tif,
+#     evaluation_name= "agriculture_proximity",
+#     where=None,
+#     target_tif=target_tif,
+#     raster_target_value=[3], 
+#     output_dir = str(base_path/"output/proximity/with_tif/")
+# )
 
 
 # #wtih shape
 # evaluate_area_by_threshold(           
-#     Area=shape_file_clip,
+#     Area=Area_path,
 #     evaluation_name="dni_threshold",
-#     ftrID= "SITENAME='Fagnes du Nord-Est'",
-#     tif_file=tif_file_elevation,
+#     where=None,
+#     tif_file=target_tif,
 #     output_dir = str(base_path/"output/threshold/with_shape/")
 # )
 
 # # with tif
-# evaluate_area_by_threshold(           
-#     Area=tif_file_clip,
-#     evaluation_name="dni_threshold",
-#     tif_file=tif_file_elevation,
-#     output_dir = str(base_path/"output/threshold/with_tif/")
-# )
+evaluate_area_by_threshold(           
+    Area=Area_path_tif,
+    evaluation_name="dni_threshold",
+    where=None,
+    tif_file=target_tif,
+    output_dir = str(base_path/"output/threshold/with_tif/")
+)
