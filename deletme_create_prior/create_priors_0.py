@@ -1,6 +1,6 @@
 import os
 
-CONDA_ENV = "/fast/home/l-madeisky/.conda/envs/preprocessing_data"
+CONDA_ENV = "/fast/home/l-madeisky/.conda/envs/glaes_2026"
 
 os.environ["CONDA_PREFIX"] = CONDA_ENV
 os.environ["PROJ_LIB"] = f"{CONDA_ENV}/share/proj"
@@ -160,6 +160,22 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
 
     else:
         raise TypeError("Area path must be a string ending with .tiff/.tif/.shp.")
+    
+
+    # Test rather metric srs
+    unit_raster = srs_raster.GetLinearUnitsName()
+    # Check rather SRS is in meter, else abort
+    if unit_raster.lower() in ["metre", "meter"]:
+        print(
+            f"Raster SRS is used as the default for evaluation. "
+            f"The raster SRS unit is '{unit_raster}'."
+        )
+    else:
+        raise ValueError(
+            f"Raster SRS has to be in metre. "
+            f"The current unit is '{unit_raster}'. Analysis is aborted."
+        )
+
 
     # region mask Info
     srs_info = reg.srs.GetAttrValue("AUTHORITY", 1)
@@ -169,21 +185,6 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
     print("reg extent:", reg.extent)
     print("Region masks shape:")
     print("reg shape:", reg.mask.shape)
-
-    # unit_raster = srs_raster.GetLinearUnitsName()
-    # # Check rather SRS is in meter, else abort
-    # if unit_raster.lower() in ["metre", "meter"]:
-    #     print(
-    #         f"Raster SRS is used as the default for evaluation. "
-    #         f"The raster SRS unit is '{unit_raster}'."
-    #     )
-    # else:
-    #     raise ValueError(
-    #         f"Raster SRS has to be in metre. "
-    #         f"The current unit is '{unit_raster}'. Analysis is aborted."
-    #     )
-
-
 
     # 2. prepare the target for proximity analysis  (target tif file)
     print("setting region/feature of interest")
@@ -331,15 +332,6 @@ def evaluate_area_by_threshold(Area_path, #area to analyze
     else:
         raise TypeError("Area must be a string ending with .tiff/.tif/.shp.")
 
-    # region mask Info
-    srs_info = reg.srs.GetAttrValue("AUTHORITY", 1)
-    print("Region masks srs:")
-    print(f"region mask srs: EPSG:{srs_info}")
-    print("Region masks extent:")
-    print("reg extent:", reg.extent)
-    print("Region masks shape:")
-    print("reg shape:", reg.mask.shape)
-
     unit_raster = srs_raster.GetLinearUnitsName()
     # Check rather SRS is in meter, else abort
     if unit_raster.lower() in ["metre", "meter"]:
@@ -352,6 +344,16 @@ def evaluate_area_by_threshold(Area_path, #area to analyze
             f"Raster SRS has to be in metre. "
             f"The current unit is '{unit_raster}'. Analysis is aborted."
         )
+
+
+    # region mask Info
+    srs_info = reg.srs.GetAttrValue("AUTHORITY", 1)
+    print("Region masks srs:")
+    print(f"region mask srs: EPSG:{srs_info}")
+    print("Region masks extent:")
+    print("reg extent:", reg.extent)
+    print("Region masks shape:")
+    print("reg shape:", reg.mask.shape)
 
 
     # 2. safety check -> is there an overlap between areas
@@ -631,13 +633,23 @@ EVALUATIONS = {
             0, 5, 10, 20, 50, 100, 200, #300, 400
             ],  # example values
     },
+
+    "road_proximity": {
+        "unit": "m",
+        "description": "Indicates distances too close to motorways areas (m)",
+        "source": "",
+        "thresholds": [
+            0, 100, 200,
+            #200, 300, 400, 500
+        ], # example values
+    },
 }
 
 ## TESTING
 
-Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/CDDA_aachenClipped.shp"
-# Area_path_tif = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif"
-target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif"
+# Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/CDDA_aachenClipped.shp"
+# # Area_path_tif = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif"
+# target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif"
 
 #with shape
 # evaluate_area_by_proximity(          
@@ -651,8 +663,8 @@ target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/del
 
 
 evaluate_area_by_proximity(          
-    Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/CDDA_aachenClipped.shp",
-    evaluation_name= "agriculture_proximity",
+    Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/aachenShapefile.shp",
+    evaluation_name= "road_proximity",
     #where="SITE_CODE=555558604",
     target_tif="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
     raster_target_value=[10, 7, 21], 
