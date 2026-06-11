@@ -96,7 +96,6 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
 
     # get target raster information
     info = gk.raster.rasterInfo(target_tif)
-
     srs_raster = info.srs
     pixel_res = abs(info.pixelWidth)
 
@@ -120,7 +119,7 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
                                  pixelRes=pixel_res,
                                  where=where,
                                  limitOne=False, 
-                                # padExtent=max(thresholds)
+                                 padExtent=max(thresholds)
                                  ) 
 
         print(f"Target Raster SRS {srs_raster} and pixe size {pixel_res} is set for area shapes region mask")
@@ -171,6 +170,18 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
     print("Region masks shape:")
     print("reg shape:", reg.mask.shape)
 
+    # unit_raster = srs_raster.GetLinearUnitsName()
+    # # Check rather SRS is in meter, else abort
+    # if unit_raster.lower() in ["metre", "meter"]:
+    #     print(
+    #         f"Raster SRS is used as the default for evaluation. "
+    #         f"The raster SRS unit is '{unit_raster}'."
+    #     )
+    # else:
+    #     raise ValueError(
+    #         f"Raster SRS has to be in metre. "
+    #         f"The current unit is '{unit_raster}'. Analysis is aborted."
+    #     )
 
 
 
@@ -208,9 +219,9 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
         e.yMax < r[1] or
         e.yMin > r[3]
     )
-
     print("Overlap:", overlap)
-
+    
+    # check rather values are in range
     arr = reg.warp(target_tif, resampleAlg="near") 
     inside = arr[reg.mask.astype(bool)] 
     print("The following raster values are available in within your target area:") 
@@ -230,7 +241,7 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
     )
     
 def evaluate_area_by_threshold(Area_path, #area to analyze
-                              tif_file, #tif file to analyze
+                              target_tif, #tif file to analyze
                               where=None, #set the polygon or cell values that define th area
                               output_dir=None,
                               evaluation_name= None,
@@ -292,10 +303,14 @@ def evaluate_area_by_threshold(Area_path, #area to analyze
     if suffix == ".shp":
         # Make Region Mask
         print("loading area shape file")
-        reg = gk.RegionMask.load(region=Area_path, where=where, padExtent=500, limitOne=False) 
-        #Area_path = shapefile path
-        #where = attribute feature
-        #padExtent = buffer
+        reg = gk.RegionMask.fromVector(Area_path, 
+                                 srs=srs_raster, #srs from target raster
+                                 pixelRes=pixel_res,
+                                 where=where,
+                                 limitOne=False, 
+                                 padExtent=max(thresholds)
+                                 ) 
+        print(f"Target Raster SRS {srs_raster} and pixe size {pixel_res} is set for area shapes region mask")
         
     elif suffix in (".tif", ".tiff"):
         print("loading area tif file")
@@ -308,7 +323,10 @@ def evaluate_area_by_threshold(Area_path, #area to analyze
         # create vector from raster and then egionmask from vector
         vector_1 = gk.raster.polygonizeRaster(ras_boolean)
         vector_2 = gk.vector.createVector(vector_1)
-        reg = gk.RegionMask.fromVector(vector_2, limitOne=False, padExtent=500)
+        reg = gk.RegionMask.fromVector(vector_2, 
+                                       limitOne=False, 
+                                       padExtent=max(thresholds)
+                                       )
 
     else:
         raise TypeError("Area must be a string ending with .tiff/.tif/.shp.")
@@ -321,6 +339,19 @@ def evaluate_area_by_threshold(Area_path, #area to analyze
     print("reg extent:", reg.extent)
     print("Region masks shape:")
     print("reg shape:", reg.mask.shape)
+
+    unit_raster = srs_raster.GetLinearUnitsName()
+    # Check rather SRS is in meter, else abort
+    if unit_raster.lower() in ["metre", "meter"]:
+        print(
+            f"Raster SRS is used as the default for evaluation. "
+            f"The raster SRS unit is '{unit_raster}'."
+        )
+    else:
+        raise ValueError(
+            f"Raster SRS has to be in metre. "
+            f"The current unit is '{unit_raster}'. Analysis is aborted."
+        )
 
 
     # 2. safety check -> is there an overlap between areas
@@ -349,12 +380,14 @@ def evaluate_area_by_threshold(Area_path, #area to analyze
 
     print("Overlap:", overlap)
 
+
+
     arr = reg.warp(target_tif, resampleAlg="near") 
     inside = arr[reg.mask.astype(bool)] 
     print("The following raster values are available in within your target area:") 
     unique, counts = np.unique(inside, return_counts=True) 
     for v, c in zip(unique, counts): print(v, c)
-    #print (f"Please make sure that at least one of these values is selected by your raster target values: {raster_target_value}")
+    print (f"Please make sure that your thresholds of: {thresholds} matches the range of values in your target region")
 
 
     # 3. Calculate the threshold
@@ -595,14 +628,14 @@ EVALUATIONS = {
         "description": "Indicates pixels in which the average daily direct-normal irradiance (DNI) is less-than or equal-to X kWh/m2/day",
         "source": "",
         "thresholds": [
-            0, 5, 10, 20, 50, 100, 200, 300, 400,
+            0, 5, 10, 20, 50, 100, 200, #300, 400
             ],  # example values
     },
 }
 
 ## TESTING
 
-# Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/CDDA_aachenClipped.shp"
+Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/CDDA_aachenClipped.shp"
 # Area_path_tif = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif"
 target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif"
 
@@ -617,14 +650,14 @@ target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/del
 # )
 
 
-# evaluate_area_by_proximity(          
-#     Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/CDDA_aachenClipped.shp",
-#     evaluation_name= "agriculture_proximity",
-#     where="SITE_CODE=555558604",
-#     target_tif="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
-#     raster_target_value=[10, 7, 21], 
-#     output_dir = str(base_path/"output/proximity/with_shape/")
-# )
+evaluate_area_by_proximity(          
+    Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/CDDA_aachenClipped.shp",
+    evaluation_name= "agriculture_proximity",
+    #where="SITE_CODE=555558604",
+    target_tif="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
+    raster_target_value=[10, 7, 21], 
+    output_dir = str(base_path/"output/proximity/with_shape/")
+)
 
 
 
@@ -640,20 +673,20 @@ target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/del
 
 
 #wtih shape
-evaluate_area_by_threshold(           
-    Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/CDDA_aachenClipped.shp",
-    evaluation_name="dni_threshold",
-    #where="SITE_CODE=555558689",
-    where=None, 
-    tif_file=target_tif,
-    output_dir = str(base_path/"output/threshold/with_shape/")
-)
+# evaluate_area_by_threshold(           
+#     Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/CDDA_aachenClipped.shp",
+#     evaluation_name="dni_threshold",
+#     #where="SITE_CODE=555558689",
+#     where=None, 
+#     target_tif="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
+#     output_dir = str(base_path/"output/threshold/with_shape/")
+# )
 
 # # with tif
 # evaluate_area_by_threshold(           
 #     Area=Area_path_tif,
 #     evaluation_name="dni_threshold",
 #     where=None,
-#     tif_file=target_tif,
+#     target_tif=target_tif,
 #     output_dir = str(base_path/"output/threshold/with_tif/")
 # )
