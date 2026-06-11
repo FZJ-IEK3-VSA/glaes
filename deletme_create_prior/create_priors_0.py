@@ -9,15 +9,14 @@ os.environ["GDAL_DATA"] = f"{CONDA_ENV}/share/gdal"
 
 import geokit as gk
 import numpy as np
-import os
-import os
 from multiprocessing import Pool
 from datetime import datetime as dt
 from collections import namedtuple, OrderedDict
 from json import dumps
 from pathlib import Path
 import matplotlib.pyplot as plt
-
+import os
+os.environ["SHAPE_RESTORE_SHX"] = "YES"
 
 
                             ## CREATE PRIORS  ##
@@ -119,9 +118,9 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
         reg = gk.RegionMask.fromVector(Area_path, 
                                  srs=srs_raster, #srs from target raster
                                  pixelRes=pixel_res,
-                                 where=None,
-                                 Limitone=False, 
-                                 padExtent=max(thresholds)
+                                 where=where,
+                                 limitOne=False, 
+                                # padExtent=max(thresholds)
                                  ) 
 
         print(f"Target Raster SRS {srs_raster} and pixe size {pixel_res} is set for area shapes region mask")
@@ -156,7 +155,7 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
                                     srs=srs_raster, 
                                     pixelRes=pixel_res,
                                     padExtent=max(thresholds), 
-                                    Limitone=False,
+                                    limitOne=False,
                                     )
         print(f"Target Raster SRS {srs_raster} and pixe size {pixel_res} is set for area tif region mask")
 
@@ -212,6 +211,13 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
 
     print("Overlap:", overlap)
 
+    arr = reg.warp(target_tif, resampleAlg="near") 
+    inside = arr[reg.mask.astype(bool)] 
+    print("The following raster values are available in within your target area:") 
+    unique, counts = np.unique(inside, return_counts=True) 
+    for v, c in zip(unique, counts): print(v, c)
+    print (f"Please make sure that at least one of these values is selected b your raster target values: {raster_target_value}")
+
 
 
     # 4. create proximity matrix
@@ -223,7 +229,7 @@ def evaluate_area_by_proximity(Area_path, target_tif, where=None, output_dir=Non
         result, reg, output_dir, evaluation_name, unit, description, source, thresholds
     )
     
-def evaluate_area_by_threshold(Area, #area to analyze
+def evaluate_area_by_threshold(Area_path, #area to analyze
                               tif_file, #tif file to analyze
                               where=None, #set the polygon or cell values that define th area
                               output_dir=None,
@@ -281,20 +287,20 @@ def evaluate_area_by_threshold(Area, #area to analyze
 
 
     # 1. set the area
-    suffix = os.path.splitext(Area)[1].lower()
+    suffix = os.path.splitext(Area_path)[1].lower()
 
     if suffix == ".shp":
         # Make Region Mask
         print("loading area shape file")
-        reg = gk.RegionMask.load(region=Area, where=where, padExtent=500) 
-        #Area = shapefile path
+        reg = gk.RegionMask.load(region=Area_path, where=where, padExtent=500, limitOne=False) 
+        #Area_path = shapefile path
         #where = attribute feature
         #padExtent = buffer
         
     elif suffix in (".tif", ".tiff"):
         print("loading area tif file")
         # load raster
-        raster_1 = gk.raster.loadRaster(Area)
+        raster_1 = gk.raster.loadRaster(Area_path)
         raster_matrix = gk.raster.extractMatrix(raster_1)
         # boolean raster
         ras_boolean = gk.raster.createRasterLike(source=raster_1, data=raster_matrix == 1, noData=0)
@@ -317,11 +323,7 @@ def evaluate_area_by_threshold(Area, #area to analyze
     print("reg shape:", reg.mask.shape)
 
 
-
-    # 2. Calculate the threshold
-    result = edgesByThreshold(reg, tif_file, thresholds, output_dir)
-
-    # 3. safety check -> is there an overlap between areas
+    # 2. safety check -> is there an overlap between areas
     # Raster-Infos
     info = gk.raster.rasterInfo(target_tif)
 
@@ -346,6 +348,17 @@ def evaluate_area_by_threshold(Area, #area to analyze
     )
 
     print("Overlap:", overlap)
+
+    arr = reg.warp(target_tif, resampleAlg="near") 
+    inside = arr[reg.mask.astype(bool)] 
+    print("The following raster values are available in within your target area:") 
+    unique, counts = np.unique(inside, return_counts=True) 
+    for v, c in zip(unique, counts): print(v, c)
+    #print (f"Please make sure that at least one of these values is selected by your raster target values: {raster_target_value}")
+
+
+    # 3. Calculate the threshold
+    result = edgesByThreshold(reg, target_tif, thresholds, output_dir)
 
     # 4. make result
     writeEdgeFile(
@@ -532,13 +545,15 @@ def writeEdgeFile(
     
     print(f"saving proximity output {output}")
     
+
+    result = result.astype(np.uint8)
+
     d = reg.createRaster(
         output=os.path.join(output_dir, output),
-        #output=output_dir,
         data=result,
         overwrite=True,
-        noDataValue=255,
-        dtype=1,
+        noData=255,
+        dtype="uint8",
         meta=meta,
     )
 
@@ -548,9 +563,9 @@ def writeEdgeFile(
 #   1. define input files
 base_path = Path(__file__).resolve().parents[0]
 
-Area_path = str(base_path/"input/aachenShapefile.shp")
-Area_path_tif = str(base_path/"input/aachen_srs_3035.tif")
-target_tif =str(base_path/"input/roads_prior_clip.tif")
+# Area_path = str(base_path/"input/aachenShapefile.shp")
+# Area_path_tif = str(base_path/"input/aachen_srs_3035.tif")
+# target_tif =str(base_path/"input/roads_prior_clip.tif")
 
 
 
@@ -570,7 +585,7 @@ EVALUATIONS = {
         "description": "Indicates distances too close to agriculture areas (m)",
         "source": "",
         "thresholds": [
-            0, 100, 
+            0, 100, 200,
             #200, 300, 400, 500
         ], # example values
     },
@@ -587,9 +602,9 @@ EVALUATIONS = {
 
 ## TESTING
 
-# Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenShapefile.shp"
+# Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/CDDA_aachenClipped.shp"
 # Area_path_tif = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif"
-# target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif"
+target_tif ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif"
 
 #with shape
 # evaluate_area_by_proximity(          
@@ -600,6 +615,17 @@ EVALUATIONS = {
 #     raster_target_value=[3], 
 #     output_dir = str(base_path/"output/proximity/with_shape/")
 # )
+
+
+# evaluate_area_by_proximity(          
+#     Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/CDDA_aachenClipped.shp",
+#     evaluation_name= "agriculture_proximity",
+#     where="SITE_CODE=555558604",
+#     target_tif="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
+#     raster_target_value=[10, 7, 21], 
+#     output_dir = str(base_path/"output/proximity/with_shape/")
+# )
+
 
 
 #with tif
@@ -613,11 +639,12 @@ EVALUATIONS = {
 # )
 
 
-# #wtih shape
+#wtih shape
 evaluate_area_by_threshold(           
-    Area=Area_path,
+    Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/CDDA_aachenClipped.shp",
     evaluation_name="dni_threshold",
-    where=None,
+    #where="SITE_CODE=555558689",
+    where=None, 
     tif_file=target_tif,
     output_dir = str(base_path/"output/threshold/with_shape/")
 )
