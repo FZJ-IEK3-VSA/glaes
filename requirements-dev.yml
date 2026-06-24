@@ -12,6 +12,7 @@ dependencies:
   - numpy
   - scipy <1.15
   - scikit-learn
+  # - geokit >=1.7.1 # should be installed from the extra repo, not conda-forge
   - pytest
   - pytest-xdist
   - pytest-cov
