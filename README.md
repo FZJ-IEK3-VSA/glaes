@@ -16,6 +16,7 @@ Fortunately, GLAES is built on top of the Geospatial Data Abstraction Library (<
 In this way, GLAES affords a high degree of flexibility for very specific considerations, while still maintaining a consistent application method between studies.
 
 [![DOI](https://zenodo.org/badge/114907468.svg)](https://zenodo.org/badge/latestdoi/114907468)
+[![codecov](https://codecov.io/gh/FZJ-IEK3-VSA/glaes/branch/dev/graph/badge.svg)](https://codecov.io/gh/FZJ-IEK3-VSA/glaes)
 
 ## Features
 
