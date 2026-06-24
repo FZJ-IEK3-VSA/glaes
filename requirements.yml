@@ -10,7 +10,7 @@ dependencies:
   - pandas <=2.3.2
   - numpy
   - scipy <1.15
-  - geokit >=1.7.1
+  - geokit >=1.7.1,<=1.9.0
   # - pytest
   # - pytest-xdist
   # - pytest-cov
