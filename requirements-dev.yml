@@ -7,9 +7,9 @@ dependencies:
   - pip
   - jupyter
   - matplotlib
-  - pandas <=2.3.2
+  - pandas >=1.4.0,<=3.0.3
   - numpy
-  - scipy <1.15
+  - scipy >=1.10.0,<1.18.0
   - geokit >=1.7.1,<=1.9.0 # should be installed from the extra repo, not conda-forge
   - pytest
   - pytest-xdist
