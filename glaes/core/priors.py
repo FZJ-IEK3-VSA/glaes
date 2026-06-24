@@ -1,4 +1,16 @@
-from .util import *
+import json
+import re
+from collections import OrderedDict
+from difflib import SequenceMatcher as SM
+from glob import glob
+from os.path import basename, dirname, join, splitext
+from sys import platform
+from warnings import warn
+
+import geokit as gk
+import numpy as np
+
+from glaes.core.util import GlaesError, checkMultiProcessingAvailability
 
 # Sort out the data paths
 defaultPriorDir = join(dirname(dirname(__file__)), "data", "priors")
@@ -57,9 +69,7 @@ class PriorSource(object):
         for i in range(253):
             try:
                 valString = valMap["%d" % i]
-            except (
-                KeyError
-            ):  # should fail when we've reached the end of the precalculated edges
+            except KeyError:  # should fail when we've reached the end of the precalculated edges
                 break
 
             s.edgeStr.append(valString)
@@ -95,14 +105,10 @@ class PriorSource(object):
         s.values = np.array(s.values)
 
         if not s.edges.size == s.values.size:
-            raise RuntimeError(
-                basename(path) + ": edges length does not match values length"
-            )
+            raise RuntimeError(basename(path) + ": edges length does not match values length")
 
         # make nodata and untouched value
-        qualifier, value = numRE.search(
-            valMap["%d" % (s.values.size - 1)]
-        ).groups()  # Get the last calculated edge
+        qualifier, value = numRE.search(valMap["%d" % (s.values.size - 1)]).groups()  # Get the last calculated edge
         value = float(value)
 
         # estimate a value
@@ -131,12 +137,8 @@ class PriorSource(object):
         doc += "VALUE MAP:\n"
         doc += "  Raw Value : Precalculated Edge : Estimated Value\n"
         for i in range(len(s.edges)):
-            doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(
-                i, s.edgeStr[i], s.values[i]
-            )
-        doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(
-            254, "untouched", s.untouchedTight
-        )
+            doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(i, s.edgeStr[i], s.values[i])
+        doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(254, "untouched", s.untouchedTight)
         doc += "  {:^9} - {:^18s} - {:^15.3f}\n".format(255, "no-data", s.noData)
 
         s.__doc__ = doc
@@ -239,7 +241,7 @@ class PriorSource(object):
             boundsSRS=extent.srs,
             processor=mutator,
             noData=s.noData,
-            **kwargs
+            **kwargs,
         )
 
         # return
@@ -299,9 +301,7 @@ class PriorSource(object):
         mat = extent.extractMatrix(s.path, strict=True) <= edgeI
 
         # Polygonize
-        geoms = gk.geom.polygonizeMask(
-            mat, bounds=extent.xyXY, srs=extent.srs, flat=False, shrink=False
-        )
+        geoms = gk.geom.polygonizeMask(mat, bounds=extent.xyXY, srs=extent.srs, flat=False, shrink=False)
 
         # Do extra grow
         if edgeDiffs[edgeI] / s.edges[edgeI] > 0.01:
@@ -374,13 +374,17 @@ class PriorSet(object):
             except PriorSource._LoadFail:
                 warn("Could not parse file: %s" % (basename(f)), UserWarning)
 
-    def regionIsOkay(s, region):
+    def regionIsOkay(s, region, multiProcess=False):
         """Checks if a given region is valid within the Prior Datasets
 
         * Not really intended for external use and will probably fail
         """
         # Check if region is okay
-        goodPixels = region.indicateValues(join(s.path, "goodArea.tif"), value=1).sum()
+
+        multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess)
+        goodPixels = region.indicateValues(
+            join(s.path, "goodArea.tif"), value=1, multiProcess=multiProcessAdjusted
+        ).sum()
 
         goodRatio = goodPixels / region.mask.sum()
         if goodRatio > 0.9999:

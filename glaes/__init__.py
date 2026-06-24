@@ -2,15 +2,17 @@
 
 __version__ = "1.3.0"
 
-from .core import util
-from .core.priors import Priors
-from .core.ExclusionCalculator import ExclusionCalculator
-from .core.WeightedCriterionCalculator import WeightedCriterionCalculator
-from .predefinedExclusions import ExclusionSets
-
-from os.path import join as _join, dirname as _dirname, basename as _basename
 from collections import OrderedDict as _OrderedDict
 from glob import glob as _glob
+from os.path import basename as _basename
+from os.path import dirname as _dirname
+from os.path import join as _join
+
+from .core import util
+from .core.ExclusionCalculator import ExclusionCalculator
+from .core.priors import Priors
+from .core.WeightedCriterionCalculator import WeightedCriterionCalculator
+from .predefinedExclusions import ExclusionSets
 
 _test_data_ = _OrderedDict()
 

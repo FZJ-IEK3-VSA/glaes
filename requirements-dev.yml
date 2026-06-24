@@ -1,21 +1,19 @@
-name: glaes
+name: glaes_env
 channels:
   - conda-forge
+  - nodefaults
 dependencies:
-  - conda-forge::python
-  - conda-forge::pytest
-  - conda-forge::pytest-cov
-  - conda-forge::pylint
-  - conda-forge::autopep8
-  - conda-forge::jupyter
-  - conda-forge::notebook
-  - conda-forge::jupyterlab
-  - conda-forge::pip
-  - conda-forge::matplotlib
-  - conda-forge::descartes
-  - conda-forge::pandas
-  - conda-forge::numpy<1.24
-  - conda-forge::scipy
-  - conda-forge::scikit-learn
-  - conda-forge::geokit>=1.4.0
-  - conda-forge::gdal=3.4.*
+  - python >=3.10.0,<=3.13.9
+  - pip
+  - jupyter <=1.1.1
+  - matplotlib <=3.10.5
+  - pandas >=1.4.0,<=3.0.3
+  - numpy >=1.26.0,<=2.5.0
+  - scipy >=1.10.0,<1.18.0
+  # - geokit >=1.7.1,<=1.9.0 # should be installed from the extra repo, not conda-forge
+  # dev
+  - pytest <=9.1.1
+  - pytest-xdist <=3.8.0
+  - pytest-cov <=7.1.0
+  - ruff =0.14.1
+  - nbval <=0.11.0 

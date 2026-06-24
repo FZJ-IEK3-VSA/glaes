@@ -1,0 +1,23 @@
+on:
+  pull_request:
+    branches: ["dev"]
+
+jobs:
+  TestPullCondaForgeDev:
+    name: Test development version on ${{ matrix.runner_tag }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner_tag: ["self-hosted", "windows-latest"]
+    # geokit is checked out as an extra repo, its requirements-dev.yml is merged
+    # with glaes', and both are installed editable before the tests run.
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/run_conda_forge_test_with_extra_repos.yml@v1
+    secrets: inherit
+    with:
+      runner_tag: ${{ matrix.runner_tag }}
+      requirements_file_name: requirements-dev.yml
+      extra_repos: |
+        [
+          {"repo": "FZJ-IEK3-VSA/geokit"}
+        ]
+      multiprocessing_pytest_string: "-n auto"

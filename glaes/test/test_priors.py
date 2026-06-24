@@ -1,12 +1,13 @@
 import warnings
-from os.path import join, dirname
-from osgeo import gdal
-import numpy as np
+from os.path import dirname, join
+
 import geokit as gk
+import numpy as np
 import pytest
+from osgeo import gdal
 
 import glaes as gl
-from glaes.core.priors import PriorSource, PriorSet
+from glaes.core.priors import PriorSet, PriorSource
 
 TESTDIR = dirname(__file__)
 DATADIR = join(TESTDIR, "data")
@@ -84,18 +85,14 @@ def test_Prior_generateVector():
     ext = gk.Extent.load(aachenShape)
 
     # Test an on-edge generation
-    v = p.generateVector(
-        ext, value=4000, output=join(RESULTDIR, "generatedVector1.shp")
-    )
+    v = p.generateVector(ext, value=4000, output=join(RESULTDIR, "generatedVector1.shp"))
     g = gk.vector.extractFeature(v, onlyGeom=True)
     # Tests below are failing for 3.0.0<=gdal<3.4.0 due to problems when
     # polygonizing
     assert np.isclose(g.Area(), 1684940000.0)
 
     # Test an off-edge generation
-    v = p.generateVector(
-        ext, value=5500, output=join(RESULTDIR, "generatedVector2.shp")
-    )
+    v = p.generateVector(ext, value=5500, output=join(RESULTDIR, "generatedVector2.shp"))
     g = gk.vector.extractFeature(v, onlyGeom=True)
     # Tests below are failing for 3.0.0<=gdal<3.4.0 due to problems when
     # polygonizing

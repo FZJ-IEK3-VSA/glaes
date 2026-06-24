@@ -1,0 +1,39 @@
+context:
+  version: 1.5.0
+  python_min: 3.10
+
+package:
+  name: glaes
+  version: ${{ version }}
+
+source:
+  path: .
+
+build:
+  script: ${{ PYTHON }} -m pip install -e . --no-deps
+  noarch: python
+  number: 0
+
+requirements:
+  host:
+  - python ${{ python_min }}.*
+  - setuptools >=64.0
+  - pip
+  run:
+  - python >=${{ python_min }},<=3.13.9
+  - pip
+  - jupyter <=1.1.1
+  - matplotlib <=3.10.5
+  - pandas >=1.4.0,<=3.0.3
+  - numpy >=1.26.0,<=2.5.0
+  - scipy >=1.10.0,<1.18.0
+  - geokit >=1.7.1,<=1.9.0
+  # dev
+  - pytest <=9.1.1
+  - pytest-xdist <=3.8.0
+  - pytest-cov <=7.1.0
+  - ruff =0.14.1
+  - nbval <=0.11.0
+
+
+
