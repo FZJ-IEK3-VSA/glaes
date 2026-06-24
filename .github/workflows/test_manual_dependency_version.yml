@@ -37,7 +37,7 @@ jobs:
       min_version: ${{ inputs.min_version }}
       max_version: ${{ inputs.max_version }}
       runner_tag: ${{ inputs.runner_tag }}
-      requirements_file_name: requirements.yml
+      requirements_file_name: requirements-dev.yml
       extra_repos: |
         [
           {"repo": "FZJ-IEK3-VSA/geokit"}
