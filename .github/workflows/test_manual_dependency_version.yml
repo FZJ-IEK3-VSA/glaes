@@ -1,0 +1,45 @@
+on:
+  workflow_dispatch:
+    inputs:
+      library:
+        description: "Dependency library name to test (e.g. numpy)"
+        required: true
+        type: string
+      min_version:
+        description: "Minimum (lower-bound) version to test (optional)"
+        required: false
+        type: string
+        default: ""
+      max_version:
+        description: "Maximum (upper-bound) version to test (optional)"
+        required: false
+        type: string
+        default: ""
+      runner_tag:
+        description: "Runner to execute the tests on (e.g. self-hosted, ubuntu-latest)"
+        required: true
+        type: string
+        default: "self-hosted"
+      additional_conda_channel:
+        description: "Additional conda channel to search for packages (e.g. 'gurobi')."
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  # Orchestration lives in the centralized .github repo. glaes only supplies the
+  # repo-specific values: its requirements file and geokit as an extra repo.
+  manual-dependency-test:
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/test_manual_dependency_version.yml@v1
+    secrets: inherit
+    with:
+      library: ${{ inputs.library }}
+      min_version: ${{ inputs.min_version }}
+      max_version: ${{ inputs.max_version }}
+      runner_tag: ${{ inputs.runner_tag }}
+      requirements_file_name: requirements-dev.yml
+      extra_repos: |
+        [
+          {"repo": "FZJ-IEK3-VSA/geokit"}
+        ]
+      additional_conda_channel: ${{ inputs.additional_conda_channel }}
