@@ -56,7 +56,7 @@ class ExclusionCalculator(object):
 
     * In fact, the ExclusionCalculator initialization is simply a call to
       geokit.RegionMask.load, so see that for more information. This also means
-      that any geokit.RegoinMask object can be used to initialize the
+      that any geokit.RegionMask object can be used to initialize the
       ExclusionCalculator
 
         >>> rm = geokit.RegionMask.load(<path>, pad=..., srs=..., pixelRes=..., ...)
@@ -66,7 +66,7 @@ class ExclusionCalculator(object):
     ------
     * The ExclusionCalculator object contains a member name "availability", which
       contains the most up to date result of the LE analysis
-        - Just after initialization, the the availability matrix is filled with
+        - Just after initialization, the availability matrix is filled with
           100's, meaning that all locations are available
         - After excluding locations based off various geospatial datasets, cells
           in the availability matrix are changed to a value between 0 and 100,
@@ -329,7 +329,7 @@ class ExclusionCalculator(object):
     def draw(
         s,
         ax=None,
-        goodColor=(255 / 255, 255 / 255, 255 / 255),
+        goodColor=(255 / 255, 255 / 255, 255 / 255), #TODO create contrast in the legend box for this colour. ATM there is a white box on white background.
         excludedColor=(2 / 255, 61 / 255, 107 / 255),
         itemsColor=(51 / 255, 153 / 255, 255 / 255),
         legend=True,
