@@ -1,10 +1,10 @@
 import os
 
-CONDA_ENV = "/fast/home/l-madeisky/.conda/envs/glaes_2026"
+# CONDA_ENV = "/fast/home/l-madeisky/.conda/envs/glaes_2026"
 
-os.environ["CONDA_PREFIX"] = CONDA_ENV
-os.environ["PROJ_LIB"] = f"{CONDA_ENV}/share/proj"
-os.environ["GDAL_DATA"] = f"{CONDA_ENV}/share/gdal"
+# os.environ["CONDA_PREFIX"] = CONDA_ENV
+# os.environ["PROJ_LIB"] = f"{CONDA_ENV}/share/proj"
+# os.environ["GDAL_DATA"] = f"{CONDA_ENV}/share/gdal"
 
 
 import geokit as gk
@@ -17,6 +17,16 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import os
 os.environ["SHAPE_RESTORE_SHX"] = "YES"
+
+## TODO
+# - debugger macht manchmal probleme used env ==> glaes_2026
+# - beide funktionen: proximity und threshold müssen umgeschrieben werden, um mit shape zu funktionieren. Also der komplette import vom raster auf shape umgemüntzt werden.
+# - ACHTNG vielleicht gehts auch nur für proximity, bei threshold wird nämlich das raster übergeben
+# - dann muss es eine funktion geben, die raster uns shape zusammenbringt, je nachdem, ob shape oder raster übergeben wird
+# - weiter mit example, wo prior erzeug tund dann angewandt wird 
+
+
+
 
 
                             ## CREATE PRIORS  ##
@@ -153,7 +163,7 @@ def evaluate_area_by_proximity_raster(Area_path, target_file, where=None, output
                                     padExtent=max(thresholds), 
                                     limitOne=False,
                                     )
-        print(f"Target Raster SRS {srs_raster} and pixe size {pixel_res} is set for area tif region mask")
+#        print(f"Target Raster SRS {srs_raster} and pixe size {pixel_res} is set for area tif region mask")
 
     else:
         raise TypeError("Area path must be a string ending with .tiff/.tif/.shp.")
@@ -222,9 +232,12 @@ def evaluate_area_by_proximity_raster(Area_path, target_file, where=None, output
     # check rather values are in range
     arr = reg.warp(target_file, resampleAlg="near") 
     inside = arr[reg.mask.astype(bool)] 
-    print("The following raster values are available in within your target area:") 
+
     unique, counts = np.unique(inside, return_counts=True) 
-    for v, c in zip(unique, counts): print(v, c)
+    print("Raster values inside target area:")
+    for value, pixel_count in zip(unique, counts):
+        print(f"value={value}, number pixels={pixel_count}")
+
     print (f"Please make sure that at least one of these values is selected b your raster target values: {file_target_value}")
 
 
@@ -259,8 +272,6 @@ def evaluate_area_by_threshold_raster(Area_path, #area to analyze
             Raster file containing values to which the trechhold is applied. Usually represents
             infrastructure, land use features, or environmental constraints
 
-        file_target_value (list[int | float]):
-            Pixel value in "target_file" that will be used as the target for threshold application
 
         output_dir (str):
             Path where the output files will be stored
@@ -270,7 +281,11 @@ def evaluate_area_by_threshold_raster(Area_path, #area to analyze
             Determines thresholds, unit, and description for the evaluation process.
 
     """
-    
+    print("===================================================================================================")
+    print("indicate your raster or shape files values within your target area that are below your threholds")
+    print("===================================================================================================")
+
+
     # gets data from the EVALUATIONS DICT
     eval_def = EVALUATIONS[evaluation_name]
     unit = eval_def["unit"]
@@ -322,6 +337,7 @@ def evaluate_area_by_threshold_raster(Area_path, #area to analyze
         vector_1 = gk.raster.polygonizeRaster(ras_boolean)
         vector_2 = gk.vector.createVector(vector_1)
         reg = gk.RegionMask.fromVector(vector_2, 
+                                       srs=srs_raster, #srs from target raster
                                        limitOne=False, 
                                        padExtent=max(thresholds)
                                        )
@@ -383,10 +399,11 @@ def evaluate_area_by_threshold_raster(Area_path, #area to analyze
 
     arr = reg.warp(target_file, resampleAlg="near") 
     inside = arr[reg.mask.astype(bool)] 
-    print("The following raster values are available in within your target area:") 
-    unique, counts = np.unique(inside, return_counts=True) 
-    for v, c in zip(unique, counts): print(v, c)
-    print (f"Please make sure that your thresholds of: {thresholds} matches the range of values in your target region")
+    unique, counts = np.unique(inside, return_counts=True)
+    print("Raster values inside target area:")
+    for value, pixel_count in zip(unique, counts):
+        print(f"value={value}, number pixels={pixel_count}")
+    print (f"Your thresholds should be within the same range. Selected thresholds:{thresholds}")
 
 
     # 3. Calculate the threshold
@@ -510,7 +527,7 @@ def evaluate_area_by_proximity_shape(Area_path, target_file, where=None, output_
                                     padExtent=max(thresholds), 
                                     limitOne=False,
                                     )
-        print(f"Target Raster SRS {srs_raster} and pixe size {pixel_res} is set for area tif region mask")
+#        print(f"Target Raster SRS {srs_raster} and pixe size {pixel_res} is set for area tif region mask")
 
     else:
         raise TypeError("Area path must be a string ending with .tiff/.tif/.shp.")
@@ -763,14 +780,6 @@ def evaluate_area_by_threshold_shape(Area_path, #area to analyze
     
 
 
-
-
-
-
-
-
-
-
 ########################################################################################
 
 ## UTILITY FUNCTIONS
@@ -987,12 +996,12 @@ EVALUATIONS = {
         ], # example values
     },
     # threshold
-    "dni_threshold": {
+    "road_threshold": {
         "unit": "kWh/m2/day",
         "description": "Indicates pixels in which the average daily direct-normal irradiance (DNI) is less-than or equal-to X kWh/m2/day",
         "source": "",
         "thresholds": [
-            0, 5, 10, 20, 50, 100, 200, #300, 400
+            0, 1, 2, 3, 4, 5, 10, 20, 25, 26, 27, 50, 
             ],  # example values
     },
 
@@ -1001,7 +1010,7 @@ EVALUATIONS = {
         "description": "Indicates distances too close to motorways areas (m)",
         "source": "",
         "thresholds": [
-            0, 100, 200,
+            0, 100, 200,500, 1000
             #200, 300, 400, 500
         ], # example values
     },
@@ -1009,21 +1018,21 @@ EVALUATIONS = {
 
 ## TESTING
 
-# Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/CDDA_aachenClipped.shp"
-# # Area_path_tif = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif"
-# target_file ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif"
+Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/CDDA_aachenClipped.shp"
+Area_path_tif = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif"
+target_file ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif"
 
 #with shape
-evaluate_area_by_proximity_raster(          
-    Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/aachenShapefile.shp",
-    evaluation_name= "road_proximity",
-    #where="SITE_CODE=555558604",
-    #target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
-    target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenRoads.shp",
-    #file_target_value=[10, 7, 21], 
-    file_target_value="maxspeed='nan'",
-    output_dir = str(base_path/"output/proximity/with_shape/")
-)
+# evaluate_area_by_proximity_raster(          
+#     Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/aachenShapefile.shp",
+#     evaluation_name= "road_proximity",
+#     #where="SITE_CODE=555558604",
+#     #target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
+#     target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenRoads.shp",
+#     #file_target_value=[10, 7, 21], 
+#     file_target_value="maxspeed='nan'",
+#     output_dir = str(base_path/"output/proximity/with_shape/")
+# )
 #with tif
 # evaluate_area_by_proximity_raster(          
 #     Area_path=Area_path_tif,
@@ -1038,25 +1047,26 @@ evaluate_area_by_proximity_raster(
 
 
 #wtih shape
-# evaluate_area_by_threshold_raster(           
-#     Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/aachenShapefile.shp",
-#     evaluation_name= "road_proximity",
-#     #where="SITE_CODE=555558604",
-#     #target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
-#     target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenRoads.shp",
-#     #file_target_value=[10, 7, 21], 
-#     file_target_value="maxspeed='nan'",
-#     output_dir = str(base_path/"output/proximity/with_shape/")
-#     )
+evaluate_area_by_threshold_raster(           
+    Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenShapefile.shp",
+    evaluation_name= "road_threshold",
+    #where="SITE_CODE=555558604",
+    target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
+    output_dir = str("/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/output/threshold/target_raster/")
+    )
 
 # # with tif
 # evaluate_area_by_threshold_raster(           
 #     Area_path=Area_path_tif,
 #     evaluation_name= "road_proximity",
-#     #where="SITE_CODE=555558604",
-#     #target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
-#     target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenRoads.shp",
-#     #file_target_value=[10, 7, 21], 
-#     file_target_value="maxspeed='nan'",
+#     where="SITE_CODE=555558604",
+#     target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
 #     output_dir = str(base_path/"output/proximity/with_shape/")
 #     )
+evaluate_area_by_threshold_raster(           
+    Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif",
+    evaluation_name= "road_threshold",
+    #where="SITE_CODE=555558604",
+    target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
+    output_dir = str("/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/output/threshold/target_shape/")
+    )
