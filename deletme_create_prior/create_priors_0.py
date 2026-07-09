@@ -1,12 +1,3 @@
-import os
-
-# CONDA_ENV = "/fast/home/l-madeisky/.conda/envs/glaes_2026"
-
-# os.environ["CONDA_PREFIX"] = CONDA_ENV
-# os.environ["PROJ_LIB"] = f"{CONDA_ENV}/share/proj"
-# os.environ["GDAL_DATA"] = f"{CONDA_ENV}/share/gdal"
-
-
 import geokit as gk
 import numpy as np
 from multiprocessing import Pool
@@ -16,14 +7,22 @@ from json import dumps
 from pathlib import Path
 import matplotlib.pyplot as plt
 import os
-os.environ["SHAPE_RESTORE_SHX"] = "YES"
+
 
 ## TODO
 # - debugger macht manchmal probleme used env ==> glaes_2026
-# - beide funktionen: proximity und threshold müssen umgeschrieben werden, um mit shape zu funktionieren. Also der komplette import vom raster auf shape umgemüntzt werden.
-# - ACHTNG vielleicht gehts auch nur für proximity, bei threshold wird nämlich das raster übergeben
-# - dann muss es eine funktion geben, die raster uns shape zusammenbringt, je nachdem, ob shape oder raster übergeben wird
-# - weiter mit example, wo prior erzeug tund dann angewandt wird 
+# - four functions work based on the area being passed as either a shapefile or a GeoTIFF
+# - targets are passed as GeoTIFFs
+
+# - for proximity, it is important that a shapefile can be passed as the target instead of a raster, allowing buffers to be generated around it
+# - the function handling both cases is named "evaluate_area_by_proximity" (accepting area and target as either shapefile or GeoTIFF)
+# - this is not relevant for the threshold function, as that involves marking values ​​above or below a certain level (which makes no sense for shapefiles, as they lack cell values)
+
+# TODO:
+# the function is not yet operational because loading the region requires the target's dimensions (GeoTIFF/shapefile), but these are currently loaded afterwards. --> `srs_target` and `pixel_res` are missing; these need to be integrated.
+# --> solution: load the target's SRS and pixel size first, then load the area to create the region mask, and finally load the targets using that region mask.
+# prior creation and prior application example
+
 
 
 
@@ -39,6 +38,7 @@ os.environ["SHAPE_RESTORE_SHX"] = "YES"
     # proximity: list of buffer distances
     # for each distance a buffer around the target is created and marked. 
     # e.g. mark the distance from a natural habitat with 100m, 200m, 300m, etc.
+    ### ** crs has to be in unit:meters ** #
 
 
 #                     Second: evaluate by threshold                             #
@@ -49,49 +49,33 @@ os.environ["SHAPE_RESTORE_SHX"] = "YES"
     # thresholds: cut offs.
     # for each threshold values <= that threshold are marked
     # elevation <= 10, <= 12 etc.
+    ### ** crs has to be in unit: meters ** #
 
 ########################################################################################
 
 
-# due to issues with numpy version
-if not hasattr(np, "bool"):
-    np.bool = bool
+# # due to issues with numpy version
+# if not hasattr(np, "bool"):
+#     np.bool = bool
 
 
 
-
-
-#3. evaluation function
-def evaluate_area_by_proximity_raster(Area_path, target_file, where=None, output_dir=None, file_target_value=None, evaluation_name= None):
+def evaluate_area_by_proximity(Area_path, target_file, where=None, output_dir=None, file_target_value=None, evaluation_name= None):
     """
     This function extracts all pixels in “target_file” that match “file_target_value,”
-    generates buffer zones according to the values defined for “evaluation_name,” within "Area".
-    
+    generates buffer zones according to the values defined for “evaluation_name,” within "Area"
 
-    Args:
-        Area_path (shp path | tif path ): 
-            The area boundary used for clipping the analysis. Can be a path to raster or a shapefile
 
-        where ( str | optional an SQL-style filtering string):
-            Feature ID used to select a specific polygon from "Area_path" if it is a vector dataset
-            Ignored if "Area_path" is a raster
-
-        target_file (tif | str):
-            Raster file containing values to buffer around. Usually represents
-            infrastructure, land use features, or environmental constraints
-
-        output_dir (str):
-            Path where the output files will be stored
-
-        file_target_value (list[int | float]):
-            Pixel value in "target_file" that will be used as the target for buffering
-
-        evaluation_name (str):
-            Key referring to the corresponding metadata entry in the EVALUATIONS dictionary. 
-            Determines thresholds, unit, and description for the evaluation process.
         
     """
-    # gets data from the EVALUATIONS DICT
+
+    print("===================================================================================================")
+    print("marking the buffer zones around your target area")
+    print("===================================================================================================")
+
+
+    # 1) gets data from the EVALUATIONS DICT
+    #########################################
     eval_def = EVALUATIONS[evaluation_name]
     unit = eval_def["unit"]
     description = eval_def["description"]
@@ -99,10 +83,199 @@ def evaluate_area_by_proximity_raster(Area_path, target_file, where=None, output
     thresholds = eval_def["thresholds"]
 
 
+    #  2) load refrence region/ area
+    #########################################
+    suffix = os.path.splitext(Area_path)[1].lower()
 
-    # sets output dir
-    output_dir = os.path.join(output_dir, evaluation_name)  #output path is beeing set
-    os.makedirs(output_dir, exist_ok=True)
+    if suffix == ".shp":
+        # Make Region Mask
+        print("loading area shape file")
+        reg = gk.RegionMask.fromVector(Area_path, 
+                                 srs=srs_target, #srs from target raster
+                                 where=where,
+                                 limitOne=False, 
+                                 padExtent=max(thresholds)
+                                 ) 
+
+        print(f"Target shape SRS {srs_target} is set for area shapes region mask")
+        #Area = shapefile path
+        #where = attribute feature
+        #padExtent = buffer
+
+    elif suffix in (".tif", ".tiff"):
+        print("loading area tif file")
+
+        raster_1 = gk.raster.loadRaster(Area_path)
+        # Raster-Informationen laden
+        info = gk.raster.rasterInfo(Area_path)
+
+        # EPSG-Code
+        #print(info.srs.GetAttrValue("AUTHORITY", 1))
+        # Pixelgröße
+        #print(info.pixelWidth)
+        #print(info.pixelHeight)
+
+        raster_matrix = gk.raster.extractMatrix(raster_1)
+        # boolean raster
+        ras_boolean = gk.raster.createRasterLike(source=raster_1, data=raster_matrix == 1, noData=0)
+
+        # create vector from raster and then egionmask from vector
+        vector_1 = gk.raster.polygonizeRaster(ras_boolean)
+        vector_2 = gk.vector.createVector(vector_1)
+        reg = gk.RegionMask.fromVector(vector_2, 
+                                    srs=srs_target, 
+                                    pixelRes=pixel_res,
+                                    padExtent=max(thresholds), 
+                                    limitOne=False,
+                                    )
+#        print(f"Target Raster SRS {srs_raster} and pixe size {pixel_res} is set for area tif region mask")
+
+    else:
+        raise TypeError("Area path must be a string ending with .tiff/.tif/.shp.")
+    
+
+
+    # 3) get target file value / region
+    #########################################
+    suffix = os.path.splitext(target_file)[1].lower()
+
+    # if target file is a shape 
+    if suffix == ".shp":
+        geom = gk.vector.extractFeatures(target_file)
+        srs_target = geom.srs
+
+        print("Target Shape SRS:")
+        print(srs_target.GetAttrValue("AUTHORITY", 1))
+
+        print("Target Shape Extent:")
+        print(geom.extent)
+
+        ### shape ###
+        target_area  = gk.vector.extractFeatures(target_file, where=file_target_value)
+
+
+    # if target file is a raster
+    elif suffix in (".tif", ".tiff"):
+        info = gk.raster.rasterInfo(target_file)
+        srs_target = info.srs
+        pixel_res = abs(info.pixelWidth)
+
+        print("Target Raster SRS:")
+        print(srs_target.GetAttrValue("AUTHORITY", 1))
+        print("Target Raster Pixel Size:")
+        print(info.pixelWidth)
+        print(info.pixelHeight)
+
+
+        # Test rather metric srs
+        unit_raster = srs_target.GetLinearUnitsName()
+        # Check rather SRS is in meter, else abort
+        if unit_raster.lower() in ["metre", "meter"]:
+            print(
+                f"Raster SRS is used as the default for evaluation. "
+                f"The raster SRS unit is '{unit_raster}'."
+            )
+        else:
+            raise ValueError(
+                f"Raster SRS has to be in metre. "
+                f"The current unit is '{unit_raster}'. Analysis is aborted."
+            )
+
+
+        # region mask Info
+        srs_info = reg.srs.GetAttrValue("AUTHORITY", 1)
+        print("Region masks srs:")
+        print(f"region mask srs: EPSG:{srs_info}")
+        print("Region masks extent:")
+        print("reg extent:", reg.extent)
+        print("Region masks shape:")
+        print("reg shape:", reg.mask.shape)
+
+        # 2. prepare the target for proximity analysis  (target tif file)
+        print("setting region/feature of interest")
+        matrix = reg.indicateValues(target_file, #Indicates those pixels in the RegionMask 
+                                                    # which correspond to a particular value, or range of values, from a given raster datasource
+                                    value=file_target_value,  # values that are accepted 
+                                    applyMask=False) > 0.5 # > 0.5 means matrix, where values match raster values (=1) or match more than half (>0.5)
+        # to polygon                                             
+        target_area = gk.geom.polygonizeMatrix(matrix, bounds=reg.extent.xyXY, srs=reg.srs) #convert the array to a geom with mask extent
+        
+
+        # 3. safety check -> is there an overlap between areas
+        # Raster-Infos
+        info = gk.raster.rasterInfo(target_file)
+
+        print("=== TARGET RASTER ===")
+        print("EPSG:", info.srs.GetAttrValue("AUTHORITY", 1))
+        print("bounds:", info.bounds)
+        print("pixel size:", info.pixelWidth, info.pixelHeight)
+
+        print("\n=== REGION MASK ===")
+        print("EPSG:", reg.srs.GetAttrValue("AUTHORITY", 1))
+        print("extent:", reg.extent)
+        print("shape:", reg.mask.shape)    
+
+        r = info.bounds
+        e = reg.extent
+
+        overlap = not (
+            e.xMax < r[0] or
+            e.xMin > r[2] or
+            e.yMax < r[1] or
+            e.yMin > r[3]
+        )
+        print("Overlap:", overlap)
+        
+        # check rather values are in range
+        arr = reg.warp(target_file, resampleAlg="near") 
+        inside = arr[reg.mask.astype(bool)] 
+
+        unique, counts = np.unique(inside, return_counts=True) 
+        print("Raster values inside target area:")
+        for value, pixel_count in zip(unique, counts):
+            print(f"value={value}, number pixels={pixel_count}")
+
+        print (f"Your raster target values: {file_target_value} should be part of the raster pixel values. Otherwise the calculation will yield no results")
+
+
+    #something else
+    else:
+        raise TypeError("Area path must be a string ending with .tiff/.tif/.shp.")
+    
+
+
+
+
+    # 4) create proximity matrix
+    #########################################
+    # region mask, gk_geom, distances from evaluation_values, utput dir 
+    result = edgesByProximity(reg, target_area, thresholds, output_dir)  
+
+    # 5) make result
+    #########################################
+    writeEdgeFile(
+        result, reg, output_dir, evaluation_name, unit, description, source, thresholds
+    )
+
+
+def evaluate_area_by_proximity_raster(Area_path, target_file, where=None, output_dir=None, file_target_value=None, evaluation_name= None):
+    """
+    This function extracts all pixels in “target_file” that match “file_target_value,”
+    generates buffer zones according to the values defined for “evaluation_name,” within "Area".
+    
+
+        
+    """
+    print("===================================================================================================")
+    print("marking the buffer zones around your target area")
+    print("===================================================================================================")
+
+    # gets data from the EVALUATIONS DICT
+    eval_def = EVALUATIONS[evaluation_name]
+    unit = eval_def["unit"]
+    description = eval_def["description"]
+    source = eval_def["source"]
+    thresholds = eval_def["thresholds"]
 
     # get target file value
     info = gk.raster.rasterInfo(target_file)
@@ -238,7 +411,7 @@ def evaluate_area_by_proximity_raster(Area_path, target_file, where=None, output
     for value, pixel_count in zip(unique, counts):
         print(f"value={value}, number pixels={pixel_count}")
 
-    print (f"Please make sure that at least one of these values is selected b your raster target values: {file_target_value}")
+    print (f"Your raster target values: {file_target_value} should be part of the raster pixel values. Otherwise the calculation will yield no results")
 
 
 
@@ -259,26 +432,6 @@ def evaluate_area_by_threshold_raster(Area_path, #area to analyze
                               ):
     """This function marks cells which are below a certain threshold. Base for the threshold values is the "tif_file"
     within the "Area".
-
-    Args:
-        Area (shp path | tif path ): 
-            The area boundary used for clipping the analysis. Can be a path to raster or a shapefile
-
-        where ( str | optional an SQL-style filtering string):
-            Feature ID used to select a specific polygon from "Area" if it is a vector dataset
-            Ignored if "Area" is a raster
-
-        target_file (tif | str):
-            Raster file containing values to which the trechhold is applied. Usually represents
-            infrastructure, land use features, or environmental constraints
-
-
-        output_dir (str):
-            Path where the output files will be stored
-
-        evaluation_name (str):
-            Key referring to the corresponding metadata entry in the EVALUATIONS dictionary. 
-            Determines thresholds, unit, and description for the evaluation process.
 
     """
     print("===================================================================================================")
@@ -1010,63 +1163,70 @@ EVALUATIONS = {
         "description": "Indicates distances too close to motorways areas (m)",
         "source": "",
         "thresholds": [
-            0, 100, 200,500, 1000
+            0, 100, 200,
             #200, 300, 400, 500
         ], # example values
     },
 }
 
 ## TESTING
+Area_path = str(base_path/ "input/CDDA_aachenClipped.shp")
+Area_path_tif = str(base_path/ "input/aachen_srs_3035.tif")
+target_file =str(base_path/ "input/roads_prior_clip.tif")
 
-Area_path = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/CDDA_aachenClipped.shp"
-Area_path_tif = "/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif"
-target_file ="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif"
+evaluate_area_by_proximity(          
+    Area_path = str(base_path / "input/aachenShapefile.shp"),
+    evaluation_name= "road_proximity",
+    #where="SITE_CODE=555558604",
+    #target_file=str(base_path/"input/roads_prior_clip.tif"),
+    target_file=str(base_path /"input/aachenRoads.shp"),
+    #file_target_value=[1, 10, 7, 21], # for raster target
+    file_target_value=None , # for shape
+    #file_target_value="type='residential'", # for shape
+    output_dir = str(base_path/"output/proximity/with_shape/")
+)
 
-#with shape
+
+
+
+# #with shape
 # evaluate_area_by_proximity_raster(          
-#     Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/glaes/test/data/aachenShapefile.shp",
+#     Area_path = str(base_path / "input/aachenShapefile.shp"),
 #     evaluation_name= "road_proximity",
 #     #where="SITE_CODE=555558604",
-#     #target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
-#     target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenRoads.shp",
-#     #file_target_value=[10, 7, 21], 
-#     file_target_value="maxspeed='nan'",
+#     target_file=str(base_path/"input/roads_prior_clip.tif"),
+#     #target_file=str(base_path /"input/aachenRoads.shp"),
+#     file_target_value=[1, 10, 7, 21], 
+#     #file_target_value="maxspeed='nan'",
 #     output_dir = str(base_path/"output/proximity/with_shape/")
 # )
-#with tif
+# #with tif
 # evaluate_area_by_proximity_raster(          
 #     Area_path=Area_path_tif,
 #     evaluation_name= "road_proximity",
-#     where="SITE_CODE=555558604",
-#     #target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
-#     target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenRoads.shp",
-#     #file_target_value=[10, 7, 21], 
-#     file_target_value="maxspeed='nan'",
-#     output_dir = str(base_path/"output/proximity/with_shape/")
+#     #where="SITE_CODE=555558604",
+#     #target_file=str(base_path/" input/roads_prior_clip.tif",
+#     target_file=str(base_path / "input/roads_prior_clip.tif"),
+#     file_target_value=[1, 10, 7, 21], 
+#     # file_target_value="maxspeed='nan'",
+#     output_dir = str(base_path/"output/proximity/with_raster/")
 # )
 
 
-#wtih shape
-evaluate_area_by_threshold_raster(           
-    Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachenShapefile.shp",
-    evaluation_name= "road_threshold",
-    #where="SITE_CODE=555558604",
-    target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
-    output_dir = str("/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/output/threshold/target_raster/")
-    )
-
-# # with tif
+#THRESHOLD 
+# raster as target
 # evaluate_area_by_threshold_raster(           
-#     Area_path=Area_path_tif,
-#     evaluation_name= "road_proximity",
-#     where="SITE_CODE=555558604",
-#     target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
-#     output_dir = str(base_path/"output/proximity/with_shape/")
+#     Area_path=str(base_path / "input/aachen_srs_3035.tif"),
+#     evaluation_name= "road_threshold",
+#     #where="SITE_CODE=555558604",
+#     target_file=str(base_path / "input/roads_prior_clip.tif"),
+#     output_dir = str(base_path / "output/threshold/target_raster/"),
 #     )
-evaluate_area_by_threshold_raster(           
-    Area_path="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/aachen_srs_3035.tif",
-    evaluation_name= "road_threshold",
-    #where="SITE_CODE=555558604",
-    target_file="/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/input/roads_prior_clip.tif",
-    output_dir = str("/fast/home/l-madeisky/models_IEK_3/IEK3_Models/glaes_2026/glaes/deletme_create_prior/output/threshold/target_shape/")
-    )
+# # shape as target
+# evaluate_area_by_threshold_raster(           
+#     Area_path=str(base_path / "input/aachenShapefile.shp"),
+#     evaluation_name= "road_threshold",
+#     #where="SITE_CODE=555558604",
+#     target_file=str(base_path / "input/roads_prior_clip.tif"),
+#     output_dir = str(base_path / "output/threshold/target_shape/"),
+#     )
