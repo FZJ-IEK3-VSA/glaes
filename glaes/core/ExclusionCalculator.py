@@ -329,7 +329,7 @@ class ExclusionCalculator(object):
     def draw(
         s,
         ax=None,
-        goodColor=(255 / 255, 255 / 255, 255 / 255), #TODO create contrast in the legend box for this colour. ATM there is a white box on white background.
+        goodColor=(255 / 255, 255 / 255, 255 / 255),
         excludedColor=(2 / 255, 61 / 255, 107 / 255),
         itemsColor=(51 / 255, 153 / 255, 255 / 255),
         legend=True,
