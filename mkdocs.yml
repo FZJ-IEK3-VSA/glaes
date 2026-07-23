@@ -53,6 +53,7 @@ nav:
   - Examples:
     - Basic Workflow: notebooks/00_basic_workflow.ipynb
     - Placement Algorithm: notebooks/01_Placement_algorithm.ipynb
+    - Extended Methods: notebooks/02_extended_methods.ipynb
   - API Reference: api/
   - About:
     - Further Reading: further-reading.md

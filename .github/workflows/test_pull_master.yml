@@ -1,15 +1,20 @@
 on:
-  workflow_dispatch:
-  push:
-    branches: ["**"]
+  pull_request:
+    branches: ["master"]
 
 jobs:
-  TestPushCondaForgeDev:
-    name: Test conda-forge development version on ${{ matrix.runner_tag }}
+  extract-versions:
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/extract_versions.yml@v1
+    with:
+        libraries: "python,pandas,numpy,scipy"
+        version_type: both
+        env_file: requirements-dev.yml
+  TestPullCondaForgeMaster:
+    name: Test master version on ${{ matrix.runner_tag }}
     strategy:
       fail-fast: false
       matrix:
-        runner_tag: ["self-hosted"]
+        runner_tag: ["self-hosted", "windows-latest"]
     # geokit is checked out as an extra repo, its requirements-dev.yml is merged
     # with glaes', and both are installed editable before the tests run.
     uses: FZJ-IEK3-VSA/.github/.github/workflows/run_conda_forge_test_with_extra_repos.yml@v1
@@ -22,8 +27,5 @@ jobs:
           {"repo": "FZJ-IEK3-VSA/geokit"}
         ]
       multiprocessing_pytest_string: "-n auto"
-      # Collect coverage and upload to Codecov (requires the CODECOV_TOKEN secret).
-      coverage: true
-      coverage_package_name: glaes
       ipynb_example_folder: "Examples"
       multiprocessing_example_string: "-n 2"

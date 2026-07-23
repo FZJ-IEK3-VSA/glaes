@@ -3,6 +3,12 @@ on:
     branches: ["dev"]
 
 jobs:
+  extract-versions:
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/extract_versions.yml@v1
+    with:
+        libraries: "python,pandas,numpy,scipy"
+        version_type: min
+        env_file: requirements-dev.yml
   TestPullCondaForgeDev:
     name: Test development version on ${{ matrix.runner_tag }}
     strategy:
@@ -21,3 +27,5 @@ jobs:
           {"repo": "FZJ-IEK3-VSA/geokit"}
         ]
       multiprocessing_pytest_string: "-n auto"
+      ipynb_example_folder: "Examples"
+      multiprocessing_example_string: "-n 2"
