@@ -3,29 +3,60 @@ on:
     branches: ["master"]
 
 jobs:
-  extract-versions:
-    uses: FZJ-IEK3-VSA/.github/.github/workflows/extract_versions.yml@v1
-    with:
-        libraries: "python,pandas,numpy,scipy"
-        version_type: both
-        env_file: requirements-dev.yml
+  # Development-version test: current (unpinned) requirements.
+  # Runs on both self-hosted and Windows.
   TestPullCondaForgeMaster:
     name: Test master version on ${{ matrix.runner_tag }}
     strategy:
       fail-fast: false
       matrix:
         runner_tag: ["self-hosted", "windows-latest"]
-    # geokit is checked out as an extra repo, its requirements-dev.yml is merged
+    # geokit is checked out as an extra repo, its requirements.yml is merged
     # with glaes', and both are installed editable before the tests run.
     uses: FZJ-IEK3-VSA/.github/.github/workflows/run_conda_forge_test_with_extra_repos.yml@v1
     secrets: inherit
     with:
       runner_tag: ${{ matrix.runner_tag }}
-      requirements_file_name: requirements-dev.yml
+      requirements_file_name: requirements.yml
       extra_repos: |
         [
           {"repo": "FZJ-IEK3-VSA/geokit"}
         ]
+      multiprocessing_pytest_string: "-n auto"
+      ipynb_example_folder: "Examples"
+      multiprocessing_example_string: "-n 2"
+
+  # Extract both the minimum (lower-bound) and maximum (upper-bound) versions
+  # of the core dependencies.
+  extract-versions:
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/extract_versions.yml@v1
+    with:
+        libraries: "python,pandas,numpy,scipy"
+        version_type: both
+        env_file: requirements.yml
+
+  # Minimum-/maximum-dependency-version test: pin each dependency to its
+  # lower and upper bound. This is only run on self-hosted.
+  TestPullMinMaxVersionsMaster:
+    name: Test ${{ matrix.dependencies.library_name }} ${{ matrix.dependencies.version }} (${{ matrix.dependencies.version_type }}) on self-hosted
+    needs: extract-versions
+    if: needs.extract-versions.outputs.matrix != '' && needs.extract-versions.outputs.matrix != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        dependencies: ${{ fromJSON(needs.extract-versions.outputs.matrix) }}
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/run_conda_forge_test_with_extra_repos.yml@v1
+    secrets: inherit
+    with:
+      runner_tag: "self-hosted"
+      requirements_file_name: requirements.yml
+      extra_repos: |
+        [
+          {"repo": "FZJ-IEK3-VSA/geokit"}
+        ]
+      library_name: ${{ matrix.dependencies.library_name }}
+      library_version: ${{ matrix.dependencies.version }}
+      dependency_position_env_file: ${{ matrix.dependencies.yaml_position }}
       multiprocessing_pytest_string: "-n auto"
       ipynb_example_folder: "Examples"
       multiprocessing_example_string: "-n 2"

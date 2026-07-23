@@ -4,7 +4,7 @@
         "config:recommended"
     ],
     "schedule": [
-        "* * 1 * *"
+        "before 5am on the first day of the month"
     ],
     "rangeStrategy": "widen",
     "recreateWhen": "always",
@@ -20,7 +20,7 @@
         {
             "customType": "regex",
             "managerFilePatterns": [
-                "/(^|/)requirements_dev\\.yml$/"
+                "/(^|/)requirements\\.yml$/"
             ],
             "matchStrings": [
                 "- (?<depName>python|jupyter|matplotlib|pandas|numpy|scipy|pytest|pytest-xdist|pytest-cov|ruff|nbval)\\s[^\\n]*?(?<currentValue><=\\d[^\\n,]*)"
@@ -28,7 +28,7 @@
             "packageNameTemplate": "conda-forge/{{{depName}}}",
             "datasourceTemplate": "conda",
             "versioningTemplate": "pep440"
-        },
+        }
     ],
     "packageRules": [
         {

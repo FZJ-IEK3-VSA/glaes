@@ -8,7 +8,7 @@ jobs:
     if: startsWith(github.head_ref, 'renovate/')
     uses: FZJ-IEK3-VSA/.github/.github/workflows/detect_renovate_changes.yml@v1
     with:
-      files: "requirements-dev.yml"
+      files: "requirements.yml"
 
   extract-versions:
     name: Extract max versions of changed libraries
@@ -18,7 +18,7 @@ jobs:
     with:
       libraries: ${{ needs.detect-changes.outputs.libraries }}
       version_type: max
-      env_file: requirements-dev.yml
+      env_file: requirements.yml
 
   TestRenovateMaxVersions:
     name: Test ${{ matrix.dependencies.library_name }} ${{ matrix.dependencies.version }} (max)
@@ -33,7 +33,7 @@ jobs:
     secrets: inherit
     with:
       runner_tag: ${{ matrix.runner_tag }}
-      requirements_file_name: requirements-dev.yml
+      requirements_file_name: requirements.yml
       extra_repos: |
         [
           {"repo": "FZJ-IEK3-VSA/geokit"}

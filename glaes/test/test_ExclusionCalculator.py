@@ -1,5 +1,4 @@
 import statistics
-import pytest
 import warnings
 from copy import copy
 from os.path import dirname, isfile, join
@@ -9,6 +8,7 @@ import geokit as gk
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pytest
 
 import glaes as gl
 
@@ -113,12 +113,11 @@ def test_ExclusionCalculator___init__():
     # Test region string with multiple features
     ec_multi = gl.ExclusionCalculator(cddaVector, srs=3035)
     assert ec_multi.region is not None
-    
 
-    #The intended input is a string like "N51E10", 
-    #encoding lat/lon as letter+number pairs (e.g. N51 = 51° North, E10 = 10° East).
-    #The code tries to parse this and create a centered LAEA spatial reference system via gk.srs.centeredLAEA().
-    
+    # The intended input is a string like "N51E10",
+    # encoding lat/lon as letter+number pairs (e.g. N51 = 51° North, E10 = 10° East).
+    # The code tries to parse this and create a centered LAEA spatial reference system via gk.srs.centeredLAEA().
+
     # This test ensures the deprecation warning
 
     deprecated_srs = "E51N10"
@@ -131,10 +130,8 @@ def test_ExclusionCalculator___init__():
             gl.ExclusionCalculator(geom, srs=deprecated_srs)
 
         # the warning should still have been triggered before the crash
-        assert any(
-            issubclass(warn.category, DeprecationWarning)
-            for warn in w
-        )
+        assert any(issubclass(warn.category, DeprecationWarning) for warn in w)
+
 
 def test_ExclusionCalculator_save():
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
@@ -144,7 +141,7 @@ def test_ExclusionCalculator_save():
     assert np.nansum(mat - ec.availability) == 0
     assert np.isclose(np.nansum(mat), 28461360)
     assert np.isclose(np.nanstd(mat), 77.2323849648)
- 
+
     # if threshold is given
     ec.save(join(RESULTDIR, "save2.tif"), threshold=101)
     mat2 = gk.raster.extractMatrix(join(RESULTDIR, "save2.tif"))
@@ -152,6 +149,7 @@ def test_ExclusionCalculator_save():
     assert np.sum(mat2 == 0) == 70944
     assert np.sum(mat2 == 255) == 83792
     assert mat2.size == 154736
+
 
 def test_ExclusionCalculator_draw():
     ec = gl.ExclusionCalculator(aachenShape, srs=3035)
@@ -227,10 +225,11 @@ def test_ExclusionCalculator_draw():
     assert ax_deg is not None
 
     # Feet-based region (EPSG:2263) --> TODO Not working, an actual shapefile with feet unit is needed
-    #ec_ft = gl.ExclusionCalculator(aachenShape, srs=2263)
-    #ax_ft = ec_ft.draw()
-    #plt.close()
-    #assert ax_ft is not None
+    # ec_ft = gl.ExclusionCalculator(aachenShape, srs=2263)
+    # ax_ft = ec_ft.draw()
+    # plt.close()
+    # assert ax_ft is not None
+
 
 def test_ExclusionCalculator_excludeRasterType():
     # exclude single value

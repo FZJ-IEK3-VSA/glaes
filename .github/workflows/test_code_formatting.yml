@@ -1,0 +1,38 @@
+name: Check code formatting and Linter hints
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["dev", "master"]
+
+jobs:
+  # Read the pinned ruff version from requirements.yml so it stays the single
+  # source of truth (avoids drift between the linter and the dev environment).
+  extract-ruff-version:
+    name: Read ruff version from requirements.yml
+    runs-on: ubuntu-latest
+    outputs:
+      ruff_version: ${{ steps.read.outputs.ruff_version }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Read ruff version
+        id: read
+        shell: bash
+        run: |
+          # Matches lines like "- ruff =0.14.1" (also handles ==, >=, <=).
+          version=$(sed -nE 's/^[[:space:]]*-[[:space:]]*ruff[[:space:]]*[=<>!~]+[[:space:]]*([0-9][^[:space:],]*).*/\1/p' requirements.yml | head -n1)
+          if [ -z "$version" ]; then
+            echo "::error::Could not find a pinned ruff version in requirements.yml"
+            exit 1
+          fi
+          echo "Found ruff version: $version"
+          echo "ruff_version=$version" >> "$GITHUB_OUTPUT"
+
+  ruff:
+    needs: extract-ruff-version
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/lint.yml@v1
+    with:
+      config_file: ruff.toml
+      ruff_version: ${{ needs.extract-ruff-version.outputs.ruff_version }}

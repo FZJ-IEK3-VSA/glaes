@@ -33,7 +33,7 @@ GLAES is closely linked to [GeoKit](https://github.com/FZJ-IEK3-VSA/geokit). If 
     git clone https://github.com/FZJ-IEK3-VSA/geokit.git
     ```
 
-2. Copy all dependencies from both `requirements-dev.yml` files into a new `requirements-combined.yml`.
+2. Copy all dependencies from both `requirements.yml` files into a new `requirements-combined.yml`.
 
 3. Create the new environment with all conda-forge dependencies:
 

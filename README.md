@@ -8,7 +8,7 @@
 
 # Geospatial Land Availability for Energy Systems (GLAES)
 
-GLAES is a framework for conducting land eligibility analyses and is designed to easily incorporate disparate geospatial information from a variety of sources into a unified solution.
+GLAES is a framework for conducting land eligibility analyses and is designed to easily incorporate disparate geospatial information from a variety of sources into a unified solution. The documentation can be found at: 
 Currently, the main purpose of GLAES is performing land eligibility (LE) analyses which, in short, are used to determine which areas within a region are deemed 'eligible' for some purpose (such as placing a wind turbine).
 Although initially intended to operate in the context of distributed renewable energy systems, such as onshore wind and open-field solar parks, the workflow of GLAES is applicable to any context where a constrained indication of land is desired.
 Except in the context of Europe, GLAES only provides a framework for conducting these types of analyses, and so the underlying data sources which are used will need to be provided.
@@ -103,7 +103,7 @@ git clone https://github.com/FZJ-IEK3-VSA/glaes.git
 git clone https://github.com/FZJ-IEK3-VSA/geokit.git
 ```
 
-2. Copy all dependencies of both `requirements-dev.yml` files into a new `requirements-combined.yml`.
+2. Copy all dependencies of both `requirements.yml` files into a new `requirements-combined.yml`.
 
 3. Create the new environment with all conda-forge dependencies:
 
