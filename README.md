@@ -1,14 +1,11 @@
-<a href="https://www.fz-juelich.de/en/ice/ice-2">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/FZJ-IEK3-VSA/README_assets/blob/v.1.0.0/ICE2_Logos/JSA-Header-dark.svg?raw=True">
-    <img src="https://github.com/FZJ-IEK3-VSA/README_assets/blob/v.1.0.0/ICE2_Logos/JSA-Header.svg?raw=True" alt="Logo für Forschungszentrum Juelich - Juelich System Analysis" width="300px">
-  </picture>
-</a>
-
+<p align="left">
+  <a href="https://www.fz-juelich.de/en/ice/ice-2"><img src="https://raw.githubusercontent.com/FZJ-IEK3-VSA/README_assets/v.1.0.0/ICE2_Logos/JSA-Header.svg" alt="Jülich System Analysis Header" height="80px"></a>
+</p>
 
 # Geospatial Land Availability for Energy Systems (GLAES)
 
-GLAES is a framework for conducting land eligibility analyses and is designed to easily incorporate disparate geospatial information from a variety of sources into a unified solution. The documentation can be found at: 
+GLAES is a framework for conducting land eligibility analyses and is designed to easily incorporate disparate geospatial information from a variety of sources into a unified solution. The documentation can be found at: https://ethosglaes.readthedocs.io/
+
 Currently, the main purpose of GLAES is performing land eligibility (LE) analyses which, in short, are used to determine which areas within a region are deemed 'eligible' for some purpose (such as placing a wind turbine).
 Although initially intended to operate in the context of distributed renewable energy systems, such as onshore wind and open-field solar parks, the workflow of GLAES is applicable to any context where a constrained indication of land is desired.
 Except in the context of Europe, GLAES only provides a framework for conducting these types of analyses, and so the underlying data sources which are used will need to be provided.

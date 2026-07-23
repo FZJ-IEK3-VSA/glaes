@@ -82,7 +82,7 @@ plugins:
             separate_signature: true
             show_signature_annotations: true
   - mkdocs-jupyter:
-      execute: false
+      execute: true
       include_source: true
       allow_errors: true
       include_requirejs: true

@@ -2,17 +2,27 @@
 version: 2
 
 # Build environment
+# A conda (mambaforge) environment is used so the example notebooks can be
+# executed at build time with the full geospatial runtime available from
+# conda-forge (mkdocs-jupyter runs with execute: true).
 build:
   os: ubuntu-22.04
   tools:
-    python: "3.12"
-  apt_packages:
-    - pandoc
-    - libgdal-dev
-    - gdal-bin
+    python: "mambaforge-latest"
+
   jobs:
+    post_create_environment:
+      # geokit is deliberately kept out of requirements.yml (CI installs it
+      # editable from the extra repo). For the docs build it is pulled from
+      # conda-forge so the example notebooks can be executed.
+      - mamba install -y -c conda-forge geokit
     post_install:
-      - pip install -e ".[docs]"
+      # Install glaes itself without touching the conda-managed dependencies.
+      - pip install -e . --no-deps
+
+# All dependencies come from conda-forge (see requirements.yml).
+conda:
+  environment: requirements.yml
 
 # Build documentation with MkDocs
 mkdocs:
