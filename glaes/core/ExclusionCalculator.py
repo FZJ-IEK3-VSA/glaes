@@ -515,7 +515,9 @@ class ExclusionCalculator(object):
                     label=f"{'Ausgeschlossen' if german else 'Excluded'}: %.2f%%" % (100 - p),
                 ),
                 Patch(
-                    color=goodColor,
+                    fc=goodColor,
+                    ec="0.5",
+                    linewidth=1,
                     label=f"{'Verfügbar' if german else 'Eligible'}: %.2f%%" % (p),
                 ),
             ]
