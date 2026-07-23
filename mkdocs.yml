@@ -84,7 +84,7 @@ plugins:
   - mkdocs-jupyter:
       execute: true
       include_source: true
-      allow_errors: true
+      allow_errors: false
       include_requirejs: true
       toc_depth: 3
   - gen-files:

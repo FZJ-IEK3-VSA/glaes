@@ -11,19 +11,20 @@ build:
     python: "mambaforge-latest"
 
   jobs:
-    post_create_environment:
-      # geokit is deliberately kept out of requirements.yml (CI installs it
-      # editable from the extra repo). For the docs build it is pulled from
-      # conda-forge so the example notebooks can be executed.
+    pre_build:
       - mamba install -y -c conda-forge geokit
-    post_install:
-      # Install glaes itself without touching the conda-managed dependencies.
-      - pip install -e . --no-deps
+      - conda run --name $READTHEDOCS_VERSION pip install -e . --no-deps
+      - conda list -n $READTHEDOCS_VERSION
+    build:
+      html:
+        - conda run --name $READTHEDOCS_VERSION mkdocs build --site-dir $READTHEDOCS_OUTPUT/html
 
 # All dependencies come from conda-forge (see requirements.yml).
 conda:
   environment: requirements.yml
 
-# Build documentation with MkDocs
+# Build documentation with MkDocs.
+# NOTE: the actual `mkdocs build` is invoked from build_docs.sh (see the
+# build.jobs.build.html override above); this key documents the config file.
 mkdocs:
   configuration: mkdocs.yml
