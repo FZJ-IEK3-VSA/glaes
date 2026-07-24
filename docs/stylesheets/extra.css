@@ -121,13 +121,13 @@
 /* Height-based sizing keeps the two logos aligned and symmetric.
    Footer is always dark, so the JSA logo is inverted to white. */
 .footer-logo--jsa {
-  height: 60px;
+  height: 109.2px;
   width: auto;
   filter: brightness(0) invert(1);
 }
 
 .footer-logo--helmholtz {
-  height: 33px;
+  height: 60px;
   width: auto;
 }
 
