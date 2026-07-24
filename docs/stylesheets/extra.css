@@ -118,16 +118,20 @@
   flex-shrink: 0;
 }
 
-/* Height-based sizing keeps the two logos aligned and symmetric.
-   Footer is always dark, so the JSA logo is inverted to white. */
-.footer-logo--jsa {
-  height: 72.8px;
+/* Material's ".md-typeset img" rule (specificity 0,1,1) forces height:auto on
+   images inside the footer meta. We scope under ".md-footer" (specificity
+   0,2,0) so our sizing wins — otherwise the Helmholtz SVG, which has only a
+   viewBox and no intrinsic width/height, is forced to height:auto, collapses
+   to 0, and disappears. Height-based sizing keeps the two logos aligned and
+   symmetric. The footer is always dark, so the JSA logo is inverted to white. */
+.md-footer .footer-logo--jsa {
+  height: 60px;
   width: auto;
   filter: brightness(0) invert(1);
 }
 
-.footer-logo--helmholtz {
-  height: 40px;
+.md-footer .footer-logo--helmholtz {
+  height: 33px;
   width: auto;
 }
 
