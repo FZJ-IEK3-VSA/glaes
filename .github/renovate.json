@@ -20,7 +20,7 @@
         {
             "customType": "regex",
             "managerFilePatterns": [
-                "/(^|/)requirements\\.yml$/"
+                "/(^|/)requirements(-no-geokit)?\\.yml$/"
             ],
             "matchStrings": [
                 "- (?<depName>python|jupyter|matplotlib|pandas|numpy|scipy|pytest|pytest-xdist|pytest-cov|ruff|nbval)\\s[^\\n]*?(?<currentValue><=\\d[^\\n,]*)"

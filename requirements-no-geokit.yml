@@ -10,7 +10,7 @@ dependencies:
   - pandas >=1.4.0,<=3.0.3
   - numpy >=1.26.0,<=2.5.0
   - scipy >=1.10.0,<1.18.0
-  - geokit >=1.7.1,<=1.9.0 # conda-forge build; for a source/dev install use requirements-no-geokit.yml
+  # - geokit # omitted on purpose: install editable from the geokit GitHub repo for cross-development
   # dev
   - pytest <=9.1.1
   - pytest-xdist <=3.8.0

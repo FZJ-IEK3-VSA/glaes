@@ -33,7 +33,7 @@ GLAES is closely linked to [GeoKit](https://github.com/FZJ-IEK3-VSA/geokit). If 
     git clone https://github.com/FZJ-IEK3-VSA/geokit.git
     ```
 
-2. Copy all dependencies from both `requirements.yml` files into a new `requirements-combined.yml`.
+2. Combine the dependencies from GLAES's `requirements-no-geokit.yml` and GeoKit's `requirements.yml` into a new `requirements-combined.yml`. GLAES ships a dedicated `requirements-no-geokit.yml` that intentionally omits the conda-forge `geokit` package, so it does not shadow the editable GeoKit you install from source in step 5.
 
 3. Create the new environment with all conda-forge dependencies:
 

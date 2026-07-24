@@ -12,7 +12,6 @@ build:
 
   jobs:
     pre_build:
-      - mamba install -y -c conda-forge geokit
       - conda run --name $READTHEDOCS_VERSION pip install -e . --no-deps
       - conda list -n $READTHEDOCS_VERSION
     build:

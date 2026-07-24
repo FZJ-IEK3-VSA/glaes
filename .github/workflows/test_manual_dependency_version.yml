@@ -28,7 +28,7 @@ on:
 
 jobs:
   # Orchestration lives in the centralized .github repo. glaes only supplies the
-  # repo-specific values: its requirements file and geokit as an extra repo.
+  # repo-specific values: its requirements file (geokit comes from conda-forge).
   manual-dependency-test:
     uses: FZJ-IEK3-VSA/.github/.github/workflows/test_manual_dependency_version.yml@v1
     secrets: inherit
@@ -38,8 +38,4 @@ jobs:
       max_version: ${{ inputs.max_version }}
       runner_tag: ${{ inputs.runner_tag }}
       requirements_file_name: requirements.yml
-      extra_repos: |
-        [
-          {"repo": "FZJ-IEK3-VSA/geokit"}
-        ]
       additional_conda_channel: ${{ inputs.additional_conda_channel }}

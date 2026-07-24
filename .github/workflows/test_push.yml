@@ -10,17 +10,12 @@ jobs:
       fail-fast: false
       matrix:
         runner_tag: ["self-hosted"]
-    # geokit is checked out as an extra repo, its requirements.yml is merged
-    # with glaes', and both are installed editable before the tests run.
-    uses: FZJ-IEK3-VSA/.github/.github/workflows/run_conda_forge_test_with_extra_repos.yml@v1
+    # geokit is installed from conda-forge via requirements.yml (no source checkout).
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/run_conda_forge_test.yml@v1
     secrets: inherit
     with:
       runner_tag: ${{ matrix.runner_tag }}
       requirements_file_name: requirements.yml
-      extra_repos: |
-        [
-          {"repo": "FZJ-IEK3-VSA/geokit"}
-        ]
       multiprocessing_pytest_string: "-n auto"
       # Collect coverage and upload to Codecov (requires the CODECOV_TOKEN secret).
       coverage: true

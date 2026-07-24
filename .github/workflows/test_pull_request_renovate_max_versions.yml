@@ -29,15 +29,11 @@ jobs:
       matrix:
         runner_tag: ["self-hosted"]
         dependencies: ${{ fromJSON(needs.extract-versions.outputs.matrix) }}
-    uses: FZJ-IEK3-VSA/.github/.github/workflows/run_conda_forge_test_with_extra_repos.yml@v1
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/run_conda_forge_test.yml@v1
     secrets: inherit
     with:
       runner_tag: ${{ matrix.runner_tag }}
       requirements_file_name: requirements.yml
-      extra_repos: |
-        [
-          {"repo": "FZJ-IEK3-VSA/geokit"}
-        ]
       ipynb_example_folder: "Examples"
       library_name: ${{ matrix.dependencies.library_name }}
       library_version: ${{ matrix.dependencies.version }}
