@@ -54,10 +54,12 @@
   height: auto;
 }
 
-/* Invert JSA header in dark mode so it remains visible */
-[data-md-color-scheme="slate"] .md-typeset .hero-logo--jsa {
-  filter: brightness(0) invert(1);
-}
+/* Dark mode uses the real dark asset from README_assets, selected by Material's
+   "#only-light" / "#only-dark" URL-fragment convention on the landing page —
+   the same mechanism GeoKit, TSAM and FINE use, and the form the README's
+   <picture> markup corresponds to. This replaced a
+   `filter: brightness(0) invert(1)` on the light asset, which flattened the
+   lockup to pure white instead of using the variant that ships for it. */
 
 /* -- Notebook styling — hide prompts, style code cells, dark mode -------- */
 
