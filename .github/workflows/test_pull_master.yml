@@ -1,12 +1,12 @@
 on:
   pull_request:
-    branches: ["dev"]
+    branches: ["master"]
 
 jobs:
   # Development-version test: current (unpinned) requirements.
   # Runs on both self-hosted and Windows.
-  TestPullCondaForgeDev:
-    name: Test development version on ${{ matrix.runner_tag }}
+  TestPullCondaForgeMaster:
+    name: Test master version on ${{ matrix.runner_tag }}
     strategy:
       fail-fast: false
       matrix:
@@ -21,18 +21,19 @@ jobs:
       ipynb_example_folder: "Examples"
       multiprocessing_example_string: "-n 2"
 
-  # Extract the minimum (lower-bound) versions of the core dependencies.
+  # Extract both the minimum (lower-bound) and maximum (upper-bound) versions
+  # of the core dependencies.
   extract-versions:
     uses: FZJ-IEK3-VSA/.github/.github/workflows/extract_versions.yml@v1
     with:
         libraries: "python,pandas,numpy,scipy"
-        version_type: min
+        version_type: both
         env_file: requirements.yml
 
-  # Minimum-dependency-version test: pin each dependency to its lower bound.
-  # This is only run on self-hosted.
-  TestPullMinVersionsDev:
-    name: Test min ${{ matrix.dependencies.library_name }} ${{ matrix.dependencies.version }} on self-hosted
+  # Minimum-/maximum-dependency-version test: pin each dependency to its
+  # lower and upper bound. This is only run on self-hosted.
+  TestPullMinMaxVersionsMaster:
+    name: Test ${{ matrix.dependencies.library_name }} ${{ matrix.dependencies.version }} (${{ matrix.dependencies.version_type }}) on self-hosted
     needs: extract-versions
     if: needs.extract-versions.outputs.matrix != '' && needs.extract-versions.outputs.matrix != '[]'
     strategy:

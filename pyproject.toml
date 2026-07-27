@@ -47,15 +47,6 @@ filterwarnings = [
 ]
 
 
-[project.optional-dependencies]
-docs = [
-    "mkdocs-material",
-    "mkdocstrings[python]",
-    "mkdocs-jupyter",
-    "mkdocs-gen-files",
-    "mkdocs-literate-nav",
-]
-
 [project.urls]
 homepage = "https://github.com/FZJ-IEK3-VSA/glaes"
 repository = "https://github.com/FZJ-IEK3-VSA/glaes"
