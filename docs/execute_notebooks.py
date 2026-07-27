@@ -103,9 +103,7 @@ def strip_outputs(path: Path) -> bool:
 
 def discover(notebooks_dir: Path, exclude: list[str]) -> list[Path]:
     return sorted(
-        p
-        for p in notebooks_dir.rglob("*.ipynb")
-        if p.name not in exclude and ".ipynb_checkpoints" not in p.parts
+        p for p in notebooks_dir.rglob("*.ipynb") if p.name not in exclude and ".ipynb_checkpoints" not in p.parts
     )
 
 
@@ -167,8 +165,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     print(
-        f"Executing {len(notebooks)} notebooks with {args.workers} worker(s), "
-        f"per-cell timeout {args.timeout}s",
+        f"Executing {len(notebooks)} notebooks with {args.workers} worker(s), per-cell timeout {args.timeout}s",
         flush=True,
     )
 
