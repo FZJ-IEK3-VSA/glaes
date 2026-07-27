@@ -1,5 +1,5 @@
-site_name: GLAES Documentation
-site_url: https://glaes.readthedocs.io/en/latest/
+site_name: ETHOS.GLAES
+site_url: https://ethosglaes.readthedocs.io/
 repo_url: https://github.com/FZJ-IEK3-VSA/glaes
 repo_name: FZJ-IEK3-VSA/glaes
 edit_uri: edit/master/docs/
@@ -7,7 +7,10 @@ edit_uri: edit/master/docs/
 theme:
   name: material
   custom_dir: docs/overrides
-  favicon: assets/favicon.svg
+  # NOTE: no `favicon:` key — it previously pointed at assets/favicon.svg, which
+  # has never existed in the repo (docs/assets/ is empty and untracked), so every
+  # page requested a 404. Material's own default favicon is used until GLAES has
+  # a brand mark of its own; add the key back alongside a `logo:` when it does.
   font:
     text: Roboto
     code: Roboto Mono
@@ -62,9 +65,13 @@ nav:
 hooks:
   - docs/copy_examples.py
 
+# docs/overrides/ holds the Material theme overrides (see theme.custom_dir); it
+# is template source, not content, so it must not be copied into the site.
 exclude_docs: |
   gen_ref_pages.py
   copy_examples.py
+  execute_notebooks.py
+  overrides/
 
 plugins:
   - search
@@ -82,7 +89,11 @@ plugins:
             separate_signature: true
             show_signature_annotations: true
   - mkdocs-jupyter:
-      execute: true
+      # Notebooks are NOT executed here. They are pre-executed in parallel by
+      # docs/execute_notebooks.py as a docs pre-build step (see
+      # .readthedocs.yaml) and rendered from those outputs, which keeps the
+      # build fast and surfaces notebook failures on their own.
+      execute: false
       include_source: true
       allow_errors: false
       include_requirejs: true
