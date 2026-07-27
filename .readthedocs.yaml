@@ -15,7 +15,7 @@ build:
       - conda run --name $READTHEDOCS_VERSION pip install -e . --no-deps
       - conda list -n $READTHEDOCS_VERSION
       # Import matplotlib to prevent font cache warning in examples
-      - conda run --name $READTHEDOCS_VERSION python -c "import matplotlib"
+      - conda run --name $READTHEDOCS_VERSION python -c "import matplotlib.pyplot as plt"
       # Execute the example notebooks in parallel before the build.
       # mkdocs-jupyter is configured with execute: false and renders these
       # outputs; docs/copy_examples.py then stages Examples/ (outputs included)
