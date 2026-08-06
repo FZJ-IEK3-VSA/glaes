@@ -1020,11 +1020,7 @@ def evaluate_AG_ARABLE(regSource, ftrID, tail, multiProcess: bool = False):
 
     multiProcessAdjusted = checkMultiProcessingAvailability(multiProcess=multiProcess)
     # Indicate values and create a geomoetry from the result
-<<<<<<< HEAD
-    matrix = reg.indicateValues(clcSource, value=(12, 14), applyMask=False) > 0.5   #Indicates those pixels in the RegionMask which correspond to a particular value, or range of values, from a given raster datasource
-=======
     matrix = reg.indicateValues(clcSource, value=(12, 14), applyMask=False, multiProcess=multiProcessAdjusted) > 0.5
->>>>>>> af44cd5f4922e6afda0edf2c98214e0db097f1b8
     geom = gk.geom.convertMask(matrix, bounds=reg.extent.xyXY, srs=reg.srs)
 
     # Get edge matrix
