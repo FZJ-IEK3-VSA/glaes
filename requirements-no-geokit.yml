@@ -1,0 +1,27 @@
+name: glaes_env
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python >=3.10.0,<=3.13.9
+  - pip
+  - jupyter <=1.1.1
+  - matplotlib <=3.10.5
+  - pandas >=1.4.0,<=3.0.3
+  - numpy >=1.26.0,<=2.5.0
+  - scipy >=1.10.0,<1.18.0
+  # - geokit # omitted on purpose: install editable from the geokit GitHub repo for cross-development
+  # dev
+  - pytest <=9.1.1
+  - pytest-xdist <=3.8.0
+  - pytest-cov <=7.1.0
+  - ruff =0.14.1
+  - nbval <=0.11.0
+  # docs
+  - mkdocs-material
+  - mkdocstrings
+  - mkdocstrings-python
+  - mkdocs-jupyter
+  - mkdocs-gen-files
+  - mkdocs-literate-nav 
+  - mkdocs

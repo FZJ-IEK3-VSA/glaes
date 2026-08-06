@@ -1,0 +1,41 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended"
+    ],
+    "schedule": [
+        "before 5am on the first day of the month"
+    ],
+    "rangeStrategy": "widen",
+    "recreateWhen": "always",
+    "vulnerabilityAlerts": {
+        "enabled": false
+    },
+    "osvVulnerabilityAlerts": false,
+    "enabledManagers": [
+        "pep621",
+        "custom.regex"
+    ],
+    "customManagers": [
+        {
+            "customType": "regex",
+            "managerFilePatterns": [
+                "/(^|/)requirements(-no-geokit)?\\.yml$/"
+            ],
+            "matchStrings": [
+                "- (?<depName>python|jupyter|matplotlib|pandas|numpy|scipy|pytest|pytest-xdist|pytest-cov|ruff|nbval)\\s[^\\n]*?(?<currentValue><=\\d[^\\n,]*)"
+            ],
+            "packageNameTemplate": "conda-forge/{{{depName}}}",
+            "datasourceTemplate": "conda",
+            "versioningTemplate": "pep440"
+        }
+    ],
+    "packageRules": [
+        {
+            "matchManagers": [
+                "custom.regex"
+            ],
+            "groupName": "{{depName}}"
+        }
+    ]
+}

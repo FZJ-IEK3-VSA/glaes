@@ -2,61 +2,51 @@ on:
   pull_request:
     branches: ["dev"]
 
-defaults:
-  run:
-    shell: pwsh
 jobs:
+  # Development-version test: current (unpinned) requirements.
+  # Runs on both self-hosted and Windows.
   TestPullCondaForgeDev:
     name: Test development version on ${{ matrix.runner_tag }}
     strategy:
       fail-fast: false
       matrix:
-        runner_tag: [
-            "self-hosted","windows-latest"
-          ]
-        python_version: ["3.10"]
+        runner_tag: ["self-hosted", "windows-latest"]
+    # geokit is installed from conda-forge via requirements.yml (no source checkout).
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/run_conda_forge_test.yml@v1
+    secrets: inherit
+    with:
+      runner_tag: ${{ matrix.runner_tag }}
+      requirements_file_name: requirements.yml
+      multiprocessing_pytest_string: "-n auto"
+      ipynb_example_folder: "Examples"
+      multiprocessing_example_string: "-n 2"
 
-    runs-on: ${{ matrix.runner_tag }}
-    steps:
-      - name: Checkout glaes
-        uses: actions/checkout@v6
-        with:
-          path: "glaes"
-      - name: Checkout geokit
-        uses: actions/checkout@v6
-        with:
-          # Repository name with owner. For example, actions/checkout
-          repository: "FZJ-IEK3-VSA/geokit"
-          path: "geokit"
-      - name: Setup yq 4.30.6
-        uses: vegardit/gha-setup-yq@v1
-        with:
-          use-cache: true
-          version: 4.30.6
-      - name: Merge yaml files
-        run: yq eval-all '. as $item ireduce ({}; . *+ $item)' geokit/requirements-dev.yml glaes/requirements-dev.yml > combined_env.yml
-      - name: Show combined yml
-        run: |
-          get-content combined_env.yml
-      - uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: 25.3.0-3
-          channels: conda-forge
-          activate-environment: ""
-          conda-remove-defaults: "true"
-      - name: Setup environment
-        run: |
-          get-content combined_env.yml
-          ls
-          echo "LS Done"
-          mamba env create --name test_env --yes --file combined_env.yml
-          mamba run --name test_env pip install -e ./glaes --no-deps
-          mamba run --name test_env pip install -e ./geokit --no-deps
-          echo "Installation done"
-          mamba list --name test_env
-          echo "packages printed"
-      - name: Run tests
-        run: |
-          echo "start pytest"
-          mamba run --name test_env pytest -n auto  -vv
-          echo "Pytest done"
+  # Extract the minimum (lower-bound) versions of the core dependencies.
+  extract-versions:
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/extract_versions.yml@v1
+    with:
+        libraries: "python,pandas,numpy,scipy"
+        version_type: min
+        env_file: requirements.yml
+
+  # Minimum-dependency-version test: pin each dependency to its lower bound.
+  # This is only run on self-hosted.
+  TestPullMinVersionsDev:
+    name: Test min ${{ matrix.dependencies.library_name }} ${{ matrix.dependencies.version }} on self-hosted
+    needs: extract-versions
+    if: needs.extract-versions.outputs.matrix != '' && needs.extract-versions.outputs.matrix != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        dependencies: ${{ fromJSON(needs.extract-versions.outputs.matrix) }}
+    uses: FZJ-IEK3-VSA/.github/.github/workflows/run_conda_forge_test.yml@v1
+    secrets: inherit
+    with:
+      runner_tag: "self-hosted"
+      requirements_file_name: requirements.yml
+      library_name: ${{ matrix.dependencies.library_name }}
+      library_version: ${{ matrix.dependencies.version }}
+      dependency_position_env_file: ${{ matrix.dependencies.yaml_position }}
+      multiprocessing_pytest_string: "-n auto"
+      ipynb_example_folder: "Examples"
+      multiprocessing_example_string: "-n 2"
