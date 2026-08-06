@@ -1,4 +1,5 @@
 conda_python.sh eol=lf text
+build_docs.sh eol=lf text
 # All files are checked into the repo with LF
 * text=auto eol=lf
 *.shx binary
