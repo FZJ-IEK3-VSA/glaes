@@ -13,7 +13,7 @@ import numpy as np
 from glaes.core.util import GlaesError, checkMultiProcessingAvailability
 
 # Sort out the data paths
-defaultPriorDir = join(dirname(dirname(__file__)), "data", "priors") #TODO #Issue 70 #refers to empty directory
+defaultPriorDir = join(dirname(dirname(__file__)), "data", "priors")  # TODO #Issue 70 #refers to empty directory
 
 
 # Prior datasource class
@@ -413,10 +413,10 @@ class PriorSet(object):
         for _k in k:
             print(_k)
 
-    def __getitem__(s, prior): 
+    def __getitem__(s, prior):
         if len(s.sources) == 0:
             raise GlaesError(
-                "No priors have been installed. Use gl.setPriorDirectory( <path> ) or else place the files directly in the default prior data directory (%s)" #TODO 'Issue 70 #refers to another directory than in Priors = PriorSet(defaultPriorDir)
+                "No priors have been installed. Use gl.setPriorDirectory( <path> ) or else place the files directly in the default prior data directory (%s)"  # TODO 'Issue 70 #refers to another directory than in Priors = PriorSet(defaultPriorDir)
                 % defaultPriorDir
             )
         try:
