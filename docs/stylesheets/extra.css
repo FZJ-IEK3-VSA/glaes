@@ -36,24 +36,30 @@
 }
 
 /* -- Landing page logo row ------------------------------------------------ */
-.landing-logos {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 2rem;
-  flex-wrap: nowrap;
-  margin-bottom: 1rem;
-}
+/* The landing page sizes its logo with the HTML `height` attribute, but
+   Material's ".md-typeset img" rule (specificity 0,1,1) sets `height: auto` and
+   overrides it — the JSA header is intrinsically 568.23x81.38 (6.98:1), so
+   unsized it renders ~758px wide and overflows the ~696px content column
+   (61rem grid, less two 12.1rem sidebars and padding, at html font-size 125%).
+   These rules re-assert a size at specificity 0,2,0.
 
-.landing-logos .jsa-logo img {
-  max-width: 250px;
+   Sized by WIDTH in PERCENT, not by height in pixels. Because every ETHOS docs
+   site uses the same Material grid and sidebars, a given percentage is the same
+   rendered width on all of them — this is what keeps the ICE-2 header the same
+   size across GLAES, GeoKit, TSAM and FINE, so keep this rule identical in each
+   repo's extra.css. `height: auto` then resolves the height from the logo's own
+   aspect ratio, which keeps logos optically equal wherever a row mixes ratios. */
+.md-typeset .hero-logo--jsa {
+  width: 65.8%;
   height: auto;
 }
 
-/* Invert JSA header in dark mode so it remains visible */
-[data-md-color-scheme="slate"] .landing-logos .jsa-logo img {
-  filter: brightness(0) invert(1);
-}
+/* Dark mode uses the real dark asset from README_assets, selected by Material's
+   "#only-light" / "#only-dark" URL-fragment convention on the landing page —
+   the same mechanism GeoKit, TSAM and FINE use, and the form the README's
+   <picture> markup corresponds to. This replaced a
+   `filter: brightness(0) invert(1)` on the light asset, which flattened the
+   lockup to pure white instead of using the variant that ships for it. */
 
 /* -- Notebook styling — hide prompts, style code cells, dark mode -------- */
 
@@ -118,14 +124,21 @@
   flex-shrink: 0;
 }
 
-.footer-logo--jsa {
-  width: 200px;
-  height: auto;
+/* Material's ".md-typeset img" rule (specificity 0,1,1) forces height:auto on
+   images inside the footer meta. We scope under ".md-footer" (specificity
+   0,2,0) so our sizing wins — otherwise the Helmholtz SVG, which has only a
+   viewBox and no intrinsic width/height, is forced to height:auto, collapses
+   to 0, and disappears. Height-based sizing keeps the two logos aligned and
+   symmetric. The footer is always dark, so the JSA logo is inverted to white. */
+.md-footer .footer-logo--jsa {
+  height: 60px;
+  width: auto;
+  filter: brightness(0) invert(1);
 }
 
-.footer-logo--helmholtz {
-  width: 120px;
-  height: auto;
+.md-footer .footer-logo--helmholtz {
+  height: 33px;
+  width: auto;
 }
 
 .footer-institutional__text {
@@ -145,9 +158,4 @@
 
 .footer-institutional__text a:hover {
   text-decoration-color: inherit;
-}
-
-/* Footer is always dark — always show JSA logo in white */
-.footer-logo--jsa {
-  filter: brightness(0) invert(1);
 }

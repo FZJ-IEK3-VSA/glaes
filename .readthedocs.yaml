@@ -2,18 +2,37 @@
 version: 2
 
 # Build environment
+# A conda (mambaforge) environment is used so the example notebooks can be
+# executed at build time with the full geospatial runtime available from
+# conda-forge.
 build:
   os: ubuntu-22.04
   tools:
-    python: "3.12"
-  apt_packages:
-    - pandoc
-    - libgdal-dev
-    - gdal-bin
-  jobs:
-    post_install:
-      - pip install -e ".[docs]"
+    python: "mambaforge-latest"
 
-# Build documentation with MkDocs
+  jobs:
+    pre_build:
+      - conda run --name $READTHEDOCS_VERSION pip install -e . --no-deps
+      - conda list -n $READTHEDOCS_VERSION
+      # Import matplotlib to prevent font cache warning in examples
+      - conda run --name $READTHEDOCS_VERSION python -c "import matplotlib.pyplot as plt"
+      # Execute the example notebooks in parallel before the build.
+      # mkdocs-jupyter is configured with execute: false and renders these
+      # outputs; docs/copy_examples.py then stages Examples/ (outputs included)
+      # into docs/notebooks/ via its on_pre_build hook. Workers are pinned
+      # because the script defaults to os.cpu_count()-1, which reports the
+      # host's CPUs rather than this container's quota.
+      - conda run --name $READTHEDOCS_VERSION python docs/execute_notebooks.py --workers 2
+    build:
+      html:
+        - conda run --name $READTHEDOCS_VERSION mkdocs build --site-dir $READTHEDOCS_OUTPUT/html
+
+# All dependencies come from conda-forge (see requirements.yml).
+conda:
+  environment: requirements.yml
+
+# Build documentation with MkDocs.
+# NOTE: the actual `mkdocs build` is invoked from build_docs.sh (see the
+# build.jobs.build.html override above); this key documents the config file.
 mkdocs:
   configuration: mkdocs.yml
