@@ -30,4 +30,4 @@ Using Priors is as simple as calling `excludePrior()` with the prior name and de
 For more detailed examples, see:
 
 - [Basic Workflow](notebooks/00_basic_workflow.ipynb) - A complete walkthrough of the GLAES workflow
-- [Placement Algorithm](notebooks/01_Placement_algorithm.ipynb) - Using GLAES for turbine/module placement
+- [Placement Algorithm](notebooks/01_placement_algorithm.ipynb) - Using GLAES for turbine/module placement
