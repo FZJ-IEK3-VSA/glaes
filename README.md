@@ -135,7 +135,7 @@ Objective:
 ### More Examples
 
 1. [Basic Workflow](Examples/00_basic_workflow.ipynb)
-2. [Placement Algorithm](Examples/01_Placement_algorithm.ipynb)
+2. [Placement Algorithm](Examples/01_placement_algorithm.ipynb)
 
 ## Citation
 

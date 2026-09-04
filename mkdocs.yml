@@ -55,7 +55,7 @@ nav:
     - Getting Started: getting-started.md
   - Examples:
     - Basic Workflow: notebooks/00_basic_workflow.ipynb
-    - Placement Algorithm: notebooks/01_Placement_algorithm.ipynb
+    - Placement Algorithm: notebooks/01_placement_algorithm.ipynb
     - Extended Methods: notebooks/02_extended_methods.ipynb
   - API Reference: api/
   - About:
