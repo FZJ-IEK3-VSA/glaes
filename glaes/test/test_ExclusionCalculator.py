@@ -512,6 +512,11 @@ def test_ExclusionCalculator_distributeItems():
     points = ec.distributeItems(separation=(8, 3), sepScaling=ras, axialDirection=0)
     assert points.shape[0] == 390
 
+    points_meteo = ec.distributeItems(
+        separation=(8, 3), sepScaling=ras, axialDirection=0, axialDirectionConvention="meteorological"
+    )
+    assert points_meteo.shape[0] == 347
+
 
 def test_ExclusionCalculator_distributeAreas():
     # make a prior source
