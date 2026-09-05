@@ -1482,7 +1482,7 @@ class ExclusionCalculator(object):
             + f"({basename(sourcePath)}/where: {where}/buffer: {buffer if isinstance(buffer, int) else 0}m), "
         )
 
-    def excludePoints(s, source, geometryShape, scale=None, where=None, direction=None, saveToEC=None):
+    def excludePoints(s, source, geometryShape, scale=None, where=None, direction=None, directionConvention="mathematical", saveToEC=None):
         """Exclude points with different buffer shapes.
 
         Parameters
@@ -1504,8 +1504,15 @@ class ExclusionCalculator(object):
                 called 'type' and only features with the type "protected" are
                 wanted, the correct statement would be:
                     where="type='protected'", by default None
-        direction : int, optional
-            orientation of the buffer geometry in degrees, by default None
+        direction : str or int, optional
+            scalar orientation of the buffer geometry in degrees or name of the dataframe 
+            column that contains the orientation per point, will define the main axis of the exclusion shape, 
+            by default None
+        directionConvention : str, optional
+            The definition of the "direction" value, the following options are allowed:
+            - mathematical: Counterclockwise from East = 0°, pointing TO direction (away from (0,0))
+            - meteorological : Clockwise from North = 0°, coming FROM direction (pointing towards the opposite direction)
+            By default "mathematical".
         saveToEC : str, optional
             name for points in ec plot, by default None. The points are only
             saved if a string is passed.
@@ -1561,6 +1568,19 @@ class ExclusionCalculator(object):
                 _direction = direction
             else:
                 raise GlaesError("Direction has to be defined.")
+            # make numerical
+            _direction = float(_direction)
+
+            # now align direction with the expected mathematical convention if needed
+            if directionConvention == "mathematical":
+                # this is the standard polar angle coordinate definition that below algorithm expects
+                pass
+            elif directionConvention == "meteorological":
+                # we first need to convert meteorological North=0° CW definition to "mathematical" polar coordinates (CCW from E=0°)
+                _direction = (270 - _direction) % 360
+            else:
+                raise ValueError(f"Unknown directionConvention={directionConvention}")
+            
             coor = gk.srs.xyTransform(
                 np.array([[row["geom"].GetX(), row["geom"].GetY()]]),
                 fromSRS=row["geom"].GetSpatialReference(),
