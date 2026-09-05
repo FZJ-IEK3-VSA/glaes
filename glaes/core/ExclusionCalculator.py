@@ -1955,6 +1955,7 @@ class ExclusionCalculator(object):
         minArea=100000,
         maxAcceptableDistance=None,
         axialDirection=None,
+        axialDirectionConvention="mathematical",
         sepScaling=None,
         _voronoiBoundaryPoints=10,
         _voronoiBoundaryPadding=5,
@@ -1987,6 +1988,12 @@ class ExclusionCalculator(object):
                 - float : The direction to apply to all points
                 - np.ndarray : The directions at each pixel (must match availability matrix shape)
                 - str : A path to a raster file containing axial directions
+
+            axialDirectionConvention : str, optional
+                The definition of the "axialDirection" value, the following options are allowed:
+                - mathematical: Counterclockwise from East = 0°, pointing TO direction (away from (0,0))
+                - meteorological : Clockwise from North = 0°, coming FROM direction (pointing towards the opposite direction)
+                By default "mathematical".
 
             maxAcceptableDistance : A maximum distance to allow between items
                 - Computes a post-placement distance matrix for the located placements
@@ -2062,6 +2069,14 @@ class ExclusionCalculator(object):
                 axialDirection = float(axialDirection)
 
             # we now have the axialDirection in degrees in all cases
+            if axialDirectionConvention == "mathematical":
+                # this is the standard polar angle coordinate definition that below algorithm expects
+                pass
+            elif axialDirectionConvention == "meteorological":
+                # we first need to convert meteorological North=0° CW definition to "mathematical" polar coordinates (CCW from E=0°)
+                axialDirection = (270 - axialDirection) % 360
+            else:
+                raise ValueError(f"Unknown axialDirectionConvention={axialDirectionConvention}")
 
             useGradient = True
         else:
