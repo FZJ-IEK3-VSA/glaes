@@ -43,6 +43,9 @@ def test_excludePoints():
     ec1.excludePoints(source=pointData, geometryShape="rectangle", direction=25)
     assert np.isclose(ec1.percentAvailable, 94.36879792512404)
     assert len(ec1._additionalPoints["Test"]["points"]) == 13
+    ec1.excludePoints(source=pointData, geometryShape="rectangle", direction=25, directionConvention="meteorological")
+    assert np.isclose(ec1.percentAvailable, 93.40888588182229)
+    assert len(ec1._additionalPoints["Test"]["points"]) == 13
 
 
 def test_ExclusionCalculator___init__():
