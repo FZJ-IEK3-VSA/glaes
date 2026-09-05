@@ -2054,12 +2054,14 @@ class ExclusionCalculator(object):
         if axialDirection is not None:
             if isinstance(axialDirection, str):  # Assume a path to a raster file is given
                 axialDirection = s.region.warp(axialDirection, resampleAlg="near")
-            # Assume a path to a raster file is given
+            # Assume direction data is given as an array matching the region mask "chess board"
             elif isinstance(axialDirection, np.ndarray):
                 if not axialDirection.shape == s.region.mask.shape:
                     raise GlaesError("axialDirection matrix does not match context")
-            else:  # axialDirection should be a single value
-                axialDirection = np.radians(float(axialDirection))
+            else:  # axialDirection should be a single degree value
+                axialDirection = float(axialDirection)
+
+            # we now have the axialDirection in degrees in all cases
 
             useGradient = True
         else:
@@ -2212,9 +2214,11 @@ class ExclusionCalculator(object):
                 # only continue if there are no points in the immediate range of the whole pixel
                 if useGradient:
                     if isinstance(axialDirection, np.ndarray):
-                        grad = np.radians(axialDirection[yi, xi])
+                        grad = axialDirection[yi, xi]
                     else:
                         grad = axialDirection
+                    # Convert centrally to radians
+                    grad = np.radians(grad)
 
                     cG = np.cos(grad)
                     sG = np.sin(grad)
