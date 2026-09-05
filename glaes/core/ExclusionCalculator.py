@@ -1482,7 +1482,16 @@ class ExclusionCalculator(object):
             + f"({basename(sourcePath)}/where: {where}/buffer: {buffer if isinstance(buffer, int) else 0}m), "
         )
 
-    def excludePoints(s, source, geometryShape, scale=None, where=None, direction=None, saveToEC=None):
+    def excludePoints(
+        s,
+        source,
+        geometryShape,
+        scale=None,
+        where=None,
+        direction=None,
+        directionConvention="mathematical",
+        saveToEC=None,
+    ):
         """Exclude points with different buffer shapes.
 
         Parameters
@@ -1504,8 +1513,15 @@ class ExclusionCalculator(object):
                 called 'type' and only features with the type "protected" are
                 wanted, the correct statement would be:
                     where="type='protected'", by default None
-        direction : int, optional
-            orientation of the buffer geometry in degrees, by default None
+        direction : str or int, optional
+            scalar orientation of the buffer geometry in degrees or name of the dataframe
+            column that contains the orientation per point, will define the main axis of the exclusion shape,
+            by default None
+        directionConvention : str, optional
+            The definition of the "direction" value, the following options are allowed:
+            - mathematical: Counterclockwise from East = 0°, pointing TO direction (away from (0,0))
+            - meteorological : Clockwise from North = 0°, coming FROM direction (pointing towards the opposite direction)
+            By default "mathematical".
         saveToEC : str, optional
             name for points in ec plot, by default None. The points are only
             saved if a string is passed.
@@ -1561,6 +1577,19 @@ class ExclusionCalculator(object):
                 _direction = direction
             else:
                 raise GlaesError("Direction has to be defined.")
+            # make numerical
+            _direction = float(_direction)
+
+            # now align direction with the expected mathematical convention if needed
+            if directionConvention == "mathematical":
+                # this is the standard polar angle coordinate definition that below algorithm expects
+                pass
+            elif directionConvention == "meteorological":
+                # we first need to convert meteorological North=0° CW definition to "mathematical" polar coordinates (CCW from E=0°)
+                _direction = (270 - _direction) % 360
+            else:
+                raise ValueError(f"Unknown directionConvention={directionConvention}")
+
             coor = gk.srs.xyTransform(
                 np.array([[row["geom"].GetX(), row["geom"].GetY()]]),
                 fromSRS=row["geom"].GetSpatialReference(),
@@ -1955,6 +1984,7 @@ class ExclusionCalculator(object):
         minArea=100000,
         maxAcceptableDistance=None,
         axialDirection=None,
+        axialDirectionConvention="mathematical",
         sepScaling=None,
         _voronoiBoundaryPoints=10,
         _voronoiBoundaryPadding=5,
@@ -1987,6 +2017,12 @@ class ExclusionCalculator(object):
                 - float : The direction to apply to all points
                 - np.ndarray : The directions at each pixel (must match availability matrix shape)
                 - str : A path to a raster file containing axial directions
+
+            axialDirectionConvention : str, optional
+                The definition of the "axialDirection" value, the following options are allowed:
+                - mathematical: Counterclockwise from East = 0°, pointing TO direction (away from (0,0))
+                - meteorological : Clockwise from North = 0°, coming FROM direction (pointing towards the opposite direction)
+                By default "mathematical".
 
             maxAcceptableDistance : A maximum distance to allow between items
                 - Computes a post-placement distance matrix for the located placements
@@ -2054,12 +2090,22 @@ class ExclusionCalculator(object):
         if axialDirection is not None:
             if isinstance(axialDirection, str):  # Assume a path to a raster file is given
                 axialDirection = s.region.warp(axialDirection, resampleAlg="near")
-            # Assume a path to a raster file is given
+            # Assume direction data is given as an array matching the region mask "chess board"
             elif isinstance(axialDirection, np.ndarray):
                 if not axialDirection.shape == s.region.mask.shape:
                     raise GlaesError("axialDirection matrix does not match context")
-            else:  # axialDirection should be a single value
-                axialDirection = np.radians(float(axialDirection))
+            else:  # axialDirection should be a single degree value
+                axialDirection = float(axialDirection)
+
+            # we now have the axialDirection in degrees in all cases
+            if axialDirectionConvention == "mathematical":
+                # this is the standard polar angle coordinate definition that below algorithm expects
+                pass
+            elif axialDirectionConvention == "meteorological":
+                # we first need to convert meteorological North=0° CW definition to "mathematical" polar coordinates (CCW from E=0°)
+                axialDirection = (270 - axialDirection) % 360
+            else:
+                raise ValueError(f"Unknown axialDirectionConvention={axialDirectionConvention}")
 
             useGradient = True
         else:
@@ -2212,9 +2258,11 @@ class ExclusionCalculator(object):
                 # only continue if there are no points in the immediate range of the whole pixel
                 if useGradient:
                     if isinstance(axialDirection, np.ndarray):
-                        grad = np.radians(axialDirection[yi, xi])
+                        grad = axialDirection[yi, xi]
                     else:
                         grad = axialDirection
+                    # Convert centrally to radians
+                    grad = np.radians(grad)
 
                     cG = np.cos(grad)
                     sG = np.sin(grad)
