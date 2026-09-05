@@ -1482,7 +1482,16 @@ class ExclusionCalculator(object):
             + f"({basename(sourcePath)}/where: {where}/buffer: {buffer if isinstance(buffer, int) else 0}m), "
         )
 
-    def excludePoints(s, source, geometryShape, scale=None, where=None, direction=None, directionConvention="mathematical", saveToEC=None):
+    def excludePoints(
+        s,
+        source,
+        geometryShape,
+        scale=None,
+        where=None,
+        direction=None,
+        directionConvention="mathematical",
+        saveToEC=None,
+    ):
         """Exclude points with different buffer shapes.
 
         Parameters
@@ -1505,8 +1514,8 @@ class ExclusionCalculator(object):
                 wanted, the correct statement would be:
                     where="type='protected'", by default None
         direction : str or int, optional
-            scalar orientation of the buffer geometry in degrees or name of the dataframe 
-            column that contains the orientation per point, will define the main axis of the exclusion shape, 
+            scalar orientation of the buffer geometry in degrees or name of the dataframe
+            column that contains the orientation per point, will define the main axis of the exclusion shape,
             by default None
         directionConvention : str, optional
             The definition of the "direction" value, the following options are allowed:
@@ -1580,7 +1589,7 @@ class ExclusionCalculator(object):
                 _direction = (270 - _direction) % 360
             else:
                 raise ValueError(f"Unknown directionConvention={directionConvention}")
-            
+
             coor = gk.srs.xyTransform(
                 np.array([[row["geom"].GetX(), row["geom"].GetY()]]),
                 fromSRS=row["geom"].GetSpatialReference(),
