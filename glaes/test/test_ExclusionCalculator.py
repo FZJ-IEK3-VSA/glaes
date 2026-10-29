@@ -43,6 +43,9 @@ def test_excludePoints():
     ec1.excludePoints(source=pointData, geometryShape="rectangle", direction=25)
     assert np.isclose(ec1.percentAvailable, 94.36879792512404)
     assert len(ec1._additionalPoints["Test"]["points"]) == 13
+    ec1.excludePoints(source=pointData, geometryShape="rectangle", direction=25, directionConvention="meteorological")
+    assert np.isclose(ec1.percentAvailable, 93.40888588182229)
+    assert len(ec1._additionalPoints["Test"]["points"]) == 13
 
 
 def test_ExclusionCalculator___init__():
@@ -511,6 +514,11 @@ def test_ExclusionCalculator_distributeItems():
 
     points = ec.distributeItems(separation=(8, 3), sepScaling=ras, axialDirection=0)
     assert points.shape[0] == 390
+
+    points_meteo = ec.distributeItems(
+        separation=(8, 3), sepScaling=ras, axialDirection=0, axialDirectionConvention="meteorological"
+    )
+    assert points_meteo.shape[0] == 347
 
 
 def test_ExclusionCalculator_distributeAreas():
