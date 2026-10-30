@@ -1060,7 +1060,7 @@ def writeEdgeFile(
 
 
 ########################################################################################
-
+# These are just input parameters. They can be deleted after the code is finally tested // or in case of the testing copy and pasted to the respective Test glaes/test/test_priors.py 
 
 #   1. define input files
 base_path = Path(__file__).resolve().parents[0]
