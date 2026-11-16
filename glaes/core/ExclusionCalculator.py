@@ -2199,11 +2199,12 @@ class ExclusionCalculator(object):
 
         # start searching
         yN, xN = workingAvailability.shape
-        substeps = np.linspace(-0.5, 0.5, pixelDivision)
-        # add a tiny bit to the left/top edge (so that the point is definitely in the right pixel)
-        substeps[0] += 0.0001
-        # subtract a tiny bit to the right/bottom edge for the same reason
-        substeps[-1] -= 0.0001
+        substeps = np.array([0.0]) if pixelDivision == 1 else np.linspace(-0.5, 0.5, pixelDivision)
+        if pixelDivision > 1:
+            # add a tiny bit to the left/top edge (so that the point is definitely in the right pixel)
+            substeps[0] += 0.0001
+            # subtract a tiny bit to the right/bottom edge for the same reason
+            substeps[-1] -= 0.0001
 
         for yi in range(yN):
             # update the "bottom" value
@@ -2283,34 +2284,28 @@ class ExclusionCalculator(object):
                     continue
 
                 # Determine if a placement has been found
-                if pixelDivision == 1:
-                    found = True
-                    xsp = xi
-                    ysp = yi
-                else:
-                    # Start searching in the 'sub pixel'
-                    found = False
-                    for xsp in substeps + xi:
-                        xSubDist = xClip[pir] - xsp
-                        for ysp in substeps + yi:
-                            ySubDist = yClip[pir] - ysp
+                found = False
+                for xsp in substeps + xi:
+                    xSubDist = xClip[pir] - xsp
+                    for ysp in substeps + yi:
+                        ySubDist = yClip[pir] - ysp
 
-                            # Test if any points in the range are overlapping
-                            if useGradient:  # Test if in rotated ellipse
-                                dist = (np.power((xSubDist * cG - ySubDist * sG), 2) / _sepA2) + (
-                                    np.power((xSubDist * sG + ySubDist * cG), 2) / _sepT2
-                                )
-                                overlapping = dist <= 1
+                        # Test if any points in the range are overlapping
+                        if useGradient:  # Test if in rotated ellipse
+                            dist = (np.power((xSubDist * cG - ySubDist * sG), 2) / _sepA2) + (
+                                np.power((xSubDist * sG + ySubDist * cG), 2) / _sepT2
+                            )
+                            overlapping = dist <= 1
 
-                            else:  # test if in circle
-                                overlapping = (np.power(xSubDist, 2) + np.power(ySubDist, 2)) <= _sep2
+                        else:  # test if in circle
+                            overlapping = (np.power(xSubDist, 2) + np.power(ySubDist, 2)) <= _sep2
 
-                            if not overlapping.any():
-                                found = True
-                                break
-
-                        if found:
+                        if not overlapping.any():
+                            found = True
                             break
+
+                    if found:
+                        break
 
                 # Add if found
                 if found:
