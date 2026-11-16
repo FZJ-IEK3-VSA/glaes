@@ -1,5 +1,8 @@
 import logging
+import os
+from pathlib import Path
 from sys import platform
+import uuid
 from warnings import warn
 
 # Configure Logging
@@ -51,3 +54,27 @@ def checkMultiProcessingAvailability(multiProcess: bool) -> bool:
         multiProcessCorrected = False
         warn(message=GeokitMultiProcessingWarning.multiProcessingWarningMessage, category=GeokitMultiProcessingWarning)
     return multiProcessCorrected
+
+
+def createRasterAtomic(region, output, **kwargs):
+    """Create a raster via a temporary file and atomically replace output."""
+    if output is None:
+        return region.createRaster(output=None, **kwargs)
+
+    output = Path(output)
+    tmp_output = output.with_name(f"{output.stem}.tmp-{os.getpid()}-{uuid.uuid4().hex}{output.suffix}")
+
+    try:
+        region.createRaster(
+            output=str(tmp_output),
+            **kwargs,
+        )
+        os.replace(tmp_output, output)
+    except Exception:
+        try:
+            tmp_output.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+
+    return str(output)

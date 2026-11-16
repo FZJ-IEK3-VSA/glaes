@@ -13,10 +13,9 @@ import numpy as np
 import pandas as pd
 from osgeo import gdal, ogr
 
-from glaes.core.util import checkMultiProcessingAvailability
+from glaes.core.util import checkMultiProcessingAvailability, createRasterAtomic, GlaesError, glaes_logger
 
-from .priors import Priors, PriorSource
-from .util import GlaesError, glaes_logger
+from glaes.core.priors import Priors, PriorSource
 
 Areas = namedtuple("Areas", "coordinates geoms")
 Areas = namedtuple("Areas", "coordinates geoms")
@@ -1146,7 +1145,14 @@ class ExclusionCalculator(object):
             indications = np.zeros(s.region.mask.shape)
             data = indications if mode == "include" else 100 - indications
             data = s.region.applyMask(data, 255.0)
-            s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
+            # save via atomic writing, will not create unfinished intermediate files in case of interrupted writing process
+            createRasterAtomic(
+                s.region,
+                output=intermediate,
+                data=data,
+                meta=metadata,
+                noData=255,
+            )
             glaes_logger.info(f"NOTE: Default intermediate was created as {intermediate}.")
         else:
             # Do prewarp, if needed
@@ -1218,7 +1224,14 @@ class ExclusionCalculator(object):
                 # invert indications matrix for intermediate when mode=exclude
                 data = indications if mode == "include" else 100 - indications
                 data = s.region.applyMask(data, 255.0)
-                s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
+                # save via atomic write to avoid unfinished intermediate files when writing is interrupted
+                createRasterAtomic(
+                    s.region,
+                    output=intermediate,
+                    data=data,
+                    meta=metadata,
+                    noData=255,
+                )
 
         # exclude the indicated area from the total availability
         if mode == "exclude":
@@ -1403,7 +1416,14 @@ class ExclusionCalculator(object):
             indications = np.zeros(s.region.mask.shape)
             data = indications if mode == "include" else 100 - indications
             data = s.region.applyMask(data, 255.0)
-            s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
+            # atomic write to avoid unfinished intermediate files when writing is interrupted
+            createRasterAtomic(
+                s.region,
+                output=intermediate,
+                data=data,
+                meta=metadata,
+                noData=255,
+            )
             glaes_logger.info(f"NOTE: Default intermediate was created as {intermediate}.")
         else:
             # (re)calculate the exclusions
@@ -1449,7 +1469,14 @@ class ExclusionCalculator(object):
                 # invert indications matrix for intermediate when mode=exclude
                 data = indications if mode == "include" else 100 - indications
                 data = s.region.applyMask(data, 255.0)
-                s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
+                # atomic write to avoid unfinished intermediate files when writing is interrupted
+                createRasterAtomic(
+                    s.region,
+                    output=intermediate,
+                    data=data,
+                    meta=metadata,
+                    noData=255,
+                )
 
         # exclude the indicated area from the total availability
         if mode == "exclude":
