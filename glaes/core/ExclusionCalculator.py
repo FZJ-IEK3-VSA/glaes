@@ -2500,13 +2500,14 @@ class ExclusionCalculator(object):
             points = s._itemCoords
         else:
             points = np.array(points)
-            s = points[:, 0] >= s.region.extent.xMin
-            s = s & (points[:, 0] <= s.region.extent.xMax)
-            s = s & (points[:, 1] >= s.region.extent.yMin)
-            s = s & (points[:, 1] <= s.region.extent.yMax)
-
-            if not s.any():
+            # reduce points to only these in the current extent
+            selection = points[:, 0] >= s.region.extent.xMin
+            selection &= points[:, 0] <= s.region.extent.xMax
+            selection &= points[:, 1] >= s.region.extent.yMin
+            selection &= points[:, 1] <= s.region.extent.yMax
+            if not selection.any():
                 raise GlaesError("None of the given points are in the extent")
+            points = points[selection]
 
         # Do Voronoi
         from scipy.spatial import Voronoi
@@ -2543,7 +2544,7 @@ class ExclusionCalculator(object):
 
                 geoms.append(gk.geom.polygon(path, srs=s.region.srs))
 
-            if not len(geoms) == len(s._itemCoords):
+            if not len(geoms) == len(points):
                 raise RuntimeError("Mismatching geometry count")
 
             # Create a list of geometry from each region WITH availability and rasterize
