@@ -1855,7 +1855,9 @@ class ExclusionCalculator(object):
 
                         value = value_low, value_high
                     except:
-                        value = float(value)
+                        value = float(row.value)
+                else:
+                    value = float(row.value)
 
                 s.excludePrior(
                     prior=row["name"],
