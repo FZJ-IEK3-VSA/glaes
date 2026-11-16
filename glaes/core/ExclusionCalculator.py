@@ -4,6 +4,7 @@ import re
 import time
 import warnings
 from collections import namedtuple
+import os
 from os.path import basename, isfile
 from sys import platform
 from warnings import warn
@@ -733,10 +734,16 @@ class ExclusionCalculator(object):
         * Units are defined by the srs used to initialize the ExclusionCalculator"""
         return s.region.mask.sum(dtype=np.int64) * s.region.pixelWidth * s.region.pixelHeight / 100
 
-    def _hasEqualContext(self, source, verbose=False):
+    def _hasEqualContext(self, source, source_mask=None, verbose=False):
         """
         Internal function which checks if a given raster source has the same context as
         the ExclusionCalculator. This checks SRS, extent, and pixel resolution
+
+        source : str | gdal.Dataset
+            The raster file or dataset instance which shall be compared to the current EC instance.
+        source_mask : np.array, optional
+            The array loaded from source. Can optionally be provided if a preloaded instance exists
+            to save I/O traffic and time, will else be loaded from source. By default None.
         """
         if not isfile(source) or not gk.util.isRaster(source):
             if verbose:
@@ -758,17 +765,19 @@ class ExclusionCalculator(object):
         # are accepted as long as they are much smaller than the cells
         ri_extent = gk.Extent.fromRaster(source)
         if not (
-            np.isclose(ri_extent.xMin, self.region.extent.xMin, atol=1e-7)
-            and np.isclose(ri_extent.xMax, self.region.extent.xMax, atol=1e-7)
-            and np.isclose(ri_extent.yMin, self.region.extent.yMin, atol=1e-7)
-            and np.isclose(ri_extent.yMax, self.region.extent.yMax, atol=1e-7)
+            np.isclose(ri_extent.xMin, self.region.extent.xMin, atol=1e-7, rtol=0)
+            and np.isclose(ri_extent.xMax, self.region.extent.xMax, atol=1e-7, rtol=0)
+            and np.isclose(ri_extent.yMin, self.region.extent.yMin, atol=1e-7, rtol=0)
+            and np.isclose(ri_extent.yMax, self.region.extent.yMax, atol=1e-7, rtol=0)
         ):
             if verbose:
                 print(f"Extent mismatch! Internal/new: {self.region.extent}, external/old: {ri_extent}")
             return False
 
         # create a mask for source raster based on noData value (set noData to False, all valid values 0-100 to True)
-        source_mask = gk.raster.extractMatrix(source)
+        if source_mask is None:
+            # we need to extract it from source
+            source_mask = gk.raster.extractMatrix(source)
         if source_mask is None:
             # sometimes, saving errors lead to None matrices being reloaded from disk, simply re-calculate
             print("Source matrix was saved to disk empty.")
@@ -782,12 +791,16 @@ class ExclusionCalculator(object):
                 )
             return False
 
-        source_mask[source_mask <= 100] = True
-        source_mask[source_mask == ri.noData] = False
-        # compare the two masks and check if they are alike for all cells
-        if not (source_mask == self.region.mask).all():
+        data = np.asarray(source_mask)
+        valid_mask = np.isfinite(data) & (data >= 0) & (data <= 100)
+        if ri.noData is not None:
+            if np.isnan(ri.noData):
+                valid_mask &= ~np.isnan(data)
+            else:
+                valid_mask &= data != ri.noData
+        if not np.array_equal(valid_mask, self.region.mask):
             if verbose:
-                print("Masks not equal.")
+                glaes_logger.info("Raster masks do not match.")
             return False
 
         if not ri_extent.srs.IsSame(self.srs):
@@ -905,33 +918,72 @@ class ExclusionCalculator(object):
             boolean: If 'recalculate' is True, new (re)calculation is
             required
         """
+        assert intermediate is None or isinstance(intermediate, str), (
+            f"intermediate must be str if not None, here type {type(intermediate)}: {intermediate}"
+        )
         # initiate variable indicating need for recalculation as False
         recalculate = False
         # create a str containing a comparison of all non-matching metadata entries of old and new intermediate
         diff = str()
         # extract metadata information from existing intermediate tif file and drop those arguments that shall not be compared
         metaNotConsidered = ["sourcePath"]
+        # check if the file can be loaded, if so extract equal context info, define flag first
+        equal_context = False
+        metadata_equal = False
+        # first do a file corruption check if applicable
+        corrupted = False  # by default not the case
         if intermediate is not None and isfile(intermediate):
-            # try to load the intermediate file, recalculate if file is corrupted
+            # we have a file, try to load the intermediate file, recalculate if file is corrupted
             try:
-                gk.raster.rasterInfo(intermediate)
-            except:
+                # first just try if we can access the file, super fast but does not detect corrupted raster data
+                raster_info = gk.raster.rasterInfo(intermediate)
+            except Exception as e:
                 glaes_logger.info(
-                    f"Intermediate exclusion file could not be loaded. Recalculating intermediate data: {intermediate}"
+                    f"Intermediate exclusion file could not be read and will be recalculated: "
+                    f"{intermediate}. Error: {e}"
                 )
-                return True
-            meta_intermediate_compare = {
-                k: gk.raster.rasterInfo(intermediate).meta[k]
-                for k in gk.raster.rasterInfo(intermediate).meta
-                if k not in metaNotConsidered
-            }
+                try:
+                    os.remove(intermediate)
+                except OSError:
+                    pass
+                # we have no intermediate file (anymore)
+                corrupted = True
+
+            # if not corrupted, extract the comparison metrics for checks and status logs below
+            meta_intermediate_compare = (
+                {k: raster_info.meta[k] for k in raster_info.meta if k not in metaNotConsidered}
+                if not corrupted
+                else {}
+            )
+            metadata_equal = (
+                meta_intermediate_compare == {k: metadata[k] for k in metadata if k not in metaNotConsidered}
+                if not corrupted
+                else False
+            )
+
+            # do the full equal context check
+            try:
+                if (not corrupted) and metadata_equal:  # corrupted contained in metadata_equal, for readability only
+                    equal_context = s._hasEqualContext(intermediate, verbose=s.verbose)
+            except Exception as e:
+                glaes_logger.info(
+                    f"Intermediate exclusion file could not be read completely and will be recalculated: "
+                    f"{intermediate}. Error: {e}"
+                )
+                try:
+                    os.remove(intermediate)
+                except OSError:
+                    pass
+                # we have no intermediate file (anymore)
+                corrupted = True
 
         # check if we can apply the intermediate file (check all metadata besides sourcePath which is stored only for user information)
         if (
-            intermediate is not None
+            not corrupted  # contained in metadata_equal, for readability only
+            and intermediate is not None
             and isfile(intermediate)
-            and s._hasEqualContext(intermediate, verbose=True)
-            and meta_intermediate_compare == {k: metadata[k] for k in metadata if k not in metaNotConsidered}
+            and equal_context
+            and metadata_equal
         ):
             if s.verbose and intermediate is not None:
                 glaes_logger.info(f"Applying intermediate exclusion file: {intermediate}")
@@ -940,7 +992,7 @@ class ExclusionCalculator(object):
             if intermediate is not None:
                 if s.verbose:
                     glaes_logger.info(f"Computing intermediate exclusion file: {intermediate}")
-                if isfile(intermediate) and s.verbose:
+                if isfile(intermediate) and s.verbose and not corrupted and not metadata_equal:
                     # add all new keys
                     for k in {
                         k: metadata[k] for k in metadata if k not in metaNotConsidered
@@ -960,13 +1012,13 @@ class ExclusionCalculator(object):
                             if k == "source":
                                 diff = (
                                     diff
-                                    + f"\n(SourcePath (not considered in metadata comparison, FYI only): {gk.raster.rasterInfo(intermediate).meta['sourcePath'] if 'sourcePath' in gk.raster.rasterInfo(intermediate).meta.keys() else 'not in old dataset'} / {metadata['sourcePath']}); "
+                                    + f"\n(SourcePath (not considered in metadata comparison, FYI only): {raster_info.meta['sourcePath'] if 'sourcePath' in raster_info.meta.keys() else 'not in old dataset'} / {metadata['sourcePath']}); "
                                 )
                     diff = diff + "\n(old/new intermediate)"
                     glaes_logger.warning(
                         f"Overwriting previous intermediate exclusion file: {intermediate}. The following difference in intermediate metadata was found: {diff})"
                     )
-                recalculate = True
+            recalculate = True
 
         return recalculate
 
