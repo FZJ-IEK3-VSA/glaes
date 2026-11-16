@@ -1,3 +1,4 @@
+import ast
 import hashlib
 import re
 import time
@@ -1526,29 +1527,37 @@ class ExclusionCalculator(object):
             name for points in ec plot, by default None. The points are only
             saved if a string is passed.
         """
-
-        if isinstance(source, str) or isinstance(source, gdal.Dataset):
+        if isinstance(source, (str, gdal.Dataset)):
             points = gk.vector.extractFeatures(source, where=where)
 
         elif isinstance(source, pd.DataFrame):
-            points = source
             if where is not None:
-                raise GlaesError("Where statement only allowed when " + "gdal.Dataset or shape is provided.")
-        if all([isinstance(i, str) for i in points["scale"]]):
-            try:
-                points["scale"] = [eval(i) for i in points["scale"]]
-            except:
-                raise TypeError("Couldn't convert scale to tuple.")
+                raise GlaesError("Where statement only allowed when gdal.Dataset or shape is provided.")
+            points = source.copy()
+
+        else:
+            raise TypeError("Source must be a file path, gdal.Dataset or DataFrame.")
+
+        # Use the provided scale if the source has no scale column
+        if "scale" not in points.columns:
+            if scale is None:
+                raise GlaesError("Scale has to be defined.")
+            points["scale"] = [scale] * len(points)
+
+        # Convert string representations to tuples if necessary
+        try:
+            points["scale"] = points["scale"].apply(
+                lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+            )
+        except (ValueError, SyntaxError) as e:
+            raise TypeError("Couldn't convert scale to tuple.") from e
+
+        # Validate scale values
+        if not all(isinstance(i, tuple) for i in points["scale"]):
+            raise TypeError("Scale has to be defined as a tuple.")
+
         arr_existing = []
         vec_exclusion = pd.DataFrame(columns=["geom"])
-        if "scale" in points.columns:
-            pass
-        elif scale is not None:
-            points["scale"] = scale
-        else:
-            raise GlaesError("Scale has to be defined.")
-        if not all([isinstance(i, tuple) for i in points["scale"]]):
-            raise TypeError("Scale has to be defined as a tuple.")
 
         def rotate(pts, center, angle):
             def _rotate(pt, angle):
