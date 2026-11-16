@@ -1625,9 +1625,7 @@ class ExclusionCalculator(object):
 
         # Convert string representations to tuples if necessary
         try:
-            points["scale"] = points["scale"].apply(
-                lambda x: ast.literal_eval(x) if isinstance(x, str) else x
-            )
+            points["scale"] = points["scale"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
         except (ValueError, SyntaxError) as e:
             raise TypeError("Couldn't convert scale to tuple.") from e
 
