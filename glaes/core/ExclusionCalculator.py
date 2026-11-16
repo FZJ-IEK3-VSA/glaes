@@ -1,10 +1,10 @@
 import ast
 import hashlib
+import os
 import re
 import time
 import warnings
 from collections import namedtuple
-import os
 from os.path import basename, isfile
 from sys import platform
 from warnings import warn
@@ -14,9 +14,8 @@ import numpy as np
 import pandas as pd
 from osgeo import gdal, ogr
 
-from glaes.core.util import checkMultiProcessingAvailability, createRasterAtomic, GlaesError, glaes_logger
-
 from glaes.core.priors import Priors, PriorSource
+from glaes.core.util import GlaesError, checkMultiProcessingAvailability, createRasterAtomic, glaes_logger
 
 Areas = namedtuple("Areas", "coordinates geoms")
 Areas = namedtuple("Areas", "coordinates geoms")
