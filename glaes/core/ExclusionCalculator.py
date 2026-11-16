@@ -2058,11 +2058,11 @@ class ExclusionCalculator(object):
             if isinstance(separation, tuple) and len(separation) == 2:
                 distance = int((separation[0] + separation[1]) / 2 / 2)
                 print(distance)
-            elif isinstance(separation, int):
+            elif isinstance(separation, (int, float, np.integer, np.floating)):
                 distance = int(separation / 2)
             else:
                 message = (
-                    f"Separation must be either tuple with length 2 or integer, here {type(separation)}: {separation}."
+                    f"Separation must be either tuple with length 2 or numeric, here {type(separation)}: {separation}."
                 )
                 raise ValueError(message)
             # calculate the exclusion indications based on region shape and negative buffer
