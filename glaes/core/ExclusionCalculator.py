@@ -1,4 +1,6 @@
+import ast
 import hashlib
+import os
 import re
 import time
 import warnings
@@ -12,10 +14,8 @@ import numpy as np
 import pandas as pd
 from osgeo import gdal, ogr
 
-from glaes.core.util import checkMultiProcessingAvailability
-
-from .priors import Priors, PriorSource
-from .util import GlaesError, glaes_logger
+from glaes.core.priors import Priors, PriorSource
+from glaes.core.util import GlaesError, checkMultiProcessingAvailability, createRasterAtomic, glaes_logger
 
 Areas = namedtuple("Areas", "coordinates geoms")
 Areas = namedtuple("Areas", "coordinates geoms")
@@ -512,13 +512,13 @@ class ExclusionCalculator(object):
                 Patch(ec="k", fc="None", linewidth=3, label=regionLabel),
                 Patch(
                     color=excludedColor,
-                    label=f"{'Ausgeschlossen' if german else 'Excluded'}: %.2f%%" % (100 - p),
+                    label=f"{'Ausgeschlossen' if german else 'Excluded'}: {100 - p:.{2 if 100 - p < 1 else 1}f}%",
                 ),
                 Patch(
                     fc=goodColor,
                     ec="0.5",
                     linewidth=1,
-                    label=f"{'Verfügbar' if german else 'Eligible'}: %.2f%%" % (p),
+                    label=f"{'Verfügbar' if german else 'Eligible'}: {p:.{2 if p < 1 else 1}f}%",
                 ),
             ]
             if s._itemCoords is not None:
@@ -733,10 +733,16 @@ class ExclusionCalculator(object):
         * Units are defined by the srs used to initialize the ExclusionCalculator"""
         return s.region.mask.sum(dtype=np.int64) * s.region.pixelWidth * s.region.pixelHeight / 100
 
-    def _hasEqualContext(self, source, verbose=False):
+    def _hasEqualContext(self, source, source_mask=None, verbose=False):
         """
         Internal function which checks if a given raster source has the same context as
         the ExclusionCalculator. This checks SRS, extent, and pixel resolution
+
+        source : str | gdal.Dataset
+            The raster file or dataset instance which shall be compared to the current EC instance.
+        source_mask : np.array, optional
+            The array loaded from source. Can optionally be provided if a preloaded instance exists
+            to save I/O traffic and time, will else be loaded from source. By default None.
         """
         if not isfile(source) or not gk.util.isRaster(source):
             if verbose:
@@ -758,17 +764,19 @@ class ExclusionCalculator(object):
         # are accepted as long as they are much smaller than the cells
         ri_extent = gk.Extent.fromRaster(source)
         if not (
-            np.isclose(ri_extent.xMin, self.region.extent.xMin, atol=1e-7)
-            and np.isclose(ri_extent.xMax, self.region.extent.xMax, atol=1e-7)
-            and np.isclose(ri_extent.yMin, self.region.extent.yMin, atol=1e-7)
-            and np.isclose(ri_extent.yMax, self.region.extent.yMax, atol=1e-7)
+            np.isclose(ri_extent.xMin, self.region.extent.xMin, atol=1e-7, rtol=0)
+            and np.isclose(ri_extent.xMax, self.region.extent.xMax, atol=1e-7, rtol=0)
+            and np.isclose(ri_extent.yMin, self.region.extent.yMin, atol=1e-7, rtol=0)
+            and np.isclose(ri_extent.yMax, self.region.extent.yMax, atol=1e-7, rtol=0)
         ):
             if verbose:
                 print(f"Extent mismatch! Internal/new: {self.region.extent}, external/old: {ri_extent}")
             return False
 
         # create a mask for source raster based on noData value (set noData to False, all valid values 0-100 to True)
-        source_mask = gk.raster.extractMatrix(source)
+        if source_mask is None:
+            # we need to extract it from source
+            source_mask = gk.raster.extractMatrix(source)
         if source_mask is None:
             # sometimes, saving errors lead to None matrices being reloaded from disk, simply re-calculate
             print("Source matrix was saved to disk empty.")
@@ -782,12 +790,16 @@ class ExclusionCalculator(object):
                 )
             return False
 
-        source_mask[source_mask <= 100] = True
-        source_mask[source_mask == ri.noData] = False
-        # compare the two masks and check if they are alike for all cells
-        if not (source_mask == self.region.mask).all():
+        data = np.asarray(source_mask)
+        valid_mask = np.isfinite(data) & (data >= 0) & (data <= 100)
+        if ri.noData is not None:
+            if np.isnan(ri.noData):
+                valid_mask &= ~np.isnan(data)
+            else:
+                valid_mask &= data != ri.noData
+        if not np.array_equal(valid_mask, self.region.mask):
             if verbose:
-                print("Masks not equal.")
+                glaes_logger.info("Raster masks do not match.")
             return False
 
         if not ri_extent.srs.IsSame(self.srs):
@@ -905,33 +917,72 @@ class ExclusionCalculator(object):
             boolean: If 'recalculate' is True, new (re)calculation is
             required
         """
+        assert intermediate is None or isinstance(intermediate, str), (
+            f"intermediate must be str if not None, here type {type(intermediate)}: {intermediate}"
+        )
         # initiate variable indicating need for recalculation as False
         recalculate = False
         # create a str containing a comparison of all non-matching metadata entries of old and new intermediate
         diff = str()
         # extract metadata information from existing intermediate tif file and drop those arguments that shall not be compared
         metaNotConsidered = ["sourcePath"]
+        # check if the file can be loaded, if so extract equal context info, define flag first
+        equal_context = False
+        metadata_equal = False
+        # first do a file corruption check if applicable
+        corrupted = False  # by default not the case
         if intermediate is not None and isfile(intermediate):
-            # try to load the intermediate file, recalculate if file is corrupted
+            # we have a file, try to load the intermediate file, recalculate if file is corrupted
             try:
-                gk.raster.rasterInfo(intermediate)
-            except:
+                # first just try if we can access the file, super fast but does not detect corrupted raster data
+                raster_info = gk.raster.rasterInfo(intermediate)
+            except Exception as e:
                 glaes_logger.info(
-                    f"Intermediate exclusion file could not be loaded. Recalculating intermediate data: {intermediate}"
+                    f"Intermediate exclusion file could not be read and will be recalculated: "
+                    f"{intermediate}. Error: {e}"
                 )
-                return True
-            meta_intermediate_compare = {
-                k: gk.raster.rasterInfo(intermediate).meta[k]
-                for k in gk.raster.rasterInfo(intermediate).meta
-                if k not in metaNotConsidered
-            }
+                try:
+                    os.remove(intermediate)
+                except OSError:
+                    pass
+                # we have no intermediate file (anymore)
+                corrupted = True
+
+            # if not corrupted, extract the comparison metrics for checks and status logs below
+            meta_intermediate_compare = (
+                {k: raster_info.meta[k] for k in raster_info.meta if k not in metaNotConsidered}
+                if not corrupted
+                else {}
+            )
+            metadata_equal = (
+                meta_intermediate_compare == {k: metadata[k] for k in metadata if k not in metaNotConsidered}
+                if not corrupted
+                else False
+            )
+
+            # do the full equal context check
+            try:
+                if (not corrupted) and metadata_equal:  # corrupted contained in metadata_equal, for readability only
+                    equal_context = s._hasEqualContext(intermediate, verbose=s.verbose)
+            except Exception as e:
+                glaes_logger.info(
+                    f"Intermediate exclusion file could not be read completely and will be recalculated: "
+                    f"{intermediate}. Error: {e}"
+                )
+                try:
+                    os.remove(intermediate)
+                except OSError:
+                    pass
+                # we have no intermediate file (anymore)
+                corrupted = True
 
         # check if we can apply the intermediate file (check all metadata besides sourcePath which is stored only for user information)
         if (
-            intermediate is not None
+            not corrupted  # contained in metadata_equal, for readability only
+            and intermediate is not None
             and isfile(intermediate)
-            and s._hasEqualContext(intermediate, verbose=True)
-            and meta_intermediate_compare == {k: metadata[k] for k in metadata if k not in metaNotConsidered}
+            and equal_context
+            and metadata_equal
         ):
             if s.verbose and intermediate is not None:
                 glaes_logger.info(f"Applying intermediate exclusion file: {intermediate}")
@@ -940,7 +991,7 @@ class ExclusionCalculator(object):
             if intermediate is not None:
                 if s.verbose:
                     glaes_logger.info(f"Computing intermediate exclusion file: {intermediate}")
-                if isfile(intermediate) and s.verbose:
+                if isfile(intermediate) and s.verbose and not corrupted and not metadata_equal:
                     # add all new keys
                     for k in {
                         k: metadata[k] for k in metadata if k not in metaNotConsidered
@@ -960,13 +1011,13 @@ class ExclusionCalculator(object):
                             if k == "source":
                                 diff = (
                                     diff
-                                    + f"\n(SourcePath (not considered in metadata comparison, FYI only): {gk.raster.rasterInfo(intermediate).meta['sourcePath'] if 'sourcePath' in gk.raster.rasterInfo(intermediate).meta.keys() else 'not in old dataset'} / {metadata['sourcePath']}); "
+                                    + f"\n(SourcePath (not considered in metadata comparison, FYI only): {raster_info.meta['sourcePath'] if 'sourcePath' in raster_info.meta.keys() else 'not in old dataset'} / {metadata['sourcePath']}); "
                                 )
                     diff = diff + "\n(old/new intermediate)"
                     glaes_logger.warning(
                         f"Overwriting previous intermediate exclusion file: {intermediate}. The following difference in intermediate metadata was found: {diff})"
                     )
-                recalculate = True
+            recalculate = True
 
         return recalculate
 
@@ -1145,7 +1196,14 @@ class ExclusionCalculator(object):
             indications = np.zeros(s.region.mask.shape)
             data = indications if mode == "include" else 100 - indications
             data = s.region.applyMask(data, 255.0)
-            s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
+            # save via atomic writing, will not create unfinished intermediate files in case of interrupted writing process
+            createRasterAtomic(
+                s.region,
+                output=intermediate,
+                data=data,
+                meta=metadata,
+                noData=255,
+            )
             glaes_logger.info(f"NOTE: Default intermediate was created as {intermediate}.")
         else:
             # Do prewarp, if needed
@@ -1217,7 +1275,14 @@ class ExclusionCalculator(object):
                 # invert indications matrix for intermediate when mode=exclude
                 data = indications if mode == "include" else 100 - indications
                 data = s.region.applyMask(data, 255.0)
-                s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
+                # save via atomic write to avoid unfinished intermediate files when writing is interrupted
+                createRasterAtomic(
+                    s.region,
+                    output=intermediate,
+                    data=data,
+                    meta=metadata,
+                    noData=255,
+                )
 
         # exclude the indicated area from the total availability
         if mode == "exclude":
@@ -1402,7 +1467,14 @@ class ExclusionCalculator(object):
             indications = np.zeros(s.region.mask.shape)
             data = indications if mode == "include" else 100 - indications
             data = s.region.applyMask(data, 255.0)
-            s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
+            # atomic write to avoid unfinished intermediate files when writing is interrupted
+            createRasterAtomic(
+                s.region,
+                output=intermediate,
+                data=data,
+                meta=metadata,
+                noData=255,
+            )
             glaes_logger.info(f"NOTE: Default intermediate was created as {intermediate}.")
         else:
             # (re)calculate the exclusions
@@ -1448,7 +1520,14 @@ class ExclusionCalculator(object):
                 # invert indications matrix for intermediate when mode=exclude
                 data = indications if mode == "include" else 100 - indications
                 data = s.region.applyMask(data, 255.0)
-                s.region.createRaster(output=intermediate, data=data, meta=metadata, noData=255)
+                # atomic write to avoid unfinished intermediate files when writing is interrupted
+                createRasterAtomic(
+                    s.region,
+                    output=intermediate,
+                    data=data,
+                    meta=metadata,
+                    noData=255,
+                )
 
         # exclude the indicated area from the total availability
         if mode == "exclude":
@@ -1482,7 +1561,16 @@ class ExclusionCalculator(object):
             + f"({basename(sourcePath)}/where: {where}/buffer: {buffer if isinstance(buffer, int) else 0}m), "
         )
 
-    def excludePoints(s, source, geometryShape, scale=None, where=None, direction=None, saveToEC=None):
+    def excludePoints(
+        s,
+        source,
+        geometryShape,
+        scale=None,
+        where=None,
+        direction=None,
+        directionConvention="mathematical",
+        saveToEC=None,
+    ):
         """Exclude points with different buffer shapes.
 
         Parameters
@@ -1504,35 +1592,48 @@ class ExclusionCalculator(object):
                 called 'type' and only features with the type "protected" are
                 wanted, the correct statement would be:
                     where="type='protected'", by default None
-        direction : int, optional
-            orientation of the buffer geometry in degrees, by default None
+        direction : str or int, optional
+            scalar orientation of the buffer geometry in degrees or name of the dataframe
+            column that contains the orientation per point, will define the main axis of the exclusion shape,
+            by default None
+        directionConvention : str, optional
+            The definition of the "direction" value, the following options are allowed:
+            - mathematical: Counterclockwise from East = 0°, pointing TO direction (away from (0,0))
+            - meteorological : Clockwise from North = 0°, coming FROM direction (pointing towards the opposite direction)
+            By default "mathematical".
         saveToEC : str, optional
             name for points in ec plot, by default None. The points are only
             saved if a string is passed.
         """
-
-        if isinstance(source, str) or isinstance(source, gdal.Dataset):
+        if isinstance(source, (str, gdal.Dataset)):
             points = gk.vector.extractFeatures(source, where=where)
 
         elif isinstance(source, pd.DataFrame):
-            points = source
             if where is not None:
-                raise GlaesError("Where statement only allowed when " + "gdal.Dataset or shape is provided.")
-        if all([isinstance(i, str) for i in points["scale"]]):
-            try:
-                points["scale"] = [eval(i) for i in points["scale"]]
-            except:
-                raise TypeError("Couldn't convert scale to tuple.")
+                raise GlaesError("Where statement only allowed when gdal.Dataset or shape is provided.")
+            points = source.copy()
+
+        else:
+            raise TypeError("Source must be a file path, gdal.Dataset or DataFrame.")
+
+        # Use the provided scale if the source has no scale column
+        if "scale" not in points.columns:
+            if scale is None:
+                raise GlaesError("Scale has to be defined.")
+            points["scale"] = [scale] * len(points)
+
+        # Convert string representations to tuples if necessary
+        try:
+            points["scale"] = points["scale"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+        except (ValueError, SyntaxError) as e:
+            raise TypeError("Couldn't convert scale to tuple.") from e
+
+        # Validate scale values
+        if not all(isinstance(i, tuple) for i in points["scale"]):
+            raise TypeError("Scale has to be defined as a tuple.")
+
         arr_existing = []
         vec_exclusion = pd.DataFrame(columns=["geom"])
-        if "scale" in points.columns:
-            pass
-        elif scale is not None:
-            points["scale"] = scale
-        else:
-            raise GlaesError("Scale has to be defined.")
-        if not all([isinstance(i, tuple) for i in points["scale"]]):
-            raise TypeError("Scale has to be defined as a tuple.")
 
         def rotate(pts, center, angle):
             def _rotate(pt, angle):
@@ -1561,6 +1662,19 @@ class ExclusionCalculator(object):
                 _direction = direction
             else:
                 raise GlaesError("Direction has to be defined.")
+            # make numerical
+            _direction = float(_direction)
+
+            # now align direction with the expected mathematical convention if needed
+            if directionConvention == "mathematical":
+                # this is the standard polar angle coordinate definition that below algorithm expects
+                pass
+            elif directionConvention == "meteorological":
+                # we first need to convert meteorological North=0° CW definition to "mathematical" polar coordinates (CCW from E=0°)
+                _direction = (270 - _direction) % 360
+            else:
+                raise ValueError(f"Unknown directionConvention={directionConvention}")
+
             coor = gk.srs.xyTransform(
                 np.array([[row["geom"].GetX(), row["geom"].GetY()]]),
                 fromSRS=row["geom"].GetSpatialReference(),
@@ -1826,7 +1940,9 @@ class ExclusionCalculator(object):
 
                         value = value_low, value_high
                     except:
-                        value = float(value)
+                        value = float(row.value)
+                else:
+                    value = float(row.value)
 
                 s.excludePrior(
                     prior=row["name"],
@@ -1955,6 +2071,7 @@ class ExclusionCalculator(object):
         minArea=100000,
         maxAcceptableDistance=None,
         axialDirection=None,
+        axialDirectionConvention="mathematical",
         sepScaling=None,
         _voronoiBoundaryPoints=10,
         _voronoiBoundaryPadding=5,
@@ -1988,6 +2105,12 @@ class ExclusionCalculator(object):
                 - np.ndarray : The directions at each pixel (must match availability matrix shape)
                 - str : A path to a raster file containing axial directions
 
+            axialDirectionConvention : str, optional
+                The definition of the "axialDirection" value, the following options are allowed:
+                - mathematical: Counterclockwise from East = 0°, pointing TO direction (away from (0,0))
+                - meteorological : Clockwise from North = 0°, coming FROM direction (pointing towards the opposite direction)
+                By default "mathematical".
+
             maxAcceptableDistance : A maximum distance to allow between items
                 - Computes a post-placement distance matrix for the located placements
                 - If the placement's nearest neighbor is greater than `maxAcceptableDistance`, then it is removed
@@ -2020,11 +2143,11 @@ class ExclusionCalculator(object):
             if isinstance(separation, tuple) and len(separation) == 2:
                 distance = int((separation[0] + separation[1]) / 2 / 2)
                 print(distance)
-            elif isinstance(separation, int):
+            elif isinstance(separation, (int, float, np.integer, np.floating)):
                 distance = int(separation / 2)
             else:
                 message = (
-                    f"Separation must be either tuple with length 2 or integer, here {type(separation)}: {separation}."
+                    f"Separation must be either tuple with length 2 or numeric, here {type(separation)}: {separation}."
                 )
                 raise ValueError(message)
             # calculate the exclusion indications based on region shape and negative buffer
@@ -2054,12 +2177,22 @@ class ExclusionCalculator(object):
         if axialDirection is not None:
             if isinstance(axialDirection, str):  # Assume a path to a raster file is given
                 axialDirection = s.region.warp(axialDirection, resampleAlg="near")
-            # Assume a path to a raster file is given
+            # Assume direction data is given as an array matching the region mask "chess board"
             elif isinstance(axialDirection, np.ndarray):
                 if not axialDirection.shape == s.region.mask.shape:
                     raise GlaesError("axialDirection matrix does not match context")
-            else:  # axialDirection should be a single value
-                axialDirection = np.radians(float(axialDirection))
+            else:  # axialDirection should be a single degree value
+                axialDirection = float(axialDirection)
+
+            # we now have the axialDirection in degrees in all cases
+            if axialDirectionConvention == "mathematical":
+                # this is the standard polar angle coordinate definition that below algorithm expects
+                pass
+            elif axialDirectionConvention == "meteorological":
+                # we first need to convert meteorological North=0° CW definition to "mathematical" polar coordinates (CCW from E=0°)
+                axialDirection = (270 - axialDirection) % 360
+            else:
+                raise ValueError(f"Unknown axialDirectionConvention={axialDirectionConvention}")
 
             useGradient = True
         else:
@@ -2151,11 +2284,12 @@ class ExclusionCalculator(object):
 
         # start searching
         yN, xN = workingAvailability.shape
-        substeps = np.linspace(-0.5, 0.5, pixelDivision)
-        # add a tiny bit to the left/top edge (so that the point is definitely in the right pixel)
-        substeps[0] += 0.0001
-        # subtract a tiny bit to the right/bottom edge for the same reason
-        substeps[-1] -= 0.0001
+        substeps = np.array([0.0]) if pixelDivision == 1 else np.linspace(-0.5, 0.5, pixelDivision)
+        if pixelDivision > 1:
+            # add a tiny bit to the left/top edge (so that the point is definitely in the right pixel)
+            substeps[0] += 0.0001
+            # subtract a tiny bit to the right/bottom edge for the same reason
+            substeps[-1] -= 0.0001
 
         for yi in range(yN):
             # update the "bottom" value
@@ -2212,9 +2346,11 @@ class ExclusionCalculator(object):
                 # only continue if there are no points in the immediate range of the whole pixel
                 if useGradient:
                     if isinstance(axialDirection, np.ndarray):
-                        grad = np.radians(axialDirection[yi, xi])
+                        grad = axialDirection[yi, xi]
                     else:
                         grad = axialDirection
+                    # Convert centrally to radians
+                    grad = np.radians(grad)
 
                     cG = np.cos(grad)
                     sG = np.sin(grad)
@@ -2233,34 +2369,28 @@ class ExclusionCalculator(object):
                     continue
 
                 # Determine if a placement has been found
-                if pixelDivision == 1:
-                    found = True
-                    xsp = xi
-                    ysp = yi
-                else:
-                    # Start searching in the 'sub pixel'
-                    found = False
-                    for xsp in substeps + xi:
-                        xSubDist = xClip[pir] - xsp
-                        for ysp in substeps + yi:
-                            ySubDist = yClip[pir] - ysp
+                found = False
+                for xsp in substeps + xi:
+                    xSubDist = xClip[pir] - xsp
+                    for ysp in substeps + yi:
+                        ySubDist = yClip[pir] - ysp
 
-                            # Test if any points in the range are overlapping
-                            if useGradient:  # Test if in rotated ellipse
-                                dist = (np.power((xSubDist * cG - ySubDist * sG), 2) / _sepA2) + (
-                                    np.power((xSubDist * sG + ySubDist * cG), 2) / _sepT2
-                                )
-                                overlapping = dist <= 1
+                        # Test if any points in the range are overlapping
+                        if useGradient:  # Test if in rotated ellipse
+                            dist = (np.power((xSubDist * cG - ySubDist * sG), 2) / _sepA2) + (
+                                np.power((xSubDist * sG + ySubDist * cG), 2) / _sepT2
+                            )
+                            overlapping = dist <= 1
 
-                            else:  # test if in circle
-                                overlapping = (np.power(xSubDist, 2) + np.power(ySubDist, 2)) <= _sep2
+                        else:  # test if in circle
+                            overlapping = (np.power(xSubDist, 2) + np.power(ySubDist, 2)) <= _sep2
 
-                            if not overlapping.any():
-                                found = True
-                                break
-
-                        if found:
+                        if not overlapping.any():
+                            found = True
                             break
+
+                    if found:
+                        break
 
                 # Add if found
                 if found:
@@ -2450,13 +2580,14 @@ class ExclusionCalculator(object):
             points = s._itemCoords
         else:
             points = np.array(points)
-            s = points[:, 0] >= s.region.extent.xMin
-            s = s & (points[:, 0] <= s.region.extent.xMax)
-            s = s & (points[:, 1] >= s.region.extent.yMin)
-            s = s & (points[:, 1] <= s.region.extent.yMax)
-
-            if not s.any():
+            # reduce points to only these in the current extent
+            selection = points[:, 0] >= s.region.extent.xMin
+            selection &= points[:, 0] <= s.region.extent.xMax
+            selection &= points[:, 1] >= s.region.extent.yMin
+            selection &= points[:, 1] <= s.region.extent.yMax
+            if not selection.any():
                 raise GlaesError("None of the given points are in the extent")
+            points = points[selection]
 
         # Do Voronoi
         from scipy.spatial import Voronoi
@@ -2493,7 +2624,7 @@ class ExclusionCalculator(object):
 
                 geoms.append(gk.geom.polygon(path, srs=s.region.srs))
 
-            if not len(geoms) == len(s._itemCoords):
+            if not len(geoms) == len(points):
                 raise RuntimeError("Mismatching geometry count")
 
             # Create a list of geometry from each region WITH availability and rasterize

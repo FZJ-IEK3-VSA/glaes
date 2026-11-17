@@ -34,15 +34,12 @@ classifiers = [
 [tool.setuptools.packages.find]
 where = ["."]
 
-#Configureation options
+# Configuration options
 # https://docs.pytest.org/en/7.1.x/reference/reference.html#configuration-options
 [tool.pytest.ini_options]
 testpaths = ["glaes/test"]
 console_output_style = "progress"
 filterwarnings = [
-    "ignore::pyparsing.exceptions.PyparsingDeprecationWarning:matplotlib._fontconfig_pattern",
-    "ignore::pyparsing.exceptions.PyparsingDeprecationWarning:matplotlib._mathtext",
-    "ignore::pyparsing.exceptions.PyparsingDeprecationWarning:pyparsing.util",
     "ignore:This process.*is multi-threaded.*fork:DeprecationWarning:multiprocessing.popen_fork",
 ]
 
