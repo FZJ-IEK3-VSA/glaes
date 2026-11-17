@@ -512,13 +512,13 @@ class ExclusionCalculator(object):
                 Patch(ec="k", fc="None", linewidth=3, label=regionLabel),
                 Patch(
                     color=excludedColor,
-                    label=f"{'Ausgeschlossen' if german else 'Excluded'}: %.2f%%" % (100 - p),
+                    label=f"{'Ausgeschlossen' if german else 'Excluded'}: {100 - p:.{2 if 100 - p < 1 else 1}f}%",
                 ),
                 Patch(
                     fc=goodColor,
                     ec="0.5",
                     linewidth=1,
-                    label=f"{'Verfügbar' if german else 'Eligible'}: %.2f%%" % (p),
+                    label=f"{'Verfügbar' if german else 'Eligible'}: {p:.{2 if p < 1 else 1}f}%",
                 ),
             ]
             if s._itemCoords is not None:
